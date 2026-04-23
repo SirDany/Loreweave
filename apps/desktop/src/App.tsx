@@ -11,12 +11,12 @@ import { ExportDialog } from './views/ExportDialog.js';
 import { ImportDialog } from './views/ImportDialog.js';
 import type { TargetSuggestion } from './views/NewTraceDialog.js';
 import { NewTraceDialog } from './views/NewTraceDialog.js';
-import { TracesList } from './views/TracesList.js';
 import { RenameDialog } from './views/RenameDialog.js';
 import { ResolvedPanel } from './views/ResolvedPanel.js';
 import { SagaPicker } from './views/SagaPicker.js';
 import { SearchPanel } from './views/SearchPanel.js';
 import { ThreadView } from './views/ThreadView.js';
+import { TracesList } from './views/TracesList.js';
 import { UsagesPanel } from './views/UsagesPanel.js';
 import { VersionsPanel } from './views/VersionsPanel.js';
 
@@ -61,6 +61,18 @@ export default function App() {
     name: string;
   } | null>(null);
 
+  // Global Ctrl+P / Ctrl+K opens the search palette.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'p' || e.key === 'k')) {
+        e.preventDefault();
+        setSearching(true);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   if (saga.loading && !saga.data) {
     return <Splash message="Loading Saga…" />;
   }
@@ -80,15 +92,29 @@ export default function App() {
   const visibleEntries = applyLens(data.entries, saga.tomeLens);
   const currentEntry =
     selection?.kind === 'entry'
-      ? data.entries.find((e) => `${e.type}/${e.id}` === selection.key) ?? null
+      ? (data.entries.find((e) => `${e.type}/${e.id}` === selection.key) ??
+        null)
       : null;
   const currentChapter =
     selection?.kind === 'chapter' ? findChapter(data, selection.key) : null;
 
   const errors = data.diagnostics.filter((d) => d.severity === 'error').length;
   const warnings = data.diagnostics.filter(
-    (d) => d.severity === 'warning'
+    (d) => d.severity === 'warning',
   ).length;
+
+  const relatedTraces = currentEntry
+    ? data.traces.filter((n) => {
+        const t = n.target;
+        if (!t) return false;
+        const clean = t.replace(/^@/, '');
+        return clean === `${currentEntry.type}/${currentEntry.id}`;
+      })
+    : [];
+
+  const usagesCount = currentEntry
+    ? countInbound(currentEntry.type, currentEntry.id, data)
+    : 0;
 
   const handleJump = (loc: {
     kind: 'entry' | 'chapter';
@@ -113,31 +139,6 @@ export default function App() {
     setSelection({ kind: 'entry', key: cleaned });
     setSection(entryTypeToSection(cleaned));
   };
-
-  // Global Ctrl+P / Ctrl+K opens the search palette.
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && (e.key === 'p' || e.key === 'k')) {
-        e.preventDefault();
-        setSearching(true);
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, []);
-
-  const relatedTraces = currentEntry
-    ? data.traces.filter((n) => {
-        const t = n.target;
-        if (!t) return false;
-        const clean = t.replace(/^@/, '');
-        return clean === `${currentEntry.type}/${currentEntry.id}`;
-      })
-    : [];
-
-  const usagesCount = currentEntry
-    ? countInbound(currentEntry.type, currentEntry.id, data)
-    : 0;
 
   return (
     <div className="flex h-full font-serif">
@@ -489,10 +490,10 @@ function SectionList({
           e.type === 'lore' ||
           e.type === 'waypoint'
       : section === 'lexicon'
-      ? (e) => e.type === 'term'
-      : section === 'sigils'
-      ? (e) => e.type === 'sigil'
-      : () => false;
+        ? (e) => e.type === 'term'
+        : section === 'sigils'
+          ? (e) => e.type === 'sigil'
+          : () => false;
 
   if (section === 'threads') return null;
   if (section === 'traces') return null;
@@ -814,13 +815,13 @@ function applyLens(entries: DumpEntry[], tome: string | null): DumpEntry[] {
   if (!tome) return entries;
   return entries.filter(
     (e) =>
-      !e.appears_in || e.appears_in.length === 0 || e.appears_in.includes(tome)
+      !e.appears_in || e.appears_in.length === 0 || e.appears_in.includes(tome),
   );
 }
 
 function findChapter(
   data: DumpPayload,
-  key: string
+  key: string,
 ): { tome: string; chapter: DumpChapter } | null {
   const [tomeId, slug] = key.split('::');
   const tome = data.tomes.find((t) => t.id === tomeId);

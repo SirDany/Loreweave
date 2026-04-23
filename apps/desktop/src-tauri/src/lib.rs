@@ -25,18 +25,12 @@ pub struct LwResult {
     code: i32,
 }
 
-/// Locate the CLI bin. Dev layout: `<repo>/packages/cli/dist/bin.js`.
-/// Searches upward from cwd for a directory that contains
-/// `pnpm-workspace.yaml` (the repo root marker).
-fn locate_cli() -> Option<PathBuf> {
+/// Locate the repo root. Searches upward from cwd for `pnpm-workspace.yaml`.
+fn locate_repo_root() -> Option<PathBuf> {
     let mut cur = std::env::current_dir().ok()?;
     for _ in 0..8 {
         if cur.join("pnpm-workspace.yaml").exists() {
-            let cli = cur.join("packages/cli/dist/bin.js");
-            if cli.exists() {
-                return Some(cli);
-            }
-            return None;
+            return Some(cur);
         }
         if !cur.pop() {
             break;
@@ -44,9 +38,21 @@ fn locate_cli() -> Option<PathBuf> {
     }
     None
 }
+fn locate_cli() -> Option<PathBuf> {
+    let repo_root = locate_repo_root()?;
+    let cli = repo_root.join("packages/cli/dist/bin.js");
+    if cli.exists() {
+        Some(cli)
+    } else {
+        None
+    }
+}
 
 #[tauri::command]
 fn lw_invoke(args: Vec<String>) -> Result<LwResult, String> {
+    let repo_root = locate_repo_root().ok_or_else(|| {
+        "could not locate repo root — run from within the Loreweave workspace".to_string()
+    })?;
     let cli = locate_cli().ok_or_else(|| {
         "could not locate packages/cli/dist/bin.js — run `pnpm --filter @loreweave/cli build` first"
             .to_string()
@@ -54,6 +60,7 @@ fn lw_invoke(args: Vec<String>) -> Result<LwResult, String> {
     let output = Command::new("node")
         .arg(cli)
         .args(&args)
+        .current_dir(&repo_root)
         .output()
         .map_err(|e| format!("failed to spawn node: {e}"))?;
     Ok(LwResult {

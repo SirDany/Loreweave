@@ -64,6 +64,8 @@ sagas/<saga>/
 - Optional: `pandoc` on PATH for `lw export --format tome-pdf|tome-docx|tome-epub`
 
 > The workspace is configured for `pnpm` and the root `package.json` specifies `packageManager: "pnpm@9.12.0"`.
+>
+> **Windows note:** If you encounter icon-related build errors, a placeholder `icon.png` has been added to `apps/desktop/src-tauri/icons/`. Replace it with your own app icon for production builds.
 
 ## Getting started
 
