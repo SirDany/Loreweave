@@ -60,12 +60,9 @@ sagas/<saga>/
 - Node.js `>=20.10` (required)
 - `pnpm` `9.12.0` or newer (recommended via `corepack enable` or `npm install -g pnpm`)
 - Git (recommended for Saga versioning and `lw git` commands)
-- Rust / Cargo (required only for Tauri desktop development and builds)
 - Optional: `pandoc` on PATH for `lw export --format tome-pdf|tome-docx|tome-epub`
 
 > The workspace is configured for `pnpm` and the root `package.json` specifies `packageManager: "pnpm@9.12.0"`.
->
-> **Windows note:** If you encounter icon-related build errors, a placeholder `icon.png` has been added to `apps/desktop/src-tauri/icons/`. Replace it with your own app icon for production builds.
 
 ## Getting started
 

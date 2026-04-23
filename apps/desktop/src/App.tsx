@@ -60,6 +60,7 @@ export default function App() {
     id: string;
     name: string;
   } | null>(null);
+  const [storyTab, setStoryTab] = useState<'edit' | 'preview'>('edit');
 
   // Global Ctrl+P / Ctrl+K opens the search palette.
   useEffect(() => {
@@ -112,9 +113,16 @@ export default function App() {
       })
     : [];
 
-  const usagesCount = currentEntry
-    ? countInbound(currentEntry.type, currentEntry.id, data)
-    : 0;
+  const entryMap = new Map(
+    data.entries.map((e) => [`${e.type}/${e.id}`, e.name]),
+  );
+
+  const resolveContent = (content: string) => {
+    return content.replace(/@(\w+)\/(\w+)/g, (match, type, id) => {
+      const key = `${type}/${id}`;
+      return entryMap.get(key) || match;
+    });
+  };
 
   const handleJump = (loc: {
     kind: 'entry' | 'chapter';
@@ -271,13 +279,46 @@ export default function App() {
             key={selection?.key}
           />
         )}
-        {currentChapter && (
+        {currentChapter && section === 'story' && (
+          <div className="flex text-xs border-b border-stone-800">
+            <button
+              onClick={() => setStoryTab('edit')}
+              className={
+                'flex-1 px-3 py-2 uppercase tracking-widest ' +
+                (storyTab === 'edit'
+                  ? 'bg-amber-900/30 text-amber-200 border-b-2 border-amber-500'
+                  : 'text-stone-500 hover:text-stone-300 hover:bg-stone-800/60')
+              }
+            >
+              Edit
+            </button>
+            <button
+              onClick={() => setStoryTab('preview')}
+              className={
+                'flex-1 px-3 py-2 uppercase tracking-widest ' +
+                (storyTab === 'preview'
+                  ? 'bg-amber-900/30 text-amber-200 border-b-2 border-amber-500'
+                  : 'text-stone-500 hover:text-stone-300 hover:bg-stone-800/60')
+              }
+            >
+              Preview
+            </button>
+          </div>
+        )}
+        {currentChapter && section === 'story' && storyTab === 'edit' && (
           <ChapterView
             chapter={currentChapter}
             catalog={catalog}
             sagaPath={saga.sagaPath}
             onSaved={() => void saga.reload()}
             key={selection?.key}
+          />
+        )}
+        {currentChapter && section === 'story' && storyTab === 'preview' && (
+          <ChapterPreview
+            chapter={currentChapter}
+            data={data}
+            onJump={handleJump}
           />
         )}
         {!currentEntry && !currentChapter && section === 'threads' && (
@@ -775,6 +816,60 @@ function Splash({
           Retry
         </button>
       )}
+    </div>
+  );
+}
+
+// ---------- ChapterPreview ----------
+
+function ChapterPreview({
+  chapter,
+  data,
+  onJump,
+}: {
+  chapter: DumpChapter;
+  data: DumpPayload;
+  onJump: (loc: {
+    kind: 'entry' | 'chapter';
+    key: string;
+    line?: number;
+  }) => void;
+}) {
+  const entryMap = new Map(
+    data.entries.map((e) => [`${e.type}/${e.id}`, e.name]),
+  );
+
+  const resolveContent = (content: string) => {
+    return content.replace(/@(\w+)\/(\w+)/g, (match, type, id) => {
+      const key = `${type}/${id}`;
+      const name = entryMap.get(key);
+      if (name) {
+        return `[${name}](entry:${key})`;
+      }
+      return match;
+    });
+  };
+
+  const resolved = resolveContent(chapter.body);
+
+  return (
+    <div className="h-full overflow-auto p-6">
+      <div className="max-w-4xl mx-auto prose prose-invert">
+        <h1>{chapter.title}</h1>
+        <div
+          dangerouslySetInnerHTML={{
+            __html: resolved
+              .split('\n')
+              .map((line) => {
+                if (line.startsWith('#')) {
+                  return `<h2>${line.slice(1).trim()}</h2>`;
+                }
+                return `<p>${line}</p>`;
+              })
+              .join(''),
+          }}
+        />
+      </div>
     </div>
   );
 }

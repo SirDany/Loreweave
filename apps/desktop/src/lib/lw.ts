@@ -1,24 +1,12 @@
 // TS client around the Loreweave CLI.
 //
-// In Tauri: calls the `lw_invoke` Rust command.
 // In plain `vite dev`: POSTs to the `/lw` middleware defined in vite.config.ts.
-// Both return { stdout, stderr, code }.
+// Returns { stdout, stderr, code }.
 
 export interface LwResult {
   stdout: string;
   stderr: string;
   code: number;
-}
-
-declare global {
-  interface Window {
-    __TAURI_INTERNALS__?: unknown;
-  }
-}
-
-async function invokeTauri(args: string[]): Promise<LwResult> {
-  const { invoke } = await import('@tauri-apps/api/core');
-  return invoke<LwResult>('lw_invoke', { args });
 }
 
 async function invokeVite(args: string[]): Promise<LwResult> {
@@ -32,29 +20,14 @@ async function invokeVite(args: string[]): Promise<LwResult> {
 }
 
 export async function lw(args: string[]): Promise<LwResult> {
-  return typeof window !== 'undefined' && window.__TAURI_INTERNALS__
-    ? invokeTauri(args)
-    : invokeVite(args);
+  return invokeVite(args);
 }
 
 export async function lwWrite(
   sagaRoot: string,
   relPath: string,
-  content: string
+  content: string,
 ): Promise<void> {
-  if (typeof window !== 'undefined' && window.__TAURI_INTERNALS__) {
-    const { invoke } = await import('@tauri-apps/api/core');
-    // Tauri needs the absolute saga root; the UI only knows the workspace-
-    // relative path. The backend resolves relative paths against cwd, which
-    // for Tauri dev is the src-tauri folder — so we let the backend handle
-    // absolute paths and pass through whatever the caller provides.
-    await invoke<void>('lw_write', {
-      sagaRoot,
-      relPath,
-      content,
-    });
-    return;
-  }
   const res = await fetch('/lw/write', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -76,7 +49,7 @@ async function lwJson<T>(args: string[]): Promise<T> {
     throw new Error(
       `lw ${args.join(' ')} returned invalid JSON: ${
         (e as Error).message
-      }\nstdout:\n${r.stdout}\nstderr:\n${r.stderr}`
+      }\nstdout:\n${r.stdout}\nstderr:\n${r.stderr}`,
     );
   }
 }
@@ -218,14 +191,14 @@ export function dump(saga: string, tome?: string): Promise<DumpPayload> {
 export function resolveEntry(
   saga: string,
   type: EntryType,
-  id: string
+  id: string,
 ): Promise<ResolvedView> {
   return lwJson<ResolvedView>(['resolve', saga, `${type}/${id}`, '--json']);
 }
 
 export function validate(
   saga: string,
-  tome?: string
+  tome?: string,
 ): Promise<{ diagnostics: Diagnostic[] }> {
   const args = ['validate', saga, '--json'];
   if (tome) args.push('--tome', tome);
@@ -235,7 +208,7 @@ export function validate(
 export function threadOf(
   saga: string,
   threadId: string,
-  opts: { withBranches?: boolean; tome?: string } = {}
+  opts: { withBranches?: boolean; tome?: string } = {},
 ): Promise<{
   waypoints: Array<Waypoint & { order: number }>;
   issues: Array<{ kind: string; message: string }>;
@@ -317,7 +290,7 @@ export function gitLog(saga: string, limit = 30): Promise<GitLogEntry[]> {
 export async function gitCommit(
   saga: string,
   message: string,
-  all = true
+  all = true,
 ): Promise<{ sha: string; subject: string }> {
   const args = ['git', 'commit', saga, '--message', message, '--json'];
   if (all) args.push('--all');
@@ -327,7 +300,7 @@ export async function gitCommit(
 export async function gitCheckout(
   saga: string,
   branch: string,
-  create = false
+  create = false,
 ): Promise<void> {
   const args = ['git', 'checkout', saga, '--branch', branch];
   if (create) args.push('--all');
@@ -347,7 +320,7 @@ export function gitRemotes(saga: string): Promise<GitRemote[]> {
 export async function gitRemoteAdd(
   saga: string,
   name: string,
-  url: string
+  url: string,
 ): Promise<void> {
   const r = await lw([
     'git',
@@ -363,7 +336,7 @@ export async function gitRemoteAdd(
 
 export async function gitRemoteRemove(
   saga: string,
-  name: string
+  name: string,
 ): Promise<void> {
   const r = await lw(['git', 'remote-remove', saga, '--remote', name]);
   if (r.code !== 0) throw new Error(r.stderr || 'remote remove failed');
@@ -371,7 +344,7 @@ export async function gitRemoteRemove(
 
 export async function gitFetch(
   saga: string,
-  remote?: string
+  remote?: string,
 ): Promise<{ output: string }> {
   const args = ['git', 'fetch', saga, '--json'];
   if (remote) args.push('--remote', remote);
@@ -381,7 +354,7 @@ export async function gitFetch(
 export async function gitPull(
   saga: string,
   remote?: string,
-  branch?: string
+  branch?: string,
 ): Promise<{ output: string }> {
   const args = ['git', 'pull', saga, '--json'];
   if (remote) args.push('--remote', remote);
@@ -393,7 +366,7 @@ export async function gitPush(
   saga: string,
   remote?: string,
   branch?: string,
-  setUpstream = false
+  setUpstream = false,
 ): Promise<{ output: string }> {
   const args = ['git', 'push', saga, '--json'];
   if (remote) args.push('--remote', remote);
@@ -405,7 +378,7 @@ export async function gitPush(
 export async function gitDiff(
   saga: string,
   file?: string,
-  staged = false
+  staged = false,
 ): Promise<GitDiff> {
   const args = ['git', 'diff', saga, '--json'];
   if (file) args.push('--file', file);
@@ -494,7 +467,7 @@ export interface BackupResult {
 
 export function runBackup(
   saga: string,
-  opts: { label?: string; keep?: number; out?: string } = {}
+  opts: { label?: string; keep?: number; out?: string } = {},
 ): Promise<BackupResult> {
   const args = ['backup', saga, '--json'];
   if (opts.label) args.push('--label', opts.label);
@@ -519,7 +492,7 @@ export interface ImportPlan {
 
 export function importPlan(
   zipPath: string,
-  into = 'sagas'
+  into = 'sagas',
 ): Promise<ImportPlan> {
   return lwJson<ImportPlan>([
     'import',
@@ -542,7 +515,7 @@ export interface ImportApplyResult {
 export function importApply(
   zipPath: string,
   into = 'sagas',
-  resolve: 'overwrite' | 'keep' = 'keep'
+  resolve: 'overwrite' | 'keep' = 'keep',
 ): Promise<ImportApplyResult> {
   return lwJson<ImportApplyResult>([
     'import',
@@ -571,7 +544,7 @@ export interface RenamePlanSummary {
 export function renamePlan(
   saga: string,
   fromRef: string,
-  toRef: string
+  toRef: string,
 ): Promise<RenamePlanSummary> {
   return lwJson<RenamePlanSummary>(['rename', saga, fromRef, toRef, '--json']);
 }
@@ -579,7 +552,7 @@ export function renamePlan(
 export async function renameApply(
   saga: string,
   fromRef: string,
-  toRef: string
+  toRef: string,
 ): Promise<void> {
   const r = await lw(['rename', saga, fromRef, toRef, '--apply']);
   if (r.code !== 0) throw new Error(r.stderr || 'rename failed');
@@ -624,7 +597,7 @@ export function restorePlan(zip: string, saga?: string): Promise<RestorePlan> {
 export function restoreApply(
   zip: string,
   saga?: string,
-  noPreBackup = false
+  noPreBackup = false,
 ): Promise<RestorePlan> {
   const args = ['restore', zip, '--apply', '--json'];
   if (saga) args.push('--saga', saga);
@@ -660,7 +633,7 @@ export function search(
     type?: string;
     case?: boolean;
     limit?: number;
-  } = {}
+  } = {},
 ): Promise<SearchResult> {
   const args = ['search', saga, query, '--json'];
   if (opts.scope) args.push('--scope', opts.scope);
@@ -682,7 +655,7 @@ export interface EntryDiffResult {
 export function entryDiff(
   saga: string,
   ref: string,
-  staged = false
+  staged = false,
 ): Promise<EntryDiffResult> {
   const args = ['entry-diff', saga, ref, '--json'];
   if (staged) args.push('--staged');

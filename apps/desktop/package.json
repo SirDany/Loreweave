@@ -9,10 +9,7 @@
     "typecheck": "tsc -b --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "preview": "vite preview",
-    "tauri": "tauri",
-    "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build"
+    "preview": "vite preview"
   },
   "dependencies": {
     "@codemirror/autocomplete": "6.18.0",
@@ -22,14 +19,16 @@
     "@codemirror/state": "6.4.1",
     "@codemirror/view": "6.34.1",
     "@loreweave/core": "workspace:*",
-    "@tauri-apps/api": "2.0.1",
     "codemirror": "6.0.1",
+    "class-variance-authority": "^0.7.0",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.439.0",
     "react": "18.3.1",
     "react-dom": "18.3.1",
+    "tailwind-merge": "^2.5.2",
     "yaml": "2.5.1"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "2.0.1",
     "@types/react": "18.3.5",
     "@types/react-dom": "18.3.0",
     "@vitejs/plugin-react": "4.3.1",
