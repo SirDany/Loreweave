@@ -118,15 +118,6 @@ export default defineConfig({
       '@': path.resolve(HERE, './src'),
     },
   },
-});
-
-export default defineConfig({
-  plugins: [react(), lwSidecar()],
-  clearScreen: false,
-  server: {
-    port: 5173,
-    strictPort: true,
-  },
   build: {
     target: 'es2022',
     sourcemap: true,

@@ -1,4 +1,11 @@
 import { useEffect, useState } from 'react';
+import { Input } from './components/ui/input.js';
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from './components/ui/tabs.js';
 import { Editor } from './editor/Editor.js';
 import type { RefCatalog } from './editor/ReferenceExtension.js';
 import type { DumpChapter, DumpEntry, DumpPayload } from './lib/lw.js';
@@ -91,6 +98,40 @@ export default function App() {
   const data = saga.data;
   const catalog = buildCatalog(data);
   const visibleEntries = applyLens(data.entries, saga.tomeLens);
+
+  const REF_RE = /@([a-zA-Z]+)\/([a-zA-Z0-9\-_]+)/g;
+
+  function getUsagesCount(entry: DumpEntry, data: DumpPayload): number {
+    const sources = [
+      ...data.entries.map((e) => ({
+        key: `${e.type}/${e.id}`,
+        kind: 'entry' as const,
+        label: e.name,
+        body: e.body,
+      })),
+      ...data.tomes.flatMap((t) =>
+        t.chapters.map((c) => ({
+          key: `${t.id}::${c.slug}`,
+          kind: 'chapter' as const,
+          label: c.title,
+          body: c.body,
+        })),
+      ),
+    ];
+    const needle = `${entry.type}/${entry.id}`;
+    let count = 0;
+    for (const src of sources) {
+      for (const line of src.body.split('\n')) {
+        for (const m of line.matchAll(REF_RE)) {
+          if (`${m[1]}/${m[2]}` === needle) {
+            count++;
+          }
+        }
+      }
+    }
+    return count;
+  }
+
   const currentEntry =
     selection?.kind === 'entry'
       ? (data.entries.find((e) => `${e.type}/${e.id}` === selection.key) ??
@@ -98,6 +139,8 @@ export default function App() {
       : null;
   const currentChapter =
     selection?.kind === 'chapter' ? findChapter(data, selection.key) : null;
+
+  const usagesCount = currentEntry ? getUsagesCount(currentEntry, data) : 0;
 
   const errors = data.diagnostics.filter((d) => d.severity === 'error').length;
   const warnings = data.diagnostics.filter(
@@ -486,6 +529,9 @@ function SectionList({
   onSelect: (s: Selection) => void;
   onRename: (entry: DumpEntry) => void;
 }) {
+  const [search, setSearch] = useState('');
+  const [activeTab, setActiveTab] = useState('character');
+
   if (section === 'story') {
     return (
       <ul className="space-y-2 text-sm">
@@ -522,19 +568,86 @@ function SectionList({
     );
   }
 
+  if (section === 'codex') {
+    const types = [
+      'character',
+      'location',
+      'concept',
+      'lore',
+      'waypoint',
+    ] as const;
+    const filteredItems = (type: string) =>
+      visibleEntries
+        .filter((e) => e.type === type)
+        .filter((e) => e.name.toLowerCase().includes(search.toLowerCase()));
+
+    return (
+      <div className="space-y-4">
+        <Input
+          placeholder="Search entries..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="grid w-full grid-cols-5">
+            {types.map((type) => (
+              <TabsTrigger key={type} value={type}>
+                {type}s ({filteredItems(type).length})
+              </TabsTrigger>
+            ))}
+          </TabsList>
+          {types.map((type) => (
+            <TabsContent key={type} value={type}>
+              <ul className="space-y-0.5 text-sm">
+                {filteredItems(type).length === 0 && (
+                  <li className="text-stone-500 text-xs italic">
+                    nothing to show
+                  </li>
+                )}
+                {filteredItems(type).map((e) => {
+                  const key = `${e.type}/${e.id}`;
+                  const sel =
+                    selection?.kind === 'entry' && selection.key === key;
+                  return (
+                    <li key={key}>
+                      <button
+                        onClick={() => onSelect({ kind: 'entry', key })}
+                        onContextMenu={(ev) => {
+                          ev.preventDefault();
+                          onRename(e);
+                        }}
+                        title="Right-click to rename"
+                        className={
+                          'w-full text-left px-2 py-1 rounded flex items-center justify-between gap-2 ' +
+                          (sel
+                            ? 'bg-amber-800/40 text-amber-100'
+                            : 'hover:bg-stone-800')
+                        }
+                      >
+                        <span>{e.name}</span>
+                        {e.appears_in && e.appears_in.length > 0 && (
+                          <span className="text-[10px] text-amber-400/80">
+                            {e.appears_in.join(',')}
+                          </span>
+                        )}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </TabsContent>
+          ))}
+        </Tabs>
+      </div>
+    );
+  }
+
   const filter: (e: DumpEntry) => boolean =
-    section === 'codex'
-      ? (e) =>
-          e.type === 'character' ||
-          e.type === 'location' ||
-          e.type === 'concept' ||
-          e.type === 'lore' ||
-          e.type === 'waypoint'
-      : section === 'lexicon'
-        ? (e) => e.type === 'term'
-        : section === 'sigils'
-          ? (e) => e.type === 'sigil'
-          : () => false;
+    section === 'lexicon'
+      ? (e) => e.type === 'term'
+      : section === 'sigils'
+        ? (e) => e.type === 'sigil'
+        : () => false;
 
   if (section === 'threads') return null;
   if (section === 'traces') return null;
@@ -591,12 +704,52 @@ function EntryView({
 }) {
   const [editing, setEditing] = useState(false);
   const [renaming, setRenaming] = useState(false);
+  const [draft, setDraft] = useState(entry.body);
+  const [saving, setSaving] = useState(false);
+  const [status, setStatus] = useState<string | null>(null);
+  const dirty = draft !== entry.body;
+
+  const save = async () => {
+    setSaving(true);
+    setStatus(null);
+    try {
+      await lwWrite(sagaPath, entry.relPath, draft);
+      setStatus('saved');
+      onSaved();
+    } catch (e) {
+      setStatus('error: ' + (e as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       <header className="px-6 py-3 border-b border-stone-800 flex items-start gap-4">
         <div className="flex-1 min-w-0">
           <div className="text-xs text-stone-500 truncate">{entry.relPath}</div>
           <div className="text-lg">{entry.name}</div>
+        </div>
+        <div className="flex items-center gap-2 text-xs">
+          {status && (
+            <span
+              className={
+                status.startsWith('error')
+                  ? 'text-rose-400'
+                  : 'text-emerald-400'
+              }
+            >
+              {status}
+            </span>
+          )}
+          {dirty && <span className="text-amber-400">• unsaved</span>}
+          <button
+            onClick={save}
+            disabled={!dirty || saving}
+            className="px-3 py-1 rounded border border-stone-700 text-stone-200 hover:bg-stone-800 disabled:opacity-50"
+          >
+            {saving ? 'Saving...' : 'Save'}
+          </button>
         </div>
         <button
           onClick={() => setRenaming(true)}
@@ -612,7 +765,7 @@ function EntryView({
         </button>
       </header>
       <div className="flex-1 overflow-hidden">
-        <Editor value={entry.body} catalog={catalog} readOnly />
+        <Editor value={draft} catalog={catalog} onChange={setDraft} />
       </div>
       {editing && (
         <EntryEditor
