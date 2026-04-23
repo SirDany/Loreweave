@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { entryDiff } from "../lib/lw.js";
 import type { DumpEntry } from "../lib/lw.js";
+import { entryDiff } from "../lib/lw.js";
 
 type Tab = "resolved" | "usages" | "traces" | "diff";
 
@@ -81,7 +81,6 @@ export function ResolvedPanel({
             appears in: {entry.appears_in.join(", ")}
           </div>
         )}
-      </div>
       <nav className="flex text-xs border-b border-stone-800">
         <TabButton
           active={tab === "resolved"}
