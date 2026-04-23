@@ -17,14 +17,14 @@ declare global {
 }
 
 async function invokeTauri(args: string[]): Promise<LwResult> {
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke<LwResult>("lw_invoke", { args });
+  const { invoke } = await import('@tauri-apps/api/core');
+  return invoke<LwResult>('lw_invoke', { args });
 }
 
 async function invokeVite(args: string[]): Promise<LwResult> {
-  const res = await fetch("/lw", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
+  const res = await fetch('/lw', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ args }),
   });
   if (!res.ok) throw new Error(`/lw ${res.status}: ${await res.text()}`);
@@ -32,7 +32,7 @@ async function invokeVite(args: string[]): Promise<LwResult> {
 }
 
 export async function lw(args: string[]): Promise<LwResult> {
-  return typeof window !== "undefined" && window.__TAURI_INTERNALS__
+  return typeof window !== 'undefined' && window.__TAURI_INTERNALS__
     ? invokeTauri(args)
     : invokeVite(args);
 }
@@ -40,24 +40,24 @@ export async function lw(args: string[]): Promise<LwResult> {
 export async function lwWrite(
   sagaRoot: string,
   relPath: string,
-  content: string,
+  content: string
 ): Promise<void> {
-  if (typeof window !== "undefined" && window.__TAURI_INTERNALS__) {
-    const { invoke } = await import("@tauri-apps/api/core");
+  if (typeof window !== 'undefined' && window.__TAURI_INTERNALS__) {
+    const { invoke } = await import('@tauri-apps/api/core');
     // Tauri needs the absolute saga root; the UI only knows the workspace-
     // relative path. The backend resolves relative paths against cwd, which
     // for Tauri dev is the src-tauri folder — so we let the backend handle
     // absolute paths and pass through whatever the caller provides.
-    await invoke<void>("lw_write", {
+    await invoke<void>('lw_write', {
       sagaRoot,
       relPath,
       content,
     });
     return;
   }
-  const res = await fetch("/lw/write", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
+  const res = await fetch('/lw/write', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ sagaRoot, relPath, content }),
   });
   if (!res.ok) {
@@ -68,13 +68,15 @@ export async function lwWrite(
 async function lwJson<T>(args: string[]): Promise<T> {
   const r = await lw(args);
   if (r.code !== 0 && !r.stdout) {
-    throw new Error(r.stderr || `lw ${args.join(" ")} failed (code ${r.code})`);
+    throw new Error(r.stderr || `lw ${args.join(' ')} failed (code ${r.code})`);
   }
   try {
     return JSON.parse(r.stdout) as T;
   } catch (e) {
     throw new Error(
-      `lw ${args.join(" ")} returned invalid JSON: ${(e as Error).message}\nstdout:\n${r.stdout}\nstderr:\n${r.stderr}`,
+      `lw ${args.join(' ')} returned invalid JSON: ${
+        (e as Error).message
+      }\nstdout:\n${r.stdout}\nstderr:\n${r.stderr}`
     );
   }
 }
@@ -82,13 +84,13 @@ async function lwJson<T>(args: string[]): Promise<T> {
 // ---------- typed payloads ----------
 
 export type EntryType =
-  | "character"
-  | "location"
-  | "concept"
-  | "lore"
-  | "waypoint"
-  | "term"
-  | "sigil";
+  | 'character'
+  | 'location'
+  | 'concept'
+  | 'lore'
+  | 'waypoint'
+  | 'term'
+  | 'sigil';
 
 export interface DumpEntry {
   type: EntryType;
@@ -98,7 +100,7 @@ export interface DumpEntry {
   tags: string[];
   inherits: string[];
   appears_in: string[] | null;
-  status: "draft" | "canon" | null;
+  status: 'draft' | 'canon' | null;
   aliases: string[];
   body: string;
   frontmatter: Record<string, unknown>;
@@ -114,7 +116,13 @@ export interface DumpChapter {
   relPath: string;
   body: string;
   meta: Record<string, unknown>;
-  refs: Array<{ type: EntryType; id: string; line: number; column: number; raw: string }>;
+  refs: Array<{
+    type: EntryType;
+    id: string;
+    line: number;
+    column: number;
+    raw: string;
+  }>;
 }
 
 export interface DumpTome {
@@ -145,31 +153,31 @@ export interface Thread {
 
 export interface CalendarSpec {
   id: string;
-  kind: "gregorian" | "numeric";
+  kind: 'gregorian' | 'numeric';
   epoch?: string;
   label?: string;
 }
 
 export interface Diagnostic {
-  severity: "error" | "warning";
+  severity: 'error' | 'warning';
   code: string;
   message: string;
   file?: string;
   line?: number;
 }
 
-export type NoteKind = "idea" | "todo" | "remark" | "question" | "done";
-export type NoteStatus = "open" | "resolved" | "archived";
+export type TraceKind = 'idea' | 'todo' | 'remark' | 'question' | 'done';
+export type TraceStatus = 'open' | 'resolved' | 'archived';
 
-export interface Note {
+export interface Trace {
   id: string;
-  kind: NoteKind;
+  kind: TraceKind;
   target: string | null;
   author: string | null;
   created: string | null;
   updated: string | null;
   tags: string[];
-  status: NoteStatus;
+  status: TraceStatus;
   body: string;
   relPath: string;
 }
@@ -186,7 +194,7 @@ export interface DumpPayload {
   tomes: DumpTome[];
   threads: Thread[];
   calendars: CalendarSpec[];
-  notes: Note[];
+  traces: Trace[];
   diagnostics: Diagnostic[];
 }
 
@@ -202,39 +210,39 @@ export interface ResolvedView {
 // ---------- command wrappers ----------
 
 export function dump(saga: string, tome?: string): Promise<DumpPayload> {
-  const args = ["dump", saga];
-  if (tome) args.push("--tome", tome);
+  const args = ['dump', saga];
+  if (tome) args.push('--tome', tome);
   return lwJson<DumpPayload>(args);
 }
 
 export function resolveEntry(
   saga: string,
   type: EntryType,
-  id: string,
+  id: string
 ): Promise<ResolvedView> {
-  return lwJson<ResolvedView>(["resolve", saga, `${type}/${id}`, "--json"]);
+  return lwJson<ResolvedView>(['resolve', saga, `${type}/${id}`, '--json']);
 }
 
 export function validate(
   saga: string,
-  tome?: string,
+  tome?: string
 ): Promise<{ diagnostics: Diagnostic[] }> {
-  const args = ["validate", saga, "--json"];
-  if (tome) args.push("--tome", tome);
+  const args = ['validate', saga, '--json'];
+  if (tome) args.push('--tome', tome);
   return lwJson<{ diagnostics: Diagnostic[] }>(args);
 }
 
 export function threadOf(
   saga: string,
   threadId: string,
-  opts: { withBranches?: boolean; tome?: string } = {},
+  opts: { withBranches?: boolean; tome?: string } = {}
 ): Promise<{
   waypoints: Array<Waypoint & { order: number }>;
   issues: Array<{ kind: string; message: string }>;
 }> {
-  const args = ["thread", saga, threadId, "--linear", "--json"];
-  if (opts.withBranches) args.push("--with-branches");
-  if (opts.tome) args.push("--tome", opts.tome);
+  const args = ['thread', saga, threadId, '--linear', '--json'];
+  if (opts.withBranches) args.push('--with-branches');
+  if (opts.tome) args.push('--tome', opts.tome);
   return lwJson(args);
 }
 
@@ -247,7 +255,12 @@ export interface GitStatus {
   ahead: number;
   behind: number;
   upstream: string | null;
-  files: Array<{ path: string; index: string; worktree: string; conflict: boolean }>;
+  files: Array<{
+    path: string;
+    index: string;
+    worktree: string;
+    conflict: boolean;
+  }>;
   clean: boolean;
   hasConflicts: boolean;
   inMerge: boolean;
@@ -281,87 +294,98 @@ export interface GitDiff {
 }
 
 export function gitStatus(saga: string): Promise<GitStatus> {
-  return lwJson<GitStatus>(["git", "status", saga, "--json"]);
+  return lwJson<GitStatus>(['git', 'status', saga, '--json']);
 }
 
 export function gitBranches(saga: string, all = false): Promise<GitBranch[]> {
-  const args = ["git", "branches", saga, "--json"];
-  if (all) args.push("--all");
+  const args = ['git', 'branches', saga, '--json'];
+  if (all) args.push('--all');
   return lwJson<GitBranch[]>(args);
 }
 
 export function gitLog(saga: string, limit = 30): Promise<GitLogEntry[]> {
   return lwJson<GitLogEntry[]>([
-    "git",
-    "log",
+    'git',
+    'log',
     saga,
-    "--limit",
+    '--limit',
     String(limit),
-    "--json",
+    '--json',
   ]);
 }
 
 export async function gitCommit(
   saga: string,
   message: string,
-  all = true,
+  all = true
 ): Promise<{ sha: string; subject: string }> {
-  const args = ["git", "commit", saga, "--message", message, "--json"];
-  if (all) args.push("--all");
+  const args = ['git', 'commit', saga, '--message', message, '--json'];
+  if (all) args.push('--all');
   return lwJson<{ sha: string; subject: string }>(args);
 }
 
 export async function gitCheckout(
   saga: string,
   branch: string,
-  create = false,
+  create = false
 ): Promise<void> {
-  const args = ["git", "checkout", saga, "--branch", branch];
-  if (create) args.push("--all");
+  const args = ['git', 'checkout', saga, '--branch', branch];
+  if (create) args.push('--all');
   const r = await lw(args);
   if (r.code !== 0) throw new Error(r.stderr || `checkout failed`);
 }
 
 export async function gitInit(saga: string): Promise<void> {
-  const r = await lw(["git", "init", saga]);
-  if (r.code !== 0) throw new Error(r.stderr || "git init failed");
+  const r = await lw(['git', 'init', saga]);
+  if (r.code !== 0) throw new Error(r.stderr || 'git init failed');
 }
 
 export function gitRemotes(saga: string): Promise<GitRemote[]> {
-  return lwJson<GitRemote[]>(["git", "remotes", saga, "--json"]);
+  return lwJson<GitRemote[]>(['git', 'remotes', saga, '--json']);
 }
 
 export async function gitRemoteAdd(
   saga: string,
   name: string,
-  url: string,
+  url: string
 ): Promise<void> {
-  const r = await lw(["git", "remote-add", saga, "--remote", name, "--url", url]);
-  if (r.code !== 0) throw new Error(r.stderr || "remote add failed");
+  const r = await lw([
+    'git',
+    'remote-add',
+    saga,
+    '--remote',
+    name,
+    '--url',
+    url,
+  ]);
+  if (r.code !== 0) throw new Error(r.stderr || 'remote add failed');
 }
 
-export async function gitRemoteRemove(saga: string, name: string): Promise<void> {
-  const r = await lw(["git", "remote-remove", saga, "--remote", name]);
-  if (r.code !== 0) throw new Error(r.stderr || "remote remove failed");
+export async function gitRemoteRemove(
+  saga: string,
+  name: string
+): Promise<void> {
+  const r = await lw(['git', 'remote-remove', saga, '--remote', name]);
+  if (r.code !== 0) throw new Error(r.stderr || 'remote remove failed');
 }
 
 export async function gitFetch(
   saga: string,
-  remote?: string,
+  remote?: string
 ): Promise<{ output: string }> {
-  const args = ["git", "fetch", saga, "--json"];
-  if (remote) args.push("--remote", remote);
+  const args = ['git', 'fetch', saga, '--json'];
+  if (remote) args.push('--remote', remote);
   return lwJson<{ output: string }>(args);
 }
 
 export async function gitPull(
   saga: string,
   remote?: string,
-  branch?: string,
+  branch?: string
 ): Promise<{ output: string }> {
-  const args = ["git", "pull", saga, "--json"];
-  if (remote) args.push("--remote", remote);
-  if (branch) args.push("--branch", branch);
+  const args = ['git', 'pull', saga, '--json'];
+  if (remote) args.push('--remote', remote);
+  if (branch) args.push('--branch', branch);
   return lwJson<{ output: string }>(args);
 }
 
@@ -369,34 +393,34 @@ export async function gitPush(
   saga: string,
   remote?: string,
   branch?: string,
-  setUpstream = false,
+  setUpstream = false
 ): Promise<{ output: string }> {
-  const args = ["git", "push", saga, "--json"];
-  if (remote) args.push("--remote", remote);
-  if (branch) args.push("--branch", branch);
-  if (setUpstream) args.push("--all");
+  const args = ['git', 'push', saga, '--json'];
+  if (remote) args.push('--remote', remote);
+  if (branch) args.push('--branch', branch);
+  if (setUpstream) args.push('--all');
   return lwJson<{ output: string }>(args);
 }
 
 export async function gitDiff(
   saga: string,
   file?: string,
-  staged = false,
+  staged = false
 ): Promise<GitDiff> {
-  const args = ["git", "diff", saga, "--json"];
-  if (file) args.push("--file", file);
-  if (staged) args.push("--staged");
+  const args = ['git', 'diff', saga, '--json'];
+  if (file) args.push('--file', file);
+  if (staged) args.push('--staged');
   return lwJson<GitDiff>(args);
 }
 
 export async function gitMergeAbort(saga: string): Promise<void> {
-  const r = await lw(["git", "merge-abort", saga]);
-  if (r.code !== 0) throw new Error(r.stderr || "merge --abort failed");
+  const r = await lw(['git', 'merge-abort', saga]);
+  if (r.code !== 0) throw new Error(r.stderr || 'merge --abort failed');
 }
 
 export async function gitMergeContinue(saga: string): Promise<void> {
-  const r = await lw(["git", "merge-continue", saga]);
-  if (r.code !== 0) throw new Error(r.stderr || "merge --continue failed");
+  const r = await lw(['git', 'merge-continue', saga]);
+  if (r.code !== 0) throw new Error(r.stderr || 'merge --continue failed');
 }
 
 // ---------- saga discovery ----------
@@ -407,24 +431,24 @@ export interface DiscoveredSaga {
   title: string | null;
 }
 
-export function listSagas(root = "sagas"): Promise<DiscoveredSaga[]> {
-  return lwJson<DiscoveredSaga[]>(["list-sagas", root, "--json"]);
+export function listSagas(root = 'sagas'): Promise<DiscoveredSaga[]> {
+  return lwJson<DiscoveredSaga[]>(['list-sagas', root, '--json']);
 }
 
 // ---------- export / import / backup ----------
 
 export type ExportFormat =
-  | "saga"
-  | "saga-json"
-  | "tome-md"
-  | "tome-html"
-  | "tome-pdf"
-  | "tome-docx"
-  | "tome-epub"
-  | "chapter-md"
-  | "codex-md"
-  | "codex-html"
-  | "slang-md";
+  | 'saga'
+  | 'saga-json'
+  | 'tome-md'
+  | 'tome-html'
+  | 'tome-pdf'
+  | 'tome-docx'
+  | 'tome-epub'
+  | 'chapter-md'
+  | 'codex-md'
+  | 'codex-html'
+  | 'slang-md';
 
 export interface ExportRequest {
   saga: string;
@@ -435,11 +459,12 @@ export interface ExportRequest {
 }
 
 export async function runExport(req: ExportRequest): Promise<string> {
-  const args = ["export", req.saga, "--format", req.format, "--out", req.out];
-  if (req.tome) args.push("--tome", req.tome);
-  if (req.chapter) args.push("--chapter", req.chapter);
+  const args = ['export', req.saga, '--format', req.format, '--out', req.out];
+  if (req.tome) args.push('--tome', req.tome);
+  if (req.chapter) args.push('--chapter', req.chapter);
   const r = await lw(args);
-  if (r.code !== 0) throw new Error(r.stderr || `export failed (code ${r.code})`);
+  if (r.code !== 0)
+    throw new Error(r.stderr || `export failed (code ${r.code})`);
   return r.stdout.trim();
 }
 
@@ -451,7 +476,14 @@ export interface SagaZipPlan {
 }
 
 export function exportPlan(saga: string): Promise<SagaZipPlan> {
-  return lwJson<SagaZipPlan>(["export", saga, "--format", "saga", "--plan", "--json"]);
+  return lwJson<SagaZipPlan>([
+    'export',
+    saga,
+    '--format',
+    'saga',
+    '--plan',
+    '--json',
+  ]);
 }
 
 export interface BackupResult {
@@ -462,12 +494,12 @@ export interface BackupResult {
 
 export function runBackup(
   saga: string,
-  opts: { label?: string; keep?: number; out?: string } = {},
+  opts: { label?: string; keep?: number; out?: string } = {}
 ): Promise<BackupResult> {
-  const args = ["backup", saga, "--json"];
-  if (opts.label) args.push("--label", opts.label);
-  if (typeof opts.keep === "number") args.push("--keep", String(opts.keep));
-  if (opts.out) args.push("--out", opts.out);
+  const args = ['backup', saga, '--json'];
+  if (opts.label) args.push('--label', opts.label);
+  if (typeof opts.keep === 'number') args.push('--keep', String(opts.keep));
+  if (opts.out) args.push('--out', opts.out);
   return lwJson<BackupResult>(args);
 }
 
@@ -487,36 +519,39 @@ export interface ImportPlan {
 
 export function importPlan(
   zipPath: string,
-  into = "sagas",
+  into = 'sagas'
 ): Promise<ImportPlan> {
   return lwJson<ImportPlan>([
-    "import",
+    'import',
     zipPath,
-    "--into",
+    '--into',
     into,
-    "--plan",
-    "--json",
+    '--plan',
+    '--json',
   ]);
 }
 
 export interface ImportApplyResult {
   plan: ImportPlan;
-  actions: Array<{ relPath: string; action: "created" | "overwritten" | "kept" }>;
+  actions: Array<{
+    relPath: string;
+    action: 'created' | 'overwritten' | 'kept';
+  }>;
 }
 
 export function importApply(
   zipPath: string,
-  into = "sagas",
-  resolve: "overwrite" | "keep" = "keep",
+  into = 'sagas',
+  resolve: 'overwrite' | 'keep' = 'keep'
 ): Promise<ImportApplyResult> {
   return lwJson<ImportApplyResult>([
-    "import",
+    'import',
     zipPath,
-    "--into",
+    '--into',
     into,
-    "--resolve",
+    '--resolve',
     resolve,
-    "--json",
+    '--json',
   ]);
 }
 
@@ -536,24 +571,18 @@ export interface RenamePlanSummary {
 export function renamePlan(
   saga: string,
   fromRef: string,
-  toRef: string,
+  toRef: string
 ): Promise<RenamePlanSummary> {
-  return lwJson<RenamePlanSummary>([
-    "rename",
-    saga,
-    fromRef,
-    toRef,
-    "--json",
-  ]);
+  return lwJson<RenamePlanSummary>(['rename', saga, fromRef, toRef, '--json']);
 }
 
 export async function renameApply(
   saga: string,
   fromRef: string,
-  toRef: string,
+  toRef: string
 ): Promise<void> {
-  const r = await lw(["rename", saga, fromRef, toRef, "--apply"]);
-  if (r.code !== 0) throw new Error(r.stderr || "rename failed");
+  const r = await lw(['rename', saga, fromRef, toRef, '--apply']);
+  if (r.code !== 0) throw new Error(r.stderr || 'rename failed');
 }
 
 // ---------- backup-list / restore ----------
@@ -572,7 +601,7 @@ export interface BackupListResult {
 }
 
 export function listBackups(saga: string): Promise<BackupListResult> {
-  return lwJson<BackupListResult>(["backup-list", saga, "--json"]);
+  return lwJson<BackupListResult>(['backup-list', saga, '--json']);
 }
 
 export interface RestorePlan {
@@ -586,32 +615,29 @@ export interface RestorePlan {
   removedFiles?: string[];
 }
 
-export function restorePlan(
-  zip: string,
-  saga?: string,
-): Promise<RestorePlan> {
-  const args = ["restore", zip, "--json"];
-  if (saga) args.push("--saga", saga);
+export function restorePlan(zip: string, saga?: string): Promise<RestorePlan> {
+  const args = ['restore', zip, '--json'];
+  if (saga) args.push('--saga', saga);
   return lwJson<RestorePlan>(args);
 }
 
 export function restoreApply(
   zip: string,
   saga?: string,
-  noPreBackup = false,
+  noPreBackup = false
 ): Promise<RestorePlan> {
-  const args = ["restore", zip, "--apply", "--json"];
-  if (saga) args.push("--saga", saga);
-  if (noPreBackup) args.push("--no-pre-backup");
+  const args = ['restore', zip, '--apply', '--json'];
+  if (saga) args.push('--saga', saga);
+  if (noPreBackup) args.push('--no-pre-backup');
   return lwJson<RestorePlan>(args);
 }
 
 // ---------- search ----------
 
-export type SearchScope = "all" | "entries" | "prose" | "echoes";
+export type SearchScope = 'all' | 'entries' | 'prose' | 'echoes';
 
 export interface SearchHit {
-  kind: "entry" | "prose" | "echo";
+  kind: 'entry' | 'prose' | 'echo';
   file: string;
   line: number;
   column: number;
@@ -629,13 +655,18 @@ export interface SearchResult {
 export function search(
   saga: string,
   query: string,
-  opts: { scope?: SearchScope; type?: string; case?: boolean; limit?: number } = {},
+  opts: {
+    scope?: SearchScope;
+    type?: string;
+    case?: boolean;
+    limit?: number;
+  } = {}
 ): Promise<SearchResult> {
-  const args = ["search", saga, query, "--json"];
-  if (opts.scope) args.push("--scope", opts.scope);
-  if (opts.type) args.push("--type", opts.type);
-  if (opts.case) args.push("--case");
-  if (typeof opts.limit === "number") args.push("--limit", String(opts.limit));
+  const args = ['search', saga, query, '--json'];
+  if (opts.scope) args.push('--scope', opts.scope);
+  if (opts.type) args.push('--type', opts.type);
+  if (opts.case) args.push('--case');
+  if (typeof opts.limit === 'number') args.push('--limit', String(opts.limit));
   return lwJson<SearchResult>(args);
 }
 
@@ -651,9 +682,9 @@ export interface EntryDiffResult {
 export function entryDiff(
   saga: string,
   ref: string,
-  staged = false,
+  staged = false
 ): Promise<EntryDiffResult> {
-  const args = ["entry-diff", saga, ref, "--json"];
-  if (staged) args.push("--staged");
+  const args = ['entry-diff', saga, ref, '--json'];
+  if (staged) args.push('--staged');
   return lwJson<EntryDiffResult>(args);
 }

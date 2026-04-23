@@ -12,7 +12,7 @@ sagas/<saga-slug>/
 ├─ sigils/                          # Sigils (tags), including slang-groups
 ├─ calendars/                       # optional in-world calendars
 ├─ threads/                         # Threads (timelines)
-├─ notes/                           # Notes (ideas, todos, remarks)
+├─ traces/                          # Traces (ideas, todos, remarks)
 └─ tomes/<tome-slug>/               # one book
    ├─ tome.yaml                     # Tome manifest
    └─ story/NN-<chapter-slug>/      # chapter folder
@@ -28,19 +28,21 @@ A **Saga** is one unified canon. Tomes hold **only prose**. There is no Tome-loc
 ## 2. Manifests
 
 ### `saga.yaml`
+
 ```yaml
 id: <kebab-case>
-title: "<string>"
-default_calendar: gregorian   # optional
+title: '<string>'
+default_calendar: gregorian # optional
 tome_order: [book-one, book-two]
 ```
 
 ### `tome.yaml`
+
 ```yaml
 id: <kebab-case>
-title: "<string>"
-default_thread: main          # optional
-strict_slang: false            # optional; if true, slang misuse = error
+title: '<string>'
+default_thread: main # optional
+strict_slang: false # optional; if true, slang misuse = error
 ```
 
 ## 3. Entries (Codex / Lexicon / Sigils)
@@ -48,44 +50,47 @@ strict_slang: false            # optional; if true, slang misuse = error
 Every entry is a markdown file with YAML frontmatter. The filename stem **must equal `id`** (e.g. `aaron.md` → `id: aaron`).
 
 ### Common fields
-| Field | Required | Notes |
-|---|---|---|
-| `id` | yes | kebab-case, unique per type |
-| `type` | yes | `character | location | concept | lore | waypoint | term | sigil` |
-| `name` | recommended | Human-readable label |
-| `aliases` | no | Additional names |
-| `tags` | no | Sigil ids this entry is labelled with |
-| `inherits` | no | Sigil ids whose `properties` merge into this entry |
-| `overrides` | no | Map of properties that **always** beat inherited and own values |
-| `properties` | no | Free-form entry properties (own) |
-| `appears_in` | no | Tome slugs; omit = present across the whole Saga |
-| `status` | no | `draft | canon` |
-| `speaks` | character | Sigil ids (kind: slang-group) the character speaks |
-| `spoken_here` | location | Sigil ids (kind: slang-group) spoken there |
+
+| Field         | Required    | Notes                                                           |
+| ------------- | ----------- | --------------------------------------------------------------- | -------- | ------- | ---- | -------- | ---- | ------ |
+| `id`          | yes         | kebab-case, unique per type                                     |
+| `type`        | yes         | `character                                                      | location | concept | lore | waypoint | term | sigil` |
+| `name`        | recommended | Human-readable label                                            |
+| `aliases`     | no          | Additional names                                                |
+| `tags`        | no          | Sigil ids this entry is labelled with                           |
+| `inherits`    | no          | Sigil ids whose `properties` merge into this entry              |
+| `overrides`   | no          | Map of properties that **always** beat inherited and own values |
+| `properties`  | no          | Free-form entry properties (own)                                |
+| `appears_in`  | no          | Tome slugs; omit = present across the whole Saga                |
+| `status`      | no          | `draft                                                          | canon`   |
+| `speaks`      | character   | Sigil ids (kind: slang-group) the character speaks              |
+| `spoken_here` | location    | Sigil ids (kind: slang-group) spoken there                      |
 
 Legacy `type: event` and `type: tag` are auto-normalized to `waypoint` / `sigil` at load time.
 
 ### `type: term` (Lexicon)
+
 ```yaml
 id: grukh
 type: term
-term: "grukh"
-language: "Northern"            # optional
-slang_of: northern-slang        # optional; Sigil id with kind: slang-group
-pronunciation: "/ɡruːx/"
-aliases: ["gruk"]
-examples: ["...", "..."]
-definition: "bitter cold"
+term: 'grukh'
+language: 'Northern' # optional
+slang_of: northern-slang # optional; Sigil id with kind: slang-group
+pronunciation: '/ɡruːx/'
+aliases: ['gruk']
+examples: ['...', '...']
+definition: 'bitter cold'
 ```
 
 ### `type: sigil` (Sigil)
+
 ```yaml
 id: northern-slang
 type: sigil
-name: "Northern Slang"
-kind: slang-group               # or `group`, `faction`, etc.
-description: "..."
-properties: { ... }             # merged into any entry that `inherits` this Sigil
+name: 'Northern Slang'
+kind: slang-group # or `group`, `faction`, etc.
+description: '...'
+properties: { ... } # merged into any entry that `inherits` this Sigil
 ```
 
 ## 4. Weave (resolution: inherits / overrides)
@@ -115,6 +120,7 @@ In prose, frontmatter strings, and chapter bodies, Echo other entries as:
 Legacy `@event/` and `@tag/` prefixes are accepted and normalized.
 
 Rules:
+
 - Always use the **entry `type`**, not the folder name (`@character/aaron`, not `@characters/aaron`).
 - Echoes are machine-checked; the validator errors on broken refs.
 - Echoes are preserved verbatim during edits — don't flatten them to plain text.
@@ -131,22 +137,23 @@ Files live in `threads/<id>.yaml`:
 
 ```yaml
 id: main
-calendar: gregorian            # optional; references calendars/<id>.yaml or builtin "gregorian"
-branches_from:                  # optional; makes this a branch of another Thread
+calendar: gregorian # optional; references calendars/<id>.yaml or builtin "gregorian"
+branches_from: # optional; makes this a branch of another Thread
   thread: main
   at_waypoint: wp-battle
 waypoints:
   - id: wp-battle
-    event: "@waypoint/battle-of-vellmar"
-    at: "1212-04-05"           # absolute date in the Thread's calendar (optional)
-    before: [other-wp-id]       # relational constraints (optional)
-    after:  [other-wp-id]
+    event: '@waypoint/battle-of-vellmar'
+    at: '1212-04-05' # absolute date in the Thread's calendar (optional)
+    before: [other-wp-id] # relational constraints (optional)
+    after: [other-wp-id]
     concurrent: [other-wp-id]
-    appears_in: [book-one]      # Tome lens (optional)
-    label: "Day of the fall"
+    appears_in: [book-one] # Tome lens (optional)
+    label: 'Day of the fall'
 ```
 
 Rules:
+
 - A Waypoint placement may have **any combination** of `at`, `before`, `after`, `concurrent`.
 - A contradiction between absolute dates and relational edges is an error.
 - Cycles in before/after are errors.
@@ -157,9 +164,9 @@ Rules:
 Files live in `calendars/<id>.yaml`:
 
 ```yaml
-id: gregorian          # note: "gregorian" is also a built-in — a file is optional
-kind: gregorian        # gregorian | numeric
-label: "..."           # optional
+id: gregorian # note: "gregorian" is also a built-in — a file is optional
+kind: gregorian # gregorian | numeric
+label: '...' # optional
 ```
 
 - `gregorian` accepts ISO-8601 date strings (`YYYY-MM-DD`).
@@ -171,14 +178,14 @@ label: "..."           # optional
 `tomes/<slug>/story/NN-<chapter>/chapter.md` is the prose. Alongside it sits `_meta.yaml`:
 
 ```yaml
-title: "..."
+title: '...'
 ordinal: 1
 status: draft
-pov: ["@character/bella"]
-voice: "<tone note>"
+pov: ['@character/bella']
+voice: '<tone note>'
 tense: past
-summary: "<one-paragraph>"
-linked_events: ["@waypoint/battle-of-vellmar"]
+summary: '<one-paragraph>'
+linked_events: ['@waypoint/battle-of-vellmar']
 ```
 
 ## 10. Slang groups

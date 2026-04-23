@@ -5,7 +5,7 @@ import {
   loadSaga,
   resolve,
   validateSaga,
-} from "@loreweave/core";
+} from '@loreweave/core';
 
 /**
  * Dump the entire Saga as one JSON blob so the desktop UI can load it in a
@@ -13,7 +13,7 @@ import {
  */
 export async function dumpCmd(
   saga: string,
-  opts: { tome?: string },
+  opts: { tome?: string }
 ): Promise<void> {
   const loaded = await loadSaga(saga);
   const idx = buildEntryIndex(loaded.entries);
@@ -55,7 +55,7 @@ export async function dumpCmd(
 
   const diagnostics = validateSaga(loaded, { tome: opts.tome ?? null });
 
-  const notes = loaded.notes.map((n) => ({
+  const traces = loaded.traces.map((n) => ({
     id: n.frontmatter.id,
     kind: n.frontmatter.kind,
     target: n.frontmatter.target ?? null,
@@ -80,7 +80,7 @@ export async function dumpCmd(
     tomes,
     threads: loaded.threads,
     calendars: [BUILTIN_GREGORIAN, ...loaded.calendars],
-    notes,
+    traces,
     diagnostics,
   };
 

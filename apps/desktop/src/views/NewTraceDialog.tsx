@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import type { NoteKind } from "../lib/lw.js";
+import type { TraceKind } from "../lib/lw.js";
 import { lwWrite } from "../lib/lw.js";
 import { filterTargets, slugify } from "../lib/helpers.js";
 
@@ -22,20 +22,20 @@ interface Props {
   onCreated: () => void;
 }
 
-const KINDS: NoteKind[] = ["idea", "todo", "remark", "question", "done"];
+const KINDS: TraceKind[] = ["idea", "todo", "remark", "question", "done"];
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
 /**
- * Minimal sticky-note creation dialog. Writes `<saga>/notes/<id>.md` via the
+ * Minimal sticky-trace creation dialog. Writes `<saga>/traces/<id>.md` via the
  * existing lw_write plumbing, then tells the parent to reload the Saga so the
- * new note appears in the list.
+ * new trace appears in the list.
  */
-export function NewNoteDialog({ sagaPath, initialTarget, suggestions, onClose, onCreated }: Props) {
+export function NewTraceDialog({ sagaPath, initialTarget, suggestions, onClose, onCreated }: Props) {
   const [title, setTitle] = useState("");
-  const [kind, setKind] = useState<NoteKind>("remark");
+  const [kind, setKind] = useState<TraceKind>("remark");
   const [target, setTarget] = useState(initialTarget ?? "");
   const [body, setBody] = useState("");
   const [saving, setSaving] = useState(false);
@@ -75,7 +75,7 @@ export function NewNoteDialog({ sagaPath, initialTarget, suggestions, onClose, o
         body.trim() || "_(no body yet)_",
         "",
       ].join("\n");
-      await lwWrite(sagaPath, `notes/${id}.md`, content);
+      await lwWrite(sagaPath, `traces/${id}.md`, content);
       onCreated();
       onClose();
     } catch (e) {
@@ -95,7 +95,7 @@ export function NewNoteDialog({ sagaPath, initialTarget, suggestions, onClose, o
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between">
-          <h2 className="text-base">New note</h2>
+          <h2 className="text-base">New trace</h2>
           <button
             onClick={onClose}
             className="text-xs text-stone-500 hover:text-stone-200"
@@ -126,7 +126,7 @@ export function NewNoteDialog({ sagaPath, initialTarget, suggestions, onClose, o
             <span className="text-stone-400">kind</span>
             <select
               value={kind}
-              onChange={(e) => setKind(e.target.value as NoteKind)}
+              onChange={(e) => setKind(e.target.value as TraceKind)}
               className="mt-1 w-full bg-stone-950 border border-stone-700 rounded px-2 py-1 text-sm"
             >
               {KINDS.map((k) => (
@@ -210,7 +210,7 @@ export function NewNoteDialog({ sagaPath, initialTarget, suggestions, onClose, o
                 : "bg-stone-800 text-stone-500 cursor-not-allowed")
             }
           >
-            {saving ? "Saving…" : "Create note"}
+            {saving ? "Saving…" : "Create trace"}
           </button>
         </div>
       </div>

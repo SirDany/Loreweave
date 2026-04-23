@@ -23,9 +23,9 @@ Legacy names (`wiki/`, `glossary/`, `tags/`, `timelines/`, `type: event`, `type:
 
 1. **Never invent canon the writer didn't ask for.** Propose, question, sketch — don't silently commit new facts (names, places, events, traits, dates) to the Codex or prose.
 2. **Check the Codex before writing.** Before drafting prose or suggesting continuation, read the relevant `codex/` entries and weave them (follow `inherits` / `overrides`). Use `lw weave <saga> <type>/<id>` when in doubt.
-3. **Keep the Codex up to date.** When new canon is established in conversation or prose, update the matching Codex entry *in the same turn*. If an entry doesn't exist, create it.
+3. **Keep the Codex up to date.** When new canon is established in conversation or prose, update the matching Codex entry _in the same turn_. If an entry doesn't exist, create it.
 4. **Ambiguity → ask.** If the request conflicts with canon, is under-specified, or could drift the voice/continuity, stop and ask a focused question before proceeding.
-5. **One unified canon per Saga.** All `codex/`, `lexicon/`, `sigils/`, `threads/`, `calendars/`, `notes/` live at the Saga root. Tomes contain only prose. If a character or Waypoint is only relevant to one Tome, express that via `appears_in: [<tome-slug>]` — **never** by duplicating entries.
+5. **One unified canon per Saga.** All `codex/`, `lexicon/`, `sigils/`, `threads/`, `calendars/`, `traces/` live at the Saga root. Tomes contain only prose. If a character or Waypoint is only relevant to one Tome, express that via `appears_in: [<tome-slug>]` — **never** by duplicating entries.
 
 ## Data model cheat sheet
 

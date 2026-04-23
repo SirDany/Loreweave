@@ -2,14 +2,14 @@ import { useEffect, useState, type ReactNode } from "react";
 import { entryDiff } from "../lib/lw.js";
 import type { DumpEntry } from "../lib/lw.js";
 
-type Tab = "resolved" | "usages" | "notes" | "diff";
+type Tab = "resolved" | "usages" | "traces" | "diff";
 
 interface Props {
   entry: DumpEntry | null;
   sagaPath?: string;
   usagesContent?: ReactNode;
-  notesContent?: ReactNode;
-  notesCount?: number;
+  tracesContent?: ReactNode;
+  tracesCount?: number;
   usagesCount?: number;
 }
 
@@ -54,22 +54,21 @@ export function ResolvedPanel({
   entry,
   sagaPath,
   usagesContent,
-  notesContent,
-  notesCount = 0,
+  tracesContent,
+  tracesCount = 0,
   usagesCount = 0,
 }: Props) {
   const [tab, setTab] = useState<Tab>("resolved");
   if (!entry) {
     return (
       <aside className="w-80 bg-stone-900/60 border-l border-stone-800 p-4 text-stone-500 text-sm">
-        Select an entry to see its Weave, Echoes, and Notes.
+        Select an entry to see its Weave, Echoes, and Traces.
       </aside>
     );
   }
   const keys = Object.keys(entry.properties).sort();
   return (
     <aside className="w-80 bg-stone-900/60 border-l border-stone-800 flex flex-col">
-      <div className="p-4 border-b border-stone-800">
         <div className="text-xs uppercase tracking-widest text-stone-500">
           {entry.type}
         </div>
@@ -95,9 +94,9 @@ export function ResolvedPanel({
           label={`Echoes${usagesCount ? ` (${usagesCount})` : ""}`}
         />
         <TabButton
-          active={tab === "notes"}
-          onClick={() => setTab("notes")}
-          label={`Notes${notesCount ? ` (${notesCount})` : ""}`}
+          active={tab === "traces"}
+          onClick={() => setTab("traces")}
+          label={`Traces${tracesCount ? ` (${tracesCount})` : ""}`}
         />
         <TabButton
           active={tab === "diff"}
@@ -112,8 +111,8 @@ export function ResolvedPanel({
         {tab === "usages" && (
           <div>{usagesContent ?? <div className="text-xs text-stone-500 italic">no data</div>}</div>
         )}
-        {tab === "notes" && (
-          <div>{notesContent ?? <div className="text-xs text-stone-500 italic">no notes</div>}</div>
+        {tab === "traces" && (
+          <div>{tracesContent ?? <div className="text-xs text-stone-500 italic">no traces</div>}</div>
         )}
         {tab === "diff" && (
           <DiffTab entry={entry} sagaPath={sagaPath} />

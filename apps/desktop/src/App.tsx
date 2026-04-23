@@ -1,50 +1,54 @@
-import { useEffect, useState } from "react";
-import { useSaga } from "./state/useSaga.js";
-import { Editor } from "./editor/Editor.js";
-import { ResolvedPanel } from "./views/ResolvedPanel.js";
-import { ThreadView } from "./views/ThreadView.js";
-import { NotesList } from "./views/NotesList.js";
-import { UsagesPanel } from "./views/UsagesPanel.js";
-import { NewNoteDialog } from "./views/NewNoteDialog.js";
-import type { TargetSuggestion } from "./views/NewNoteDialog.js";
-import { EntryEditor } from "./views/EntryEditor.js";
-import { VersionsPanel } from "./views/VersionsPanel.js";
-import { RenameDialog } from "./views/RenameDialog.js";
-import { ConstellationView } from "./views/ConstellationView.js";
-import { SagaPicker } from "./views/SagaPicker.js";
-import { ExportDialog } from "./views/ExportDialog.js";
-import { ImportDialog } from "./views/ImportDialog.js";
-import { SearchPanel } from "./views/SearchPanel.js";
-import { BackupsDialog } from "./views/BackupsDialog.js";
-import { lwWrite } from "./lib/lw.js";
-import type {
-  DumpChapter,
-  DumpEntry,
-  DumpPayload,
-} from "./lib/lw.js";
-import type { RefCatalog } from "./editor/ReferenceExtension.js";
+import { useEffect, useState } from 'react';
+import { Editor } from './editor/Editor.js';
+import type { RefCatalog } from './editor/ReferenceExtension.js';
+import type { DumpChapter, DumpEntry, DumpPayload } from './lib/lw.js';
+import { lwWrite } from './lib/lw.js';
+import { useSaga } from './state/useSaga.js';
+import { BackupsDialog } from './views/BackupsDialog.js';
+import { ConstellationView } from './views/ConstellationView.js';
+import { EntryEditor } from './views/EntryEditor.js';
+import { ExportDialog } from './views/ExportDialog.js';
+import { ImportDialog } from './views/ImportDialog.js';
+import type { TargetSuggestion } from './views/NewTraceDialog.js';
+import { NewTraceDialog } from './views/NewTraceDialog.js';
+import { TracesList } from './views/TracesList.js';
+import { RenameDialog } from './views/RenameDialog.js';
+import { ResolvedPanel } from './views/ResolvedPanel.js';
+import { SagaPicker } from './views/SagaPicker.js';
+import { SearchPanel } from './views/SearchPanel.js';
+import { ThreadView } from './views/ThreadView.js';
+import { UsagesPanel } from './views/UsagesPanel.js';
+import { VersionsPanel } from './views/VersionsPanel.js';
 
-type Section = "story" | "codex" | "lexicon" | "sigils" | "threads" | "notes" | "constellation" | "versions";
+type Section =
+  | 'story'
+  | 'codex'
+  | 'lexicon'
+  | 'sigils'
+  | 'threads'
+  | 'traces'
+  | 'constellation'
+  | 'versions';
 
 interface Selection {
-  kind: "entry" | "chapter";
+  kind: 'entry' | 'chapter';
   key: string;
 }
 
 const SECTIONS: { id: Section; label: string; hint: string }[] = [
-  { id: "story", label: "Story", hint: "prose" },
-  { id: "codex", label: "Codex", hint: "characters, locations, lore" },
-  { id: "lexicon", label: "Lexicon", hint: "terms & slang" },
-  { id: "sigils", label: "Sigils", hint: "tags & groups" },
-  { id: "threads", label: "Threads", hint: "timelines & waypoints" },
-  { id: "notes", label: "Notes", hint: "ideas & todos" },
-  { id: "constellation", label: "Constellation", hint: "graph of echoes" },
-  { id: "versions", label: "Versions", hint: "git: branches & commits" },
+  { id: 'story', label: 'Story', hint: 'prose' },
+  { id: 'codex', label: 'Codex', hint: 'characters, locations, lore' },
+  { id: 'lexicon', label: 'Lexicon', hint: 'terms & slang' },
+  { id: 'sigils', label: 'Sigils', hint: 'tags & groups' },
+  { id: 'threads', label: 'Threads', hint: 'timelines & waypoints' },
+  { id: 'traces', label: 'Traces', hint: 'ideas & todos' },
+  { id: 'constellation', label: 'Constellation', hint: 'graph of echoes' },
+  { id: 'versions', label: 'Versions', hint: 'git: branches & commits' },
 ];
 
 export default function App() {
   const saga = useSaga();
-  const [section, setSection] = useState<Section>("codex");
+  const [section, setSection] = useState<Section>('codex');
   const [selection, setSelection] = useState<Selection | null>(null);
   const [pickingSaga, setPickingSaga] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -52,7 +56,7 @@ export default function App() {
   const [searching, setSearching] = useState(false);
   const [showingBackups, setShowingBackups] = useState(false);
   const [pendingRename, setPendingRename] = useState<{
-    type: DumpEntry["type"];
+    type: DumpEntry['type'];
     id: string;
     name: string;
   } | null>(null);
@@ -75,58 +79,58 @@ export default function App() {
   const catalog = buildCatalog(data);
   const visibleEntries = applyLens(data.entries, saga.tomeLens);
   const currentEntry =
-    selection?.kind === "entry"
+    selection?.kind === 'entry'
       ? data.entries.find((e) => `${e.type}/${e.id}` === selection.key) ?? null
       : null;
   const currentChapter =
-    selection?.kind === "chapter"
-      ? findChapter(data, selection.key)
-      : null;
+    selection?.kind === 'chapter' ? findChapter(data, selection.key) : null;
 
-  const errors = data.diagnostics.filter((d) => d.severity === "error").length;
-  const warnings = data.diagnostics.filter((d) => d.severity === "warning").length;
+  const errors = data.diagnostics.filter((d) => d.severity === 'error').length;
+  const warnings = data.diagnostics.filter(
+    (d) => d.severity === 'warning'
+  ).length;
 
   const handleJump = (loc: {
-    kind: "entry" | "chapter";
+    kind: 'entry' | 'chapter';
     key: string;
     line?: number;
   }) => {
     setSelection({ kind: loc.kind, key: loc.key });
-    if (loc.kind === "chapter") setSection("story");
+    if (loc.kind === 'chapter') setSection('story');
     else setSection(entryTypeToSection(loc.key));
   };
 
   const handleJumpToTarget = (target: string) => {
-    if (target.startsWith("chapter:")) {
-      const key = target.slice("chapter:".length).replace("/", "::");
-      setSelection({ kind: "chapter", key });
-      setSection("story");
+    if (target.startsWith('chapter:')) {
+      const key = target.slice('chapter:'.length).replace('/', '::');
+      setSelection({ kind: 'chapter', key });
+      setSection('story');
       return;
     }
-    if (target.startsWith("tome:")) return;
-    if (target === "saga") return;
-    const cleaned = target.replace(/^@/, "");
-    setSelection({ kind: "entry", key: cleaned });
+    if (target.startsWith('tome:')) return;
+    if (target === 'saga') return;
+    const cleaned = target.replace(/^@/, '');
+    setSelection({ kind: 'entry', key: cleaned });
     setSection(entryTypeToSection(cleaned));
   };
 
   // Global Ctrl+P / Ctrl+K opens the search palette.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && (e.key === "p" || e.key === "k")) {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'p' || e.key === 'k')) {
         e.preventDefault();
         setSearching(true);
       }
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  const relatedNotes = currentEntry
-    ? data.notes.filter((n) => {
+  const relatedTraces = currentEntry
+    ? data.traces.filter((n) => {
         const t = n.target;
         if (!t) return false;
-        const clean = t.replace(/^@/, "");
+        const clean = t.replace(/^@/, '');
         return clean === `${currentEntry.type}/${currentEntry.id}`;
       })
     : [];
@@ -201,18 +205,18 @@ export default function App() {
         </div>
         <div className="mt-auto text-xs">
           <div className="text-stone-500 uppercase tracking-widest">Status</div>
-          <div className={errors ? "text-rose-400" : "text-emerald-400"}>
-            {errors} error{errors !== 1 ? "s" : ""}
+          <div className={errors ? 'text-rose-400' : 'text-emerald-400'}>
+            {errors} error{errors !== 1 ? 's' : ''}
           </div>
-          <div className={warnings ? "text-amber-400" : "text-stone-500"}>
-            {warnings} warning{warnings !== 1 ? "s" : ""}
+          <div className={warnings ? 'text-amber-400' : 'text-stone-500'}>
+            {warnings} warning{warnings !== 1 ? 's' : ''}
           </div>
           <button
             className="mt-2 text-xs px-2 py-1 rounded border border-stone-700 hover:bg-stone-800"
             onClick={() => void saga.reload()}
             disabled={saga.loading}
           >
-            {saga.loading ? "Reloading…" : "Reload"}
+            {saga.loading ? 'Reloading…' : 'Reload'}
           </button>
         </div>
       </aside>
@@ -227,10 +231,10 @@ export default function App() {
             <li key={s.id}>
               <button
                 className={
-                  "w-full text-left px-2 py-1 rounded " +
+                  'w-full text-left px-2 py-1 rounded ' +
                   (section === s.id
-                    ? "bg-amber-800/40 text-amber-100"
-                    : "hover:bg-stone-800")
+                    ? 'bg-amber-800/40 text-amber-100'
+                    : 'hover:bg-stone-800')
                 }
                 onClick={() => setSection(s.id)}
               >
@@ -248,7 +252,9 @@ export default function App() {
             visibleEntries={visibleEntries}
             selection={selection}
             onSelect={setSelection}
-            onRename={(e) => setPendingRename({ type: e.type, id: e.id, name: e.name })}
+            onRename={(e) =>
+              setPendingRename({ type: e.type, id: e.id, name: e.name })
+            }
           />
         </div>
       </nav>
@@ -273,31 +279,36 @@ export default function App() {
             key={selection?.key}
           />
         )}
-        {!currentEntry && !currentChapter && section === "threads" && (
-          <ThreadView data={data} sagaPath={saga.sagaPath} tomeLens={saga.tomeLens} />
+        {!currentEntry && !currentChapter && section === 'threads' && (
+          <ThreadView
+            data={data}
+            sagaPath={saga.sagaPath}
+            tomeLens={saga.tomeLens}
+          />
         )}
-        {!currentEntry && !currentChapter && section === "notes" && (
-          <NotesView
+        {!currentEntry && !currentChapter && section === 'traces' && (
+          <TracesView
             data={data}
             sagaPath={saga.sagaPath}
             onJump={handleJump}
             onReload={() => void saga.reload()}
           />
         )}
-        {!currentEntry && !currentChapter && section === "versions" && (
+        {!currentEntry && !currentChapter && section === 'versions' && (
           <VersionsPanel
             sagaPath={saga.sagaPath}
             onChanged={() => void saga.reload()}
           />
         )}
-        {!currentEntry && !currentChapter && section === "constellation" && (
+        {!currentEntry && !currentChapter && section === 'constellation' && (
           <ConstellationView data={data} onJump={handleJump} />
         )}
-        {!currentEntry && !currentChapter &&
-          section !== "threads" &&
-          section !== "notes" &&
-          section !== "versions" &&
-          section !== "constellation" && (
+        {!currentEntry &&
+          !currentChapter &&
+          section !== 'threads' &&
+          section !== 'traces' &&
+          section !== 'versions' &&
+          section !== 'constellation' && (
             <EmptyState section={section} diagnostics={data.diagnostics} />
           )}
       </main>
@@ -306,16 +317,16 @@ export default function App() {
         entry={currentEntry}
         sagaPath={saga.sagaPath}
         usagesCount={usagesCount}
-        notesCount={relatedNotes.length}
+        tracesCount={relatedTraces.length}
         usagesContent={
           currentEntry && (
             <UsagesPanel entry={currentEntry} data={data} onJump={handleJump} />
           )
         }
-        notesContent={
+        tracesContent={
           currentEntry && (
-            <NotesList
-              notes={relatedNotes}
+            <TracesList
+              traces={relatedTraces}
               onJump={(t) => handleJumpToTarget(t)}
             />
           )
@@ -408,8 +419,8 @@ function TomeItem({
       <button
         onClick={onClick}
         className={
-          "w-full text-left text-sm px-2 py-1 rounded " +
-          (active ? "bg-amber-800/40 text-amber-100" : "hover:bg-stone-800")
+          'w-full text-left text-sm px-2 py-1 rounded ' +
+          (active ? 'bg-amber-800/40 text-amber-100' : 'hover:bg-stone-800')
         }
       >
         {label}
@@ -433,7 +444,7 @@ function SectionList({
   onSelect: (s: Selection) => void;
   onRename: (entry: DumpEntry) => void;
 }) {
-  if (section === "story") {
+  if (section === 'story') {
     return (
       <ul className="space-y-2 text-sm">
         {data.tomes.map((t) => (
@@ -445,16 +456,16 @@ function SectionList({
               {t.chapters.map((c) => {
                 const key = `${t.id}::${c.slug}`;
                 const sel =
-                  selection?.kind === "chapter" && selection.key === key;
+                  selection?.kind === 'chapter' && selection.key === key;
                 return (
                   <li key={key}>
                     <button
-                      onClick={() => onSelect({ kind: "chapter", key })}
+                      onClick={() => onSelect({ kind: 'chapter', key })}
                       className={
-                        "w-full text-left px-2 py-1 rounded " +
+                        'w-full text-left px-2 py-1 rounded ' +
                         (sel
-                          ? "bg-amber-800/40 text-amber-100"
-                          : "hover:bg-stone-800")
+                          ? 'bg-amber-800/40 text-amber-100'
+                          : 'hover:bg-stone-800')
                       }
                     >
                       {c.title}
@@ -470,23 +481,23 @@ function SectionList({
   }
 
   const filter: (e: DumpEntry) => boolean =
-    section === "codex"
+    section === 'codex'
       ? (e) =>
-          e.type === "character" ||
-          e.type === "location" ||
-          e.type === "concept" ||
-          e.type === "lore" ||
-          e.type === "waypoint"
-      : section === "lexicon"
-        ? (e) => e.type === "term"
-        : section === "sigils"
-          ? (e) => e.type === "sigil"
-          : () => false;
+          e.type === 'character' ||
+          e.type === 'location' ||
+          e.type === 'concept' ||
+          e.type === 'lore' ||
+          e.type === 'waypoint'
+      : section === 'lexicon'
+      ? (e) => e.type === 'term'
+      : section === 'sigils'
+      ? (e) => e.type === 'sigil'
+      : () => false;
 
-  if (section === "threads") return null;
-  if (section === "notes") return null;
-  if (section === "versions") return null;
-  if (section === "constellation") return null;
+  if (section === 'threads') return null;
+  if (section === 'traces') return null;
+  if (section === 'versions') return null;
+  if (section === 'constellation') return null;
 
   const items = visibleEntries.filter(filter);
   return (
@@ -496,27 +507,25 @@ function SectionList({
       )}
       {items.map((e) => {
         const key = `${e.type}/${e.id}`;
-        const sel = selection?.kind === "entry" && selection.key === key;
+        const sel = selection?.kind === 'entry' && selection.key === key;
         return (
           <li key={key}>
             <button
-              onClick={() => onSelect({ kind: "entry", key })}
+              onClick={() => onSelect({ kind: 'entry', key })}
               onContextMenu={(ev) => {
                 ev.preventDefault();
                 onRename(e);
               }}
               title="Right-click to rename"
               className={
-                "w-full text-left px-2 py-1 rounded flex items-center justify-between gap-2 " +
-                (sel
-                  ? "bg-amber-800/40 text-amber-100"
-                  : "hover:bg-stone-800")
+                'w-full text-left px-2 py-1 rounded flex items-center justify-between gap-2 ' +
+                (sel ? 'bg-amber-800/40 text-amber-100' : 'hover:bg-stone-800')
               }
             >
               <span>{e.name}</span>
               {e.appears_in && e.appears_in.length > 0 && (
                 <span className="text-[10px] text-amber-400/80">
-                  {e.appears_in.join(",")}
+                  {e.appears_in.join(',')}
                 </span>
               )}
             </button>
@@ -606,10 +615,10 @@ function ChapterView({
     setStatus(null);
     try {
       await lwWrite(sagaPath, chapter.chapter.relPath, draft);
-      setStatus("saved");
+      setStatus('saved');
       onSaved();
     } catch (e) {
-      setStatus("error: " + (e as Error).message);
+      setStatus('error: ' + (e as Error).message);
     } finally {
       setSaving(false);
     }
@@ -625,14 +634,16 @@ function ChapterView({
           <div className="text-lg">{chapter.chapter.title}</div>
           <div className="text-xs text-stone-500">
             Tome: {chapter.tome} · {chapter.chapter.refs.length} reference
-            {chapter.chapter.refs.length !== 1 ? "s" : ""}
+            {chapter.chapter.refs.length !== 1 ? 's' : ''}
           </div>
         </div>
         <div className="flex items-center gap-2 text-xs">
           {status && (
             <span
               className={
-                status.startsWith("error") ? "text-rose-400" : "text-emerald-400"
+                status.startsWith('error')
+                  ? 'text-rose-400'
+                  : 'text-emerald-400'
               }
             >
               {status}
@@ -643,13 +654,13 @@ function ChapterView({
             onClick={save}
             disabled={!dirty || saving}
             className={
-              "px-3 py-1 rounded border " +
+              'px-3 py-1 rounded border ' +
               (dirty && !saving
-                ? "border-amber-500 bg-amber-900/40 text-amber-100 hover:bg-amber-800/50"
-                : "border-stone-700 text-stone-500")
+                ? 'border-amber-500 bg-amber-900/40 text-amber-100 hover:bg-amber-800/50'
+                : 'border-stone-700 text-stone-500')
             }
           >
-            {saving ? "Saving…" : "Save"}
+            {saving ? 'Saving…' : 'Save'}
           </button>
         </div>
       </header>
@@ -665,39 +676,39 @@ function EmptyState({
   diagnostics,
 }: {
   section: Section;
-  diagnostics: DumpPayload["diagnostics"];
+  diagnostics: DumpPayload['diagnostics'];
 }) {
   const COPY: Record<string, { title: string; lines: string[] }> = {
     story: {
-      title: "Story",
+      title: 'Story',
       lines: [
-        "Pick a chapter from the Grimoire on the left to start writing.",
-        "Each chapter lives at sagas/<saga>/tomes/<tome>/story/NN-<slug>/chapter.md.",
+        'Pick a chapter from the Grimoire on the left to start writing.',
+        'Each chapter lives at sagas/<saga>/tomes/<tome>/story/NN-<slug>/chapter.md.',
       ],
     },
     codex: {
-      title: "Codex",
+      title: 'Codex',
       lines: [
-        "Characters, locations, concepts, lore, and waypoints live here.",
-        "Pick an entry from the list, or add a new one under sagas/<saga>/codex/.",
+        'Characters, locations, concepts, lore, and waypoints live here.',
+        'Pick an entry from the list, or add a new one under sagas/<saga>/codex/.',
       ],
     },
     lexicon: {
-      title: "Lexicon",
+      title: 'Lexicon',
       lines: [
-        "Terms and slang. Group related terms under a Sigil with kind: slang-group.",
+        'Terms and slang. Group related terms under a Sigil with kind: slang-group.',
       ],
     },
     sigils: {
-      title: "Sigils",
+      title: 'Sigils',
       lines: [
-        "Tags and groups. Sigils with kind: slang-group bind Lexicon terms to characters and locations.",
+        'Tags and groups. Sigils with kind: slang-group bind Lexicon terms to characters and locations.',
       ],
     },
   };
   const copy = COPY[section] ?? {
     title: section,
-    lines: ["Select something from the Grimoire."],
+    lines: ['Select something from the Grimoire.'],
   };
   return (
     <div className="p-8 text-stone-300 space-y-4 overflow-auto max-w-3xl">
@@ -717,16 +728,16 @@ function EmptyState({
               <li
                 key={i}
                 className={
-                  d.severity === "error" ? "text-rose-400" : "text-amber-400"
+                  d.severity === 'error' ? 'text-rose-400' : 'text-amber-400'
                 }
               >
-                <span className="font-mono text-xs">[{d.code}]</span>{" "}
+                <span className="font-mono text-xs">[{d.code}]</span>{' '}
                 {d.message}
                 {d.file && (
                   <span className="text-stone-500 text-xs">
-                    {" "}
+                    {' '}
                     — {d.file}
-                    {d.line ? `:${d.line}` : ""}
+                    {d.line ? `:${d.line}` : ''}
                   </span>
                 )}
               </li>
@@ -771,7 +782,7 @@ function Splash({
 
 function buildCatalog(data: DumpPayload): RefCatalog {
   const sigils = data.entries
-    .filter((e) => e.type === "sigil")
+    .filter((e) => e.type === 'sigil')
     .map((e) => e.id);
   return {
     entries: data.entries.map((e) => ({
@@ -787,30 +798,31 @@ function buildCatalog(data: DumpPayload): RefCatalog {
 function entrySummary(e: DumpEntry): string | undefined {
   // For Lexicon terms, prefer the definition.
   const fm = e.frontmatter as Record<string, unknown>;
-  if (e.type === "term" && typeof fm.definition === "string") {
+  if (e.type === 'term' && typeof fm.definition === 'string') {
     return fm.definition as string;
   }
   // Otherwise, first non-empty prose line.
   const first = e.body
-    .split("\n")
+    .split('\n')
     .map((l) => l.trim())
-    .find((l) => l.length > 0 && !l.startsWith("#"));
-  if (first && first.length > 200) return first.slice(0, 200) + "…";
+    .find((l) => l.length > 0 && !l.startsWith('#'));
+  if (first && first.length > 200) return first.slice(0, 200) + '…';
   return first;
 }
 
 function applyLens(entries: DumpEntry[], tome: string | null): DumpEntry[] {
   if (!tome) return entries;
   return entries.filter(
-    (e) => !e.appears_in || e.appears_in.length === 0 || e.appears_in.includes(tome),
+    (e) =>
+      !e.appears_in || e.appears_in.length === 0 || e.appears_in.includes(tome)
   );
 }
 
 function findChapter(
   data: DumpPayload,
-  key: string,
+  key: string
 ): { tome: string; chapter: DumpChapter } | null {
-  const [tomeId, slug] = key.split("::");
+  const [tomeId, slug] = key.split('::');
   const tome = data.tomes.find((t) => t.id === tomeId);
   if (!tome) return null;
   const chapter = tome.chapters.find((c) => c.slug === slug);
@@ -818,10 +830,10 @@ function findChapter(
 }
 
 function entryTypeToSection(key: string): Section {
-  const type = key.split("/")[0];
-  if (type === "term") return "lexicon";
-  if (type === "sigil") return "sigils";
-  return "codex";
+  const type = key.split('/')[0];
+  if (type === 'term') return 'lexicon';
+  if (type === 'sigil') return 'sigils';
+  return 'codex';
 }
 
 const REF_RE = /@([a-zA-Z]+)\/([a-zA-Z0-9\-_]+)/g;
@@ -830,7 +842,8 @@ function countInbound(type: string, id: string, data: DumpPayload): number {
   const needle = `${type}/${id}`;
   let count = 0;
   const bodies: string[] = [];
-  for (const e of data.entries) if (!(e.type === type && e.id === id)) bodies.push(e.body);
+  for (const e of data.entries)
+    if (!(e.type === type && e.id === id)) bodies.push(e.body);
   for (const t of data.tomes) for (const c of t.chapters) bodies.push(c.body);
   for (const b of bodies) {
     for (const m of b.matchAll(REF_RE)) {
@@ -840,7 +853,7 @@ function countInbound(type: string, id: string, data: DumpPayload): number {
   return count;
 }
 
-function NotesView({
+function TracesView({
   data,
   sagaPath,
   onJump,
@@ -848,40 +861,44 @@ function NotesView({
 }: {
   data: DumpPayload;
   sagaPath: string;
-  onJump: (loc: { kind: "entry" | "chapter"; key: string; line?: number }) => void;
+  onJump: (loc: {
+    kind: 'entry' | 'chapter';
+    key: string;
+    line?: number;
+  }) => void;
   onReload: () => void;
 }) {
-  const [filter, setFilter] = useState<"all" | "open" | "todo" | "idea" | "question">(
-    "open",
-  );
+  const [filter, setFilter] = useState<
+    'all' | 'open' | 'todo' | 'idea' | 'question'
+  >('open');
   const [creating, setCreating] = useState(false);
-  const filtered = data.notes.filter((n) => {
-    if (filter === "all") return true;
-    if (filter === "open") return n.status === "open";
+  const filtered = data.traces.filter((n) => {
+    if (filter === 'all') return true;
+    if (filter === 'open') return n.status === 'open';
     return n.kind === filter;
   });
   const counts = {
-    all: data.notes.length,
-    open: data.notes.filter((n) => n.status === "open").length,
-    todo: data.notes.filter((n) => n.kind === "todo").length,
-    idea: data.notes.filter((n) => n.kind === "idea").length,
-    question: data.notes.filter((n) => n.kind === "question").length,
+    all: data.traces.length,
+    open: data.traces.filter((n) => n.status === 'open').length,
+    todo: data.traces.filter((n) => n.kind === 'todo').length,
+    idea: data.traces.filter((n) => n.kind === 'idea').length,
+    question: data.traces.filter((n) => n.kind === 'question').length,
   };
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       <header className="px-6 py-3 border-b border-stone-800 flex items-center gap-3">
-        <div className="text-lg">Notes</div>
+        <div className="text-lg">Traces</div>
         <div className="flex gap-1 text-xs">
-          {(["all", "open", "todo", "idea", "question"] as const).map((f) => (
+          {(['all', 'open', 'todo', 'idea', 'question'] as const).map((f) => (
             <button
               key={f}
               onClick={() => setFilter(f)}
               className={
-                "px-2 py-1 rounded border " +
+                'px-2 py-1 rounded border ' +
                 (filter === f
-                  ? "border-amber-500 bg-amber-800/40 text-amber-100"
-                  : "border-stone-700 hover:bg-stone-800")
+                  ? 'border-amber-500 bg-amber-800/40 text-amber-100'
+                  : 'border-stone-700 hover:bg-stone-800')
               }
             >
               {f} ({counts[f]})
@@ -893,25 +910,25 @@ function NotesView({
           onClick={() => setCreating(true)}
           className="text-xs px-3 py-1 rounded bg-amber-700 hover:bg-amber-600 text-amber-50"
         >
-          + New note
+          + New trace
         </button>
       </header>
       <div className="flex-1 overflow-auto p-6">
-        <NotesList
-          notes={filtered}
+        <TracesList
+          traces={filtered}
           onJump={(target) => {
-            if (target.startsWith("chapter:")) {
-              const key = target.slice("chapter:".length).replace("/", "::");
-              onJump({ kind: "chapter", key });
+            if (target.startsWith('chapter:')) {
+              const key = target.slice('chapter:'.length).replace('/', '::');
+              onJump({ kind: 'chapter', key });
               return;
             }
-            const cleaned = target.replace(/^@/, "");
-            if (cleaned.includes("/")) onJump({ kind: "entry", key: cleaned });
+            const cleaned = target.replace(/^@/, '');
+            if (cleaned.includes('/')) onJump({ kind: 'entry', key: cleaned });
           }}
         />
       </div>
       {creating && (
-        <NewNoteDialog
+        <NewTraceDialog
           sagaPath={sagaPath}
           suggestions={buildTargetSuggestions(data)}
           onClose={() => setCreating(false)}

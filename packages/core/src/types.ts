@@ -4,15 +4,15 @@
  * Canonical Loreweave entry types.
  */
 export type EntryType =
-  | "character"
-  | "location"
-  | "concept"
-  | "lore"
-  | "waypoint"
-  | "term"
-  | "sigil";
+  | 'character'
+  | 'location'
+  | 'concept'
+  | 'lore'
+  | 'waypoint'
+  | 'term'
+  | 'sigil';
 
-export type EntryStatus = "draft" | "canon";
+export type EntryStatus = 'draft' | 'canon';
 
 /** Frontmatter common to every entry. Type-specific fields live on subtypes. */
 export interface BaseFrontmatter {
@@ -33,7 +33,7 @@ export interface BaseFrontmatter {
 }
 
 export interface TermFrontmatter extends BaseFrontmatter {
-  type: "term";
+  type: 'term';
   term: string;
   language?: string;
   slang_of?: string;
@@ -43,12 +43,15 @@ export interface TermFrontmatter extends BaseFrontmatter {
 }
 
 export interface SigilFrontmatter extends BaseFrontmatter {
-  type: "sigil";
+  type: 'sigil';
   kind?: string;
   description?: string;
 }
 
-export type EntryFrontmatter = BaseFrontmatter | TermFrontmatter | SigilFrontmatter;
+export type EntryFrontmatter =
+  | BaseFrontmatter
+  | TermFrontmatter
+  | SigilFrontmatter;
 
 /** A Codex / Lexicon / Sigil entry = a markdown file with frontmatter. */
 export interface Entry<F extends BaseFrontmatter = EntryFrontmatter> {
@@ -86,7 +89,7 @@ export interface Thread {
   relPath: string;
 }
 
-export type CalendarKind = "gregorian" | "numeric";
+export type CalendarKind = 'gregorian' | 'numeric';
 
 export interface CalendarSpec {
   id: string;
@@ -150,25 +153,25 @@ export interface Saga {
   tomes: Tome[];
   threads: Thread[];
   calendars: CalendarSpec[];
-  notes: Note[];
+  traces: Trace[];
 }
 
-export type NoteKind = "idea" | "todo" | "remark" | "question" | "done";
-export type NoteStatus = "open" | "resolved" | "archived";
+export type TraceKind = 'idea' | 'todo' | 'remark' | 'question' | 'done';
+export type TraceStatus = 'open' | 'resolved' | 'archived';
 
-export interface NoteFrontmatter {
+export interface TraceFrontmatter {
   id: string;
-  kind: NoteKind;
+  kind: TraceKind;
   target?: string;
   author?: string;
   created?: string;
   updated?: string;
   tags?: string[];
-  status: NoteStatus;
+  status: TraceStatus;
 }
 
-export interface Note {
-  frontmatter: NoteFrontmatter;
+export interface Trace {
+  frontmatter: TraceFrontmatter;
   body: string;
   path: string;
   relPath: string;

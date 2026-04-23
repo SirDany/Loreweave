@@ -1,22 +1,22 @@
 // Zod schemas for frontmatter and yaml files. Used by loader + validator.
-import { z } from "zod";
+import { z } from 'zod';
 
 /**
  * Canonical entry types (Loreweave vocabulary).
  */
 export const EntryTypeSchema = z.enum([
-  "character",
-  "location",
-  "concept",
-  "lore",
-  "waypoint",
-  "term",
-  "sigil",
+  'character',
+  'location',
+  'concept',
+  'lore',
+  'waypoint',
+  'term',
+  'sigil',
 ]);
 
-export const StatusSchema = z.enum(["draft", "canon"]);
+export const StatusSchema = z.enum(['draft', 'canon']);
 
-const Id = z.string().regex(/^[a-z0-9][a-z0-9-]*$/, "id must be kebab-case");
+const Id = z.string().regex(/^[a-z0-9][a-z0-9-]*$/, 'id must be kebab-case');
 
 const BaseFrontmatter = z.object({
   id: Id,
@@ -34,7 +34,7 @@ const BaseFrontmatter = z.object({
 });
 
 export const TermFrontmatterSchema = BaseFrontmatter.extend({
-  type: z.literal("term"),
+  type: z.literal('term'),
   term: z.string().min(1),
   language: z.string().optional(),
   slang_of: Id.optional(),
@@ -44,28 +44,28 @@ export const TermFrontmatterSchema = BaseFrontmatter.extend({
 });
 
 export const SigilFrontmatterSchema = BaseFrontmatter.extend({
-  type: z.literal("sigil"),
+  type: z.literal('sigil'),
   kind: z.string().optional(),
   description: z.string().optional(),
 });
 
 export const CharacterFrontmatterSchema = BaseFrontmatter.extend({
-  type: z.literal("character"),
+  type: z.literal('character'),
 });
 export const LocationFrontmatterSchema = BaseFrontmatter.extend({
-  type: z.literal("location"),
+  type: z.literal('location'),
 });
 export const ConceptFrontmatterSchema = BaseFrontmatter.extend({
-  type: z.literal("concept"),
+  type: z.literal('concept'),
 });
 export const LoreFrontmatterSchema = BaseFrontmatter.extend({
-  type: z.literal("lore"),
+  type: z.literal('lore'),
 });
 export const WaypointEntryFrontmatterSchema = BaseFrontmatter.extend({
-  type: z.literal("waypoint"),
+  type: z.literal('waypoint'),
 });
 
-export const EntryFrontmatterSchema = z.discriminatedUnion("type", [
+export const EntryFrontmatterSchema = z.discriminatedUnion('type', [
   CharacterFrontmatterSchema,
   LocationFrontmatterSchema,
   ConceptFrontmatterSchema,
@@ -100,7 +100,7 @@ export const ThreadFileSchema = z.object({
 
 export const CalendarFileSchema = z.object({
   id: Id,
-  kind: z.enum(["gregorian", "numeric"]),
+  kind: z.enum(['gregorian', 'numeric']),
   epoch: z.string().optional(),
   label: z.string().optional(),
 });
@@ -134,12 +134,12 @@ export const ChapterMetaSchema = z.object({
   linked_events: z.array(z.string()).optional(),
 });
 
-export const NoteKindSchema = z.enum([
-  "idea",
-  "todo",
-  "remark",
-  "question",
-  "done",
+export const TraceKindSchema = z.enum([
+  'idea',
+  'todo',
+  'remark',
+  'question',
+  'done',
 ]);
 
 const DateLike = z.preprocess((v) => {
@@ -148,16 +148,16 @@ const DateLike = z.preprocess((v) => {
 }, z.string());
 
 /**
- * A Note is a sticky-note style annotation. `target` may be an `@type/id`
+ * A Trace is a sticky-trace style annotation. `target` may be an `@type/id`
  * reference, `chapter:<tome>/<slug>`, `saga` (global), or omitted (floating).
  */
-export const NoteFrontmatterSchema = z.object({
+export const TraceFrontmatterSchema = z.object({
   id: Id,
-  kind: NoteKindSchema.default("remark"),
+  kind: TraceKindSchema.default('remark'),
   target: z.string().optional(),
   author: z.string().optional(),
   created: DateLike.optional(),
   updated: DateLike.optional(),
   tags: z.array(Id).optional(),
-  status: z.enum(["open", "resolved", "archived"]).default("open"),
+  status: z.enum(['open', 'resolved', 'archived']).default('open'),
 });

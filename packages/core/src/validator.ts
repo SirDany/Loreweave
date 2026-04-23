@@ -1,13 +1,13 @@
 // Validator: schema checks are already done at load time; this module
 // layers referential integrity, cycles, shadowing, slang hygiene, and timeline contradictions.
-import { extractReferences, normalizeRef } from "./references.js";
-import { buildEntryIndex, CycleError, resolve } from "./resolver.js";
-import { canCharacterSpeakTerm } from "./slang.js";
-import { linearize } from "./timeline.js";
-import type { Entry, EntryKey, Saga, Waypoint } from "./types.js";
-import { entryKey } from "./types.js";
+import { extractReferences, normalizeRef } from './references.js';
+import { buildEntryIndex, CycleError, resolve } from './resolver.js';
+import { canCharacterSpeakTerm } from './slang.js';
+import { linearize } from './timeline.js';
+import type { Entry, EntryKey, Saga, Waypoint } from './types.js';
+import { entryKey } from './types.js';
 
-export type Severity = "error" | "warning";
+export type Severity = 'error' | 'warning';
 
 export interface Diagnostic {
   severity: Severity;
@@ -22,7 +22,7 @@ function diag(
   code: string,
   message: string,
   file?: string,
-  line?: number,
+  line?: number
 ): Diagnostic {
   return { severity, code, message, file, line };
 }
@@ -30,90 +30,92 @@ function diag(
 function checkFrontmatterRefs(
   entries: Entry[],
   index: Map<EntryKey, Entry>,
-  out: Diagnostic[],
+  out: Diagnostic[]
 ) {
   for (const e of entries) {
     const fm = e.frontmatter;
     // inherits -> Sigil entries must exist
     for (const sigilId of fm.inherits ?? []) {
-      if (!index.has(entryKey("sigil", sigilId))) {
+      if (!index.has(entryKey('sigil', sigilId))) {
         out.push(
           diag(
-            "error",
-            "missing-sigil",
+            'error',
+            'missing-sigil',
             `${fm.type}/${fm.id} inherits unknown sigil "${sigilId}"`,
-            e.relPath,
-          ),
+            e.relPath
+          )
         );
       }
     }
     // tags -> Sigil entries must exist
     for (const sigilId of fm.tags ?? []) {
-      if (!index.has(entryKey("sigil", sigilId))) {
+      if (!index.has(entryKey('sigil', sigilId))) {
         out.push(
           diag(
-            "warning",
-            "unknown-sigil",
+            'warning',
+            'unknown-sigil',
             `${fm.type}/${fm.id} uses unknown sigil "${sigilId}"`,
-            e.relPath,
-          ),
+            e.relPath
+          )
         );
       }
     }
     // speaks / spoken_here must resolve to slang-group tags
     const speakLists: [string, string[] | undefined][] = [
-      ["speaks", fm.speaks],
-      ["spoken_here", fm.spoken_here],
+      ['speaks', fm.speaks],
+      ['spoken_here', fm.spoken_here],
     ];
     for (const [field, list] of speakLists) {
       for (const sigilId of list ?? []) {
-        const sigil = index.get(entryKey("sigil", sigilId));
+        const sigil = index.get(entryKey('sigil', sigilId));
         if (!sigil) {
           out.push(
             diag(
-              "error",
-              "missing-slang-group",
+              'error',
+              'missing-slang-group',
               `${fm.type}/${fm.id}.${field} references unknown sigil "${sigilId}"`,
-              e.relPath,
-            ),
+              e.relPath
+            )
           );
           continue;
         }
         const kind = (sigil.frontmatter as { kind?: string }).kind;
-        if (kind !== "slang-group") {
+        if (kind !== 'slang-group') {
           out.push(
             diag(
-              "error",
-              "not-slang-group",
+              'error',
+              'not-slang-group',
               `${fm.type}/${fm.id}.${field} references sigil "${sigilId}" which is not kind: slang-group`,
-              e.relPath,
-            ),
+              e.relPath
+            )
           );
         }
       }
     }
     // term.slang_of -> must be a slang-group Sigil
-    if (fm.type === "term") {
+    if (fm.type === 'term') {
       const slangOf = (fm as { slang_of?: string }).slang_of;
       if (slangOf) {
-        const sigil = index.get(entryKey("sigil", slangOf));
+        const sigil = index.get(entryKey('sigil', slangOf));
         if (!sigil) {
           out.push(
             diag(
-              "error",
-              "missing-slang-group",
+              'error',
+              'missing-slang-group',
               `term/${fm.id}.slang_of references unknown sigil "${slangOf}"`,
-              e.relPath,
-            ),
+              e.relPath
+            )
           );
-        } else if ((sigil.frontmatter as { kind?: string }).kind !== "slang-group") {
+        } else if (
+          (sigil.frontmatter as { kind?: string }).kind !== 'slang-group'
+        ) {
           out.push(
             diag(
-              "error",
-              "not-slang-group",
+              'error',
+              'not-slang-group',
               `term/${fm.id}.slang_of references sigil "${slangOf}" which is not kind: slang-group`,
-              e.relPath,
-            ),
+              e.relPath
+            )
           );
         }
       }
@@ -124,7 +126,7 @@ function checkFrontmatterRefs(
 function checkCycles(
   entries: Entry[],
   index: Map<EntryKey, Entry>,
-  out: Diagnostic[],
+  out: Diagnostic[]
 ) {
   for (const e of entries) {
     try {
@@ -133,11 +135,11 @@ function checkCycles(
       if (err instanceof CycleError) {
         out.push(
           diag(
-            "error",
-            "inherit-cycle",
-            `inheritance cycle: ${err.chain.join(" -> ")}`,
-            e.relPath,
-          ),
+            'error',
+            'inherit-cycle',
+            `inheritance cycle: ${err.chain.join(' -> ')}`,
+            e.relPath
+          )
         );
       } else {
         throw err;
@@ -149,25 +151,27 @@ function checkCycles(
 function checkProseRefs(
   saga: Saga,
   index: Map<EntryKey, Entry>,
-  out: Diagnostic[],
+  out: Diagnostic[]
 ) {
   // prose = chapter bodies; also check entry bodies (they may contain @refs).
   const sources: Array<{ body: string; relPath: string }> = [];
   for (const t of saga.tomes)
-    for (const c of t.chapters) sources.push({ body: c.body, relPath: c.relPath });
-  for (const e of saga.entries) sources.push({ body: e.body, relPath: e.relPath });
+    for (const c of t.chapters)
+      sources.push({ body: c.body, relPath: c.relPath });
+  for (const e of saga.entries)
+    sources.push({ body: e.body, relPath: e.relPath });
 
   for (const src of sources) {
     for (const ref of extractReferences(src.body)) {
       if (!index.has(entryKey(ref.type, ref.id))) {
         out.push(
           diag(
-            "error",
-            "broken-reference",
+            'error',
+            'broken-reference',
             `reference ${ref.raw} is not resolvable`,
             src.relPath,
-            ref.line,
-          ),
+            ref.line
+          )
         );
       }
     }
@@ -181,11 +185,11 @@ function checkAppearsIn(saga: Saga, out: Diagnostic[]) {
       if (!tomeIds.has(tomeId)) {
         out.push(
           diag(
-            "error",
-            "unknown-tome",
+            'error',
+            'unknown-tome',
             `${e.frontmatter.type}/${e.frontmatter.id}.appears_in references unknown tome "${tomeId}"`,
-            e.relPath,
-          ),
+            e.relPath
+          )
         );
       }
     }
@@ -199,11 +203,11 @@ function checkAppearsIn(saga: Saga, out: Diagnostic[]) {
       if (!tomeIds.has(tomeId)) {
         out.push(
           diag(
-            "error",
-            "unknown-tome",
+            'error',
+            'unknown-tome',
             `waypoint "${wp.id}".appears_in references unknown tome "${tomeId}"`,
-            threadRel,
-          ),
+            threadRel
+          )
         );
       }
     }
@@ -213,23 +217,23 @@ function checkAppearsIn(saga: Saga, out: Diagnostic[]) {
 function checkWaypointEvents(
   saga: Saga,
   index: Map<EntryKey, Entry>,
-  out: Diagnostic[],
+  out: Diagnostic[]
 ) {
   for (const t of saga.threads) {
     for (const wp of t.waypoints) {
       const id = normalizeRef(wp.event);
       // `event` field may be "@waypoint/xxx", "waypoint/xxx", or bare "xxx"
-      const eventId = id.startsWith("waypoint/")
-        ? id.slice("waypoint/".length)
+      const eventId = id.startsWith('waypoint/')
+        ? id.slice('waypoint/'.length)
         : id;
-      if (!index.has(entryKey("waypoint", eventId))) {
+      if (!index.has(entryKey('waypoint', eventId))) {
         out.push(
           diag(
-            "error",
-            "broken-reference",
+            'error',
+            'broken-reference',
             `waypoint "${wp.id}" references unknown @waypoint/${eventId}`,
-            t.relPath,
-          ),
+            t.relPath
+          )
         );
       }
     }
@@ -245,47 +249,50 @@ function checkThreads(saga: Saga, out: Diagnostic[]) {
     for (const issue of res.issues) {
       out.push(
         diag(
-          issue.kind === "cycle" || issue.kind.endsWith("contradiction")
-            ? "error"
-            : "warning",
+          issue.kind === 'cycle' || issue.kind.endsWith('contradiction')
+            ? 'error'
+            : 'warning',
           issue.kind,
           issue.message,
-          t.relPath,
-        ),
+          t.relPath
+        )
       );
     }
   }
 }
 
-function checkSlang(saga: Saga, index: Map<EntryKey, Entry>, out: Diagnostic[]) {
+function checkSlang(
+  saga: Saga,
+  index: Map<EntryKey, Entry>,
+  out: Diagnostic[]
+) {
   // slang misuse: a character uses @term/X in chapter body where term X is in slang-group S,
   // and the character doesn't list S in `speaks`.
   // Heuristic: a term reference "belongs to" a character when the chapter's `_meta.yaml.pov`
   // includes them, or a character is referenced in a nearby sentence (MVP: same paragraph).
   // MVP implementation: check POV characters only.
   for (const tome of saga.tomes) {
-    const strict =
-      tome.manifest.strict_slang === true;
+    const strict = tome.manifest.strict_slang === true;
     for (const chapter of tome.chapters) {
       const povRefs = chapter.meta.pov ?? [];
       const povIds = povRefs
         .map((r) => normalizeRef(r))
-        .filter((r) => r.startsWith("character/"))
-        .map((r) => r.slice("character/".length));
+        .filter((r) => r.startsWith('character/'))
+        .map((r) => r.slice('character/'.length));
       if (!povIds.length) continue;
       for (const ref of extractReferences(chapter.body)) {
-        if (ref.type !== "term") continue;
+        if (ref.type !== 'term') continue;
         for (const povId of povIds) {
           const res = canCharacterSpeakTerm(index, povId, ref.id);
           if (res.slangGroup && !res.ok) {
             out.push(
               diag(
-                strict ? "error" : "warning",
-                "slang-misuse",
+                strict ? 'error' : 'warning',
+                'slang-misuse',
                 `POV character "@character/${povId}" uses @term/${ref.id} from slang-group "${res.slangGroup}" which they don't declare in \`speaks\``,
                 chapter.relPath,
-                ref.line,
-              ),
+                ref.line
+              )
             );
           }
         }
@@ -294,69 +301,69 @@ function checkSlang(saga: Saga, index: Map<EntryKey, Entry>, out: Diagnostic[]) 
   }
 }
 
-function checkNotes(
+function checkTraces(
   saga: Saga,
   index: Map<EntryKey, Entry>,
-  out: Diagnostic[],
+  out: Diagnostic[]
 ) {
   const tomeIds = new Set(saga.tomes.map((t) => t.manifest.id));
   const chapterKeys = new Set<string>();
   for (const t of saga.tomes)
     for (const c of t.chapters) chapterKeys.add(`${t.manifest.id}/${c.slug}`);
 
-  for (const n of saga.notes) {
+  for (const n of saga.traces) {
     const target = n.frontmatter.target;
-    if (!target || target === "saga") continue;
-    if (target.startsWith("chapter:")) {
-      const key = target.slice("chapter:".length);
+    if (!target || target === 'saga') continue;
+    if (target.startsWith('chapter:')) {
+      const key = target.slice('chapter:'.length);
       if (!chapterKeys.has(key)) {
         out.push(
           diag(
-            "warning",
-            "note-bad-target",
-            `note/${n.frontmatter.id}.target "${target}" does not match any chapter`,
-            n.relPath,
-          ),
+            'warning',
+            'trace-bad-target',
+            `trace/${n.frontmatter.id}.target "${target}" does not match any chapter`,
+            n.relPath
+          )
         );
       }
       continue;
     }
-    if (target.startsWith("tome:")) {
-      const id = target.slice("tome:".length);
+    if (target.startsWith('tome:')) {
+      const id = target.slice('tome:'.length);
       if (!tomeIds.has(id)) {
         out.push(
           diag(
-            "warning",
-            "note-bad-target",
-            `note/${n.frontmatter.id}.target "${target}" does not match any tome`,
-            n.relPath,
-          ),
+            'warning',
+            'trace-bad-target',
+            `trace/${n.frontmatter.id}.target "${target}" does not match any tome`,
+            n.relPath
+          )
         );
       }
       continue;
     }
     // Otherwise expect @type/id
     const cleaned = normalizeRef(target);
-    const [typ, id] = cleaned.split("/");
+    const [typ, id] = cleaned.split('/');
     if (!typ || !id) {
       out.push(
         diag(
-          "warning",
-          "note-bad-target",
-          `note/${n.frontmatter.id}.target "${target}" is not a valid @type/id reference`,
-          n.relPath,
-        ),
+          'warning',
+          'trace-bad-target',
+          `trace/${n.frontmatter.id}.target "${target}" is not a valid @type/id reference`,
+          n.relPath
+        )
       );
       continue;
     }
-    if (!index.has(entryKey(typ as Entry["frontmatter"]["type"], id))) {
+    if (!index.has(entryKey(typ as Entry['frontmatter']['type'], id))) {
       out.push(
         diag(
-          "warning",
-          "note-bad-target",
-          `note/${n.frontmatter.id}.target "@${cleaned}" does not resolve to an entry`,
-          n.relPath,
-        ),
+          'warning',
+          'trace-bad-target',
+          `trace/${n.frontmatter.id}.target "@${cleaned}" does not resolve to an entry`,
+          n.relPath
+        )
       );
     }
   }
@@ -367,7 +374,10 @@ export interface ValidateOptions {
   tome?: string | null;
 }
 
-export function validateSaga(saga: Saga, opts: ValidateOptions = {}): Diagnostic[] {
+export function validateSaga(
+  saga: Saga,
+  opts: ValidateOptions = {}
+): Diagnostic[] {
   const out: Diagnostic[] = [];
   const index = buildEntryIndex(saga.entries);
 
@@ -378,11 +388,13 @@ export function validateSaga(saga: Saga, opts: ValidateOptions = {}): Diagnostic
     if (seen.has(k)) {
       out.push(
         diag(
-          "error",
-          "duplicate-id",
-          `duplicate ${e.frontmatter.type}/${e.frontmatter.id} (also at ${seen.get(k)})`,
-          e.relPath,
-        ),
+          'error',
+          'duplicate-id',
+          `duplicate ${e.frontmatter.type}/${
+            e.frontmatter.id
+          } (also at ${seen.get(k)})`,
+          e.relPath
+        )
       );
     } else {
       seen.set(k, e.relPath);
@@ -396,14 +408,14 @@ export function validateSaga(saga: Saga, opts: ValidateOptions = {}): Diagnostic
   checkThreads(saga, out);
   checkProseRefs(saga, index, out);
   checkSlang(saga, index, out);
-  checkNotes(saga, index, out);
+  checkTraces(saga, index, out);
 
   // tome filter: if caller asked for a specific tome, drop warnings/errors
   // from other tomes' prose. Canon-wide errors (missing refs, cycles) remain.
   if (opts.tome) {
     return out.filter((d) => {
       if (!d.file) return true;
-      if (!d.file.startsWith("tomes/")) return true;
+      if (!d.file.startsWith('tomes/')) return true;
       return d.file.startsWith(`tomes/${opts.tome}/`);
     });
   }
@@ -411,5 +423,5 @@ export function validateSaga(saga: Saga, opts: ValidateOptions = {}): Diagnostic
 }
 
 export function hasErrors(diags: Diagnostic[]): boolean {
-  return diags.some((d) => d.severity === "error");
+  return diags.some((d) => d.severity === 'error');
 }

@@ -1,23 +1,23 @@
-import archiver from "archiver";
-import { createWriteStream, promises as fs } from "node:fs";
-import { spawn, spawnSync } from "node:child_process";
-import os from "node:os";
-import path from "node:path";
-import { loadSaga } from "@loreweave/core";
-import pc from "picocolors";
+import { loadSaga } from '@loreweave/core';
+import archiver from 'archiver';
+import { spawn, spawnSync } from 'node:child_process';
+import { createWriteStream, promises as fs } from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import pc from 'picocolors';
 
 export type ExportFormat =
-  | "saga"
-  | "tome-md"
-  | "tome-html"
-  | "tome-pdf"
-  | "tome-docx"
-  | "tome-epub"
-  | "chapter-md"
-  | "codex-md"
-  | "codex-html"
-  | "slang-md"
-  | "saga-json";
+  | 'saga'
+  | 'tome-md'
+  | 'tome-html'
+  | 'tome-pdf'
+  | 'tome-docx'
+  | 'tome-epub'
+  | 'chapter-md'
+  | 'codex-md'
+  | 'codex-html'
+  | 'slang-md'
+  | 'saga-json';
 
 export interface ExportOpts {
   out?: string;
@@ -28,13 +28,13 @@ export interface ExportOpts {
   json?: boolean;
 }
 
-const PANDOC_FORMATS: ExportFormat[] = ["tome-pdf", "tome-docx", "tome-epub"];
+const PANDOC_FORMATS: ExportFormat[] = ['tome-pdf', 'tome-docx', 'tome-epub'];
 const TOME_FORMATS: ExportFormat[] = [
-  "tome-md",
-  "tome-html",
-  "tome-pdf",
-  "tome-docx",
-  "tome-epub",
+  'tome-md',
+  'tome-html',
+  'tome-pdf',
+  'tome-docx',
+  'tome-epub',
 ];
 
 /**
@@ -42,61 +42,60 @@ const TOME_FORMATS: ExportFormat[] = [
  * as a "world bible", or extract a single chapter.
  */
 export async function exportCmd(saga: string, opts: ExportOpts): Promise<void> {
-  const format: ExportFormat = opts.format ?? "saga";
+  const format: ExportFormat = opts.format ?? 'saga';
   const outFallback = (ext: string) => {
     const base = path.basename(path.resolve(saga));
-    const tomeBit = opts.tome ? "-" + opts.tome : "";
-    const chapterBit = opts.chapter ? "-" + opts.chapter : "";
+    const tomeBit = opts.tome ? '-' + opts.tome : '';
+    const chapterBit = opts.chapter ? '-' + opts.chapter : '';
     return path.resolve(`${base}${tomeBit}${chapterBit}.${ext}`);
   };
 
-  if (format === "saga") {
+  if (format === 'saga') {
     if (opts.plan) {
       const plan = await planSagaZip(saga);
       if (opts.json) console.log(JSON.stringify(plan, null, 2));
       else printSagaPlan(plan);
       return;
     }
-    const out = opts.out ?? outFallback("zip");
+    const out = opts.out ?? outFallback('zip');
     await exportSagaZip(saga, out);
-    console.log(pc.green("exported saga →"), out);
+    console.log(pc.green('exported saga →'), out);
     return;
   }
 
-  if (format === "saga-json") {
-    const out = opts.out ?? outFallback("json");
+  if (format === 'saga-json') {
+    const out = opts.out ?? outFallback('json');
     await exportSagaJson(saga, out);
-    console.log(pc.green("exported saga-json →"), out);
+    console.log(pc.green('exported saga-json →'), out);
     return;
   }
 
-  if (format === "codex-md" || format === "codex-html") {
-    const ext = format === "codex-md" ? "md" : "html";
-    const out = opts.out ?? path.resolve(
-      `${path.basename(path.resolve(saga))}-codex.${ext}`,
-    );
+  if (format === 'codex-md' || format === 'codex-html') {
+    const ext = format === 'codex-md' ? 'md' : 'html';
+    const out =
+      opts.out ??
+      path.resolve(`${path.basename(path.resolve(saga))}-codex.${ext}`);
     await exportCodex(saga, format, out);
     console.log(pc.green(`exported ${format} →`), out);
     return;
   }
 
-  if (format === "slang-md") {
-    const out = opts.out ?? path.resolve(
-      `${path.basename(path.resolve(saga))}-slang.md`,
-    );
+  if (format === 'slang-md') {
+    const out =
+      opts.out ?? path.resolve(`${path.basename(path.resolve(saga))}-slang.md`);
     await exportSlangMd(saga, out);
-    console.log(pc.green("exported slang-md →"), out);
+    console.log(pc.green('exported slang-md →'), out);
     return;
   }
 
-  if (format === "chapter-md") {
+  if (format === 'chapter-md') {
     if (!opts.tome || !opts.chapter) {
-      console.error("--tome and --chapter are required for chapter-md");
+      console.error('--tome and --chapter are required for chapter-md');
       process.exit(1);
     }
-    const out = opts.out ?? outFallback("md");
+    const out = opts.out ?? outFallback('md');
     await exportChapterMd(saga, opts.tome, opts.chapter, out);
-    console.log(pc.green("exported chapter-md →"), out);
+    console.log(pc.green('exported chapter-md →'), out);
     return;
   }
 
@@ -108,26 +107,31 @@ export async function exportCmd(saga: string, opts: ExportOpts): Promise<void> {
     if (PANDOC_FORMATS.includes(format) && !hasPandoc()) {
       console.error(
         pc.red(
-          "pandoc not found on PATH — install it for PDF/DOCX/EPUB export: https://pandoc.org/installing.html",
-        ),
+          'pandoc not found on PATH — install it for PDF/DOCX/EPUB export: https://pandoc.org/installing.html'
+        )
       );
       process.exit(1);
     }
     const ext =
-      format === "tome-md"
-        ? "md"
-        : format === "tome-html"
-          ? "html"
-          : format === "tome-pdf"
-            ? "pdf"
-            : format === "tome-docx"
-              ? "docx"
-              : "epub";
+      format === 'tome-md'
+        ? 'md'
+        : format === 'tome-html'
+        ? 'html'
+        : format === 'tome-pdf'
+        ? 'pdf'
+        : format === 'tome-docx'
+        ? 'docx'
+        : 'epub';
     const out = opts.out ?? outFallback(ext);
-    if (format === "tome-md" || format === "tome-html") {
+    if (format === 'tome-md' || format === 'tome-html') {
       await exportTome(saga, opts.tome, format, out);
     } else {
-      await exportTomeViaPandoc(saga, opts.tome, ext as "pdf" | "docx" | "epub", out);
+      await exportTomeViaPandoc(
+        saga,
+        opts.tome,
+        ext as 'pdf' | 'docx' | 'epub',
+        out
+      );
     }
     console.log(pc.green(`exported ${format} →`), out);
     return;
@@ -144,11 +148,16 @@ interface SagaZipPlan {
   files: Array<{ relPath: string; size: number }>;
 }
 
-async function walkSagaFiles(absRoot: string, prefix = ""): Promise<Array<{ relPath: string; size: number }>> {
-  const ents = await fs.readdir(path.join(absRoot, prefix), { withFileTypes: true });
+async function walkSagaFiles(
+  absRoot: string,
+  prefix = ''
+): Promise<Array<{ relPath: string; size: number }>> {
+  const ents = await fs.readdir(path.join(absRoot, prefix), {
+    withFileTypes: true,
+  });
   const out: Array<{ relPath: string; size: number }> = [];
   for (const e of ents) {
-    if (e.name === ".git" || e.name === "node_modules") continue;
+    if (e.name === '.git' || e.name === 'node_modules') continue;
     const rel = prefix ? `${prefix}/${e.name}` : e.name;
     const full = path.join(absRoot, rel);
     if (e.isDirectory()) {
@@ -173,12 +182,17 @@ export async function planSagaZip(sagaPath: string): Promise<SagaZipPlan> {
 }
 
 function printSagaPlan(plan: SagaZipPlan): void {
-  console.log(pc.bold("saga:"), plan.saga);
-  console.log(`  files: ${plan.totalFiles}, total: ${(plan.totalBytes / 1024).toFixed(1)} KB`);
+  console.log(pc.bold('saga:'), plan.saga);
+  console.log(
+    `  files: ${plan.totalFiles}, total: ${(plan.totalBytes / 1024).toFixed(
+      1
+    )} KB`
+  );
   for (const f of plan.files.slice(0, 50)) {
     console.log(`  ${pc.dim(String(f.size).padStart(8))}  ${f.relPath}`);
   }
-  if (plan.files.length > 50) console.log(pc.dim(`  … and ${plan.files.length - 50} more`));
+  if (plan.files.length > 50)
+    console.log(pc.dim(`  … and ${plan.files.length - 50} more`));
 }
 
 async function exportSagaZip(sagaPath: string, outFile: string): Promise<void> {
@@ -190,10 +204,10 @@ async function exportSagaZip(sagaPath: string, outFile: string): Promise<void> {
 
   await new Promise<void>((resolvePromise, reject) => {
     const output = createWriteStream(outFile);
-    const archive = archiver("zip", { zlib: { level: 9 } });
-    output.on("close", () => resolvePromise());
-    output.on("error", reject);
-    archive.on("error", reject);
+    const archive = archiver('zip', { zlib: { level: 9 } });
+    output.on('close', () => resolvePromise());
+    output.on('error', reject);
+    archive.on('error', reject);
     archive.pipe(output);
 
     // Use the saga folder's basename as the zip root.
@@ -204,16 +218,16 @@ async function exportSagaZip(sagaPath: string, outFile: string): Promise<void> {
       JSON.stringify(
         {
           loreweave: {
-            kind: "saga-export",
+            kind: 'saga-export',
             version: 1,
             root: rootName,
             exported_at: new Date().toISOString(),
           },
         },
         null,
-        2,
+        2
       ),
-      { name: ".loreweave-export.json" },
+      { name: '.loreweave-export.json' }
     );
     void archive.finalize();
   });
@@ -224,21 +238,18 @@ async function exportSagaZip(sagaPath: string, outFile: string): Promise<void> {
  * resolvable; otherwise leave the raw ref in place. Used by tome-md and
  * tome-html exports so published prose doesn't leak Codex ids.
  */
-export function stripRefs(
-  text: string,
-  idx: Map<string, string>,
-): string {
+export function stripRefs(text: string, idx: Map<string, string>): string {
   return text.replace(
     /@([a-zA-Z]+)\/([a-zA-Z0-9\-_]+)/g,
-    (raw, type, id) => idx.get(`${type}/${id}`) ?? raw,
+    (raw, type, id) => idx.get(`${type}/${id}`) ?? raw
   );
 }
 
 async function exportTome(
   sagaPath: string,
   tomeId: string,
-  format: "tome-md" | "tome-html",
-  outFile: string,
+  format: 'tome-md' | 'tome-html',
+  outFile: string
 ): Promise<void> {
   const loaded = await loadSaga(sagaPath);
   const tome = loaded.tomes.find((t) => t.manifest.id === tomeId);
@@ -246,7 +257,7 @@ async function exportTome(
 
   const title = tome.manifest.title ?? tome.manifest.id;
   const chapters = [...tome.chapters].sort(
-    (a, b) => (a.meta.ordinal ?? 0) - (b.meta.ordinal ?? 0),
+    (a, b) => (a.meta.ordinal ?? 0) - (b.meta.ordinal ?? 0)
   );
 
   // Strip `@type/id` references for published prose; keep the visible name if
@@ -255,37 +266,42 @@ async function exportTome(
   for (const e of loaded.entries)
     idx.set(
       `${e.frontmatter.type}/${e.frontmatter.id}`,
-      e.frontmatter.name ?? e.frontmatter.id,
+      e.frontmatter.name ?? e.frontmatter.id
     );
   const stripRefsLocal = (text: string): string => stripRefs(text, idx);
 
-  if (format === "tome-md") {
+  if (format === 'tome-md') {
     const parts: string[] = [];
     parts.push(`# ${title}\n\n`);
     for (const c of chapters) {
       parts.push(`## ${c.meta.title ?? c.slug}\n\n`);
       parts.push(stripRefsLocal(c.body).trim());
-      parts.push("\n\n");
+      parts.push('\n\n');
     }
     await fs.mkdir(path.dirname(outFile), { recursive: true });
-    await fs.writeFile(outFile, parts.join(""), "utf8");
+    await fs.writeFile(outFile, parts.join(''), 'utf8');
     return;
   }
 
   // tome-html
   const escape = (s: string) =>
-    s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]!);
+    s.replace(
+      /[&<>]/g,
+      (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]!)
+    );
   const paragraphs = (text: string) =>
     text
       .split(/\n{2,}/)
-      .map((p) => `<p>${escape(p).replace(/\n/g, "<br/>")}</p>`) 
-      .join("\n");
+      .map((p) => `<p>${escape(p).replace(/\n/g, '<br/>')}</p>`)
+      .join('\n');
   const body = chapters
     .map(
       (c) =>
-        `<section><h2>${escape(c.meta.title ?? c.slug)}</h2>\n${paragraphs(stripRefsLocal(c.body).trim())}</section>`,
+        `<section><h2>${escape(c.meta.title ?? c.slug)}</h2>\n${paragraphs(
+          stripRefsLocal(c.body).trim()
+        )}</section>`
     )
-    .join("\n");
+    .join('\n');
   const html = `<!doctype html>
 <html lang="en">
 <head>
@@ -305,14 +321,14 @@ ${body}
 </html>
 `;
   await fs.mkdir(path.dirname(outFile), { recursive: true });
-  await fs.writeFile(outFile, html, "utf8");
+  await fs.writeFile(outFile, html, 'utf8');
 }
 
 export function hasPandoc(): boolean {
   try {
-    const r = spawnSync("pandoc", ["--version"], {
-      stdio: "ignore",
-      shell: process.platform === "win32",
+    const r = spawnSync('pandoc', ['--version'], {
+      stdio: 'ignore',
+      shell: process.platform === 'win32',
     });
     return r.status === 0;
   } catch {
@@ -328,8 +344,8 @@ export function hasPandoc(): boolean {
 async function exportTomeViaPandoc(
   sagaPath: string,
   tomeId: string,
-  ext: "pdf" | "docx" | "epub",
-  outFile: string,
+  ext: 'pdf' | 'docx' | 'epub',
+  outFile: string
 ): Promise<void> {
   const loaded = await loadSaga(sagaPath);
   const tome = loaded.tomes.find((t) => t.manifest.id === tomeId);
@@ -338,49 +354,49 @@ async function exportTomeViaPandoc(
   const title = tome.manifest.title ?? tome.manifest.id;
   const author = tome.manifest.author ?? loaded.manifest.author ?? null;
   const subtitle = tome.manifest.subtitle ?? null;
-  const language = loaded.manifest.language ?? "en";
+  const language = loaded.manifest.language ?? 'en';
   const date = new Date().toISOString().slice(0, 10);
   const chapters = [...tome.chapters].sort(
-    (a, b) => (a.meta.ordinal ?? 0) - (b.meta.ordinal ?? 0),
+    (a, b) => (a.meta.ordinal ?? 0) - (b.meta.ordinal ?? 0)
   );
   const idx = new Map<string, string>();
   for (const e of loaded.entries)
     idx.set(
       `${e.frontmatter.type}/${e.frontmatter.id}`,
-      e.frontmatter.name ?? e.frontmatter.id,
+      e.frontmatter.name ?? e.frontmatter.id
     );
 
-  const fmLines: string[] = ["---", `title: ${JSON.stringify(title)}`];
+  const fmLines: string[] = ['---', `title: ${JSON.stringify(title)}`];
   if (subtitle) fmLines.push(`subtitle: ${JSON.stringify(subtitle)}`);
   if (author) fmLines.push(`author: ${JSON.stringify(author)}`);
   fmLines.push(`date: ${JSON.stringify(date)}`);
   fmLines.push(`lang: ${JSON.stringify(language)}`);
-  fmLines.push("---", "");
+  fmLines.push('---', '');
 
   const parts: string[] = [...fmLines];
   for (const c of chapters) {
     parts.push(`# ${c.meta.title ?? c.slug}`, ``);
     parts.push(stripRefs(c.body, idx).trim(), ``);
   }
-  const md = parts.join("\n");
+  const md = parts.join('\n');
 
-  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "lw-pandoc-"));
+  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'lw-pandoc-'));
   const tmpMd = path.join(tmpDir, `${tomeId}.md`);
-  await fs.writeFile(tmpMd, md, "utf8");
+  await fs.writeFile(tmpMd, md, 'utf8');
 
   await fs.mkdir(path.dirname(outFile), { recursive: true });
 
-  const args = [tmpMd, "-o", outFile, "--from=markdown", "--toc"];
-  if (ext === "pdf") args.push("--pdf-engine=xelatex");
-  if (ext === "epub") args.push("--metadata", `lang=${language}`);
+  const args = [tmpMd, '-o', outFile, '--from=markdown', '--toc'];
+  if (ext === 'pdf') args.push('--pdf-engine=xelatex');
+  if (ext === 'epub') args.push('--metadata', `lang=${language}`);
 
   await new Promise<void>((resolvePromise, reject) => {
-    const child = spawn("pandoc", args, {
-      stdio: ["ignore", "inherit", "inherit"],
-      shell: process.platform === "win32",
+    const child = spawn('pandoc', args, {
+      stdio: ['ignore', 'inherit', 'inherit'],
+      shell: process.platform === 'win32',
     });
-    child.on("error", reject);
-    child.on("exit", (code) => {
+    child.on('error', reject);
+    child.on('exit', (code) => {
       if (code === 0) resolvePromise();
       else reject(new Error(`pandoc exited with code ${code}`));
     });
@@ -394,7 +410,7 @@ async function exportChapterMd(
   sagaPath: string,
   tomeId: string,
   chapterSlug: string,
-  outFile: string,
+  outFile: string
 ): Promise<void> {
   const loaded = await loadSaga(sagaPath);
   const tome = loaded.tomes.find((t) => t.manifest.id === tomeId);
@@ -402,19 +418,21 @@ async function exportChapterMd(
   const chapter = tome.chapters.find((c) => c.slug === chapterSlug);
   if (!chapter) {
     throw new Error(
-      `chapter "${chapterSlug}" not found in tome "${tomeId}" (have: ${tome.chapters.map((c) => c.slug).join(", ")})`,
+      `chapter "${chapterSlug}" not found in tome "${tomeId}" (have: ${tome.chapters
+        .map((c) => c.slug)
+        .join(', ')})`
     );
   }
   const idx = new Map<string, string>();
   for (const e of loaded.entries)
     idx.set(
       `${e.frontmatter.type}/${e.frontmatter.id}`,
-      e.frontmatter.name ?? e.frontmatter.id,
+      e.frontmatter.name ?? e.frontmatter.id
     );
   const title = chapter.meta.title ?? chapter.slug;
   const out = `# ${title}\n\n${stripRefs(chapter.body, idx).trim()}\n`;
   await fs.mkdir(path.dirname(outFile), { recursive: true });
-  await fs.writeFile(outFile, out, "utf8");
+  await fs.writeFile(outFile, out, 'utf8');
 }
 
 /**
@@ -426,27 +444,30 @@ async function exportChapterMd(
  */
 async function exportCodex(
   sagaPath: string,
-  format: "codex-md" | "codex-html",
-  outFile: string,
+  format: 'codex-md' | 'codex-html',
+  outFile: string
 ): Promise<void> {
   const loaded = await loadSaga(sagaPath);
   const groups: Array<{ type: string; label: string }> = [
-    { type: "character", label: "Characters" },
-    { type: "location", label: "Locations" },
-    { type: "concept", label: "Concepts" },
-    { type: "lore", label: "Lore" },
-    { type: "waypoint", label: "Waypoints" },
-    { type: "term", label: "Lexicon" },
-    { type: "sigil", label: "Sigils" },
+    { type: 'character', label: 'Characters' },
+    { type: 'location', label: 'Locations' },
+    { type: 'concept', label: 'Concepts' },
+    { type: 'lore', label: 'Lore' },
+    { type: 'waypoint', label: 'Waypoints' },
+    { type: 'term', label: 'Lexicon' },
+    { type: 'sigil', label: 'Sigils' },
   ];
 
   const idx = new Map<string, string>();
   for (const e of loaded.entries) {
-    idx.set(`${e.frontmatter.type}/${e.frontmatter.id}`, e.frontmatter.name ?? e.frontmatter.id);
+    idx.set(
+      `${e.frontmatter.type}/${e.frontmatter.id}`,
+      e.frontmatter.name ?? e.frontmatter.id
+    );
   }
   const anchorOf = (type: string, id: string) => `${type}-${id}`;
 
-  if (format === "codex-md") {
+  if (format === 'codex-md') {
     const parts: string[] = [];
     parts.push(`# ${loaded.manifest.title ?? loaded.manifest.id} — Codex\n\n`);
     parts.push(`_Generated ${new Date().toISOString().slice(0, 10)}_\n\n`);
@@ -454,10 +475,16 @@ async function exportCodex(
       const items = loaded.entries.filter((e) => e.frontmatter.type === g.type);
       if (items.length === 0) continue;
       parts.push(`## ${g.label}\n\n`);
-      items.sort((a, b) => (a.frontmatter.name ?? a.frontmatter.id).localeCompare(b.frontmatter.name ?? b.frontmatter.id));
+      items.sort((a, b) =>
+        (a.frontmatter.name ?? a.frontmatter.id).localeCompare(
+          b.frontmatter.name ?? b.frontmatter.id
+        )
+      );
       for (const e of items) {
         const name = e.frontmatter.name ?? e.frontmatter.id;
-        parts.push(`### ${name}  <a id="${anchorOf(g.type, e.frontmatter.id)}"></a>\n\n`);
+        parts.push(
+          `### ${name}  <a id="${anchorOf(g.type, e.frontmatter.id)}"></a>\n\n`
+        );
         parts.push(`*${g.type}/${e.frontmatter.id}*\n\n`);
         // Replace @echoes with markdown links to in-document anchors.
         const linked = e.body.replace(
@@ -465,30 +492,37 @@ async function exportCodex(
           (raw, type, id) => {
             const display = idx.get(`${type}/${id}`) ?? raw;
             return `[${display}](#${anchorOf(type, id)})`;
-          },
+          }
         );
-        parts.push(linked.trim() + "\n\n");
+        parts.push(linked.trim() + '\n\n');
       }
     }
     await fs.mkdir(path.dirname(outFile), { recursive: true });
-    await fs.writeFile(outFile, parts.join(""), "utf8");
+    await fs.writeFile(outFile, parts.join(''), 'utf8');
     return;
   }
 
   // codex-html
   const escape = (s: string) =>
-    s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]!);
+    s.replace(
+      /[&<>]/g,
+      (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]!)
+    );
   const paragraphs = (text: string) =>
     text
       .split(/\n{2,}/)
       .map((p) => `<p>${p}</p>`)
-      .join("\n");
+      .join('\n');
 
   const sections: string[] = [];
   for (const g of groups) {
     const items = loaded.entries.filter((e) => e.frontmatter.type === g.type);
     if (items.length === 0) continue;
-    items.sort((a, b) => (a.frontmatter.name ?? a.frontmatter.id).localeCompare(b.frontmatter.name ?? b.frontmatter.id));
+    items.sort((a, b) =>
+      (a.frontmatter.name ?? a.frontmatter.id).localeCompare(
+        b.frontmatter.name ?? b.frontmatter.id
+      )
+    );
     const entryHtml = items
       .map((e) => {
         const name = e.frontmatter.name ?? e.frontmatter.id;
@@ -500,14 +534,16 @@ async function exportCodex(
             const display = idx.get(`${type}/${id}`) ?? raw;
             tokens.push({ type, id, display });
             return `\u0000LWREF${tokens.length - 1}\u0000`;
-          },
+          }
         );
         const escaped = escape(tokenized).replace(
           /\u0000LWREF(\d+)\u0000/g,
           (_, n) => {
             const t = tokens[Number(n)]!;
-            return `<a href="#${anchorOf(t.type, t.id)}">${escape(t.display)}</a>`;
-          },
+            return `<a href="#${anchorOf(t.type, t.id)}">${escape(
+              t.display
+            )}</a>`;
+          }
         );
         return `<article id="${anchorOf(g.type, e.frontmatter.id)}">
   <h3>${escape(name)}</h3>
@@ -515,13 +551,15 @@ async function exportCodex(
   ${paragraphs(escaped)}
 </article>`;
       })
-      .join("\n");
-    sections.push(`<section><h2>${escape(g.label)}</h2>\n${entryHtml}</section>`);
+      .join('\n');
+    sections.push(
+      `<section><h2>${escape(g.label)}</h2>\n${entryHtml}</section>`
+    );
   }
 
   const title = loaded.manifest.title ?? loaded.manifest.id;
   const html = `<!doctype html>
-<html lang="${escape(loaded.manifest.language ?? "en")}">
+<html lang="${escape(loaded.manifest.language ?? 'en')}">
 <head>
 <meta charset="utf-8"/>
 <title>${escape(title)} — Codex</title>
@@ -538,16 +576,19 @@ a { color: #6b4a00; }
 <body>
 <h1>${escape(title)} — Codex</h1>
 <p><em>Generated ${new Date().toISOString().slice(0, 10)}</em></p>
-${sections.join("\n")}
+${sections.join('\n')}
 </body>
 </html>
 `;
   await fs.mkdir(path.dirname(outFile), { recursive: true });
-  await fs.writeFile(outFile, html, "utf8");
+  await fs.writeFile(outFile, html, 'utf8');
 }
 
 /** Dump the entire loaded saga as JSON — same structure as `lw dump`. */
-async function exportSagaJson(sagaPath: string, outFile: string): Promise<void> {
+async function exportSagaJson(
+  sagaPath: string,
+  outFile: string
+): Promise<void> {
   const loaded = await loadSaga(sagaPath);
   const payload = {
     saga: {
@@ -580,11 +621,11 @@ async function exportSagaJson(sagaPath: string, outFile: string): Promise<void> 
     })),
     threads: loaded.threads,
     calendars: loaded.calendars,
-    notes: loaded.notes,
+    traces: loaded.traces,
     exported_at: new Date().toISOString(),
   };
   await fs.mkdir(path.dirname(outFile), { recursive: true });
-  await fs.writeFile(outFile, JSON.stringify(payload, null, 2), "utf8");
+  await fs.writeFile(outFile, JSON.stringify(payload, null, 2), 'utf8');
 }
 
 /**
@@ -595,20 +636,22 @@ async function exportSagaJson(sagaPath: string, outFile: string): Promise<void> 
  */
 async function exportSlangMd(sagaPath: string, outFile: string): Promise<void> {
   const loaded = await loadSaga(sagaPath);
-  const terms = loaded.entries.filter((e) => e.frontmatter.type === "term");
+  const terms = loaded.entries.filter((e) => e.frontmatter.type === 'term');
   const sigils = new Map<string, string>(
     loaded.entries
-      .filter((e) => e.frontmatter.type === "sigil")
-      .map((e) => [e.frontmatter.id, e.frontmatter.name ?? e.frontmatter.id]),
+      .filter((e) => e.frontmatter.type === 'sigil')
+      .map((e) => [e.frontmatter.id, e.frontmatter.name ?? e.frontmatter.id])
   );
   // Build "who speaks what" reverse lookup.
   const speakers = new Map<string, string[]>(); // sigil id -> ["character/aaron", ...]
   for (const e of loaded.entries) {
     const fm = e.frontmatter as unknown as Record<string, unknown>;
     const groups = (Array.isArray(fm.speaks) ? fm.speaks : []) as string[];
-    const here = (Array.isArray(fm.spoken_here) ? fm.spoken_here : []) as string[];
+    const here = (
+      Array.isArray(fm.spoken_here) ? fm.spoken_here : []
+    ) as string[];
     for (const g of [...groups, ...here]) {
-      if (typeof g !== "string") continue;
+      if (typeof g !== 'string') continue;
       const arr = speakers.get(g) ?? [];
       arr.push(`${e.frontmatter.type}/${e.frontmatter.id}`);
       speakers.set(g, arr);
@@ -619,8 +662,9 @@ async function exportSlangMd(sagaPath: string, outFile: string): Promise<void> {
   const byLang = new Map<string, Map<string, typeof terms>>();
   for (const t of terms) {
     const fm = t.frontmatter as unknown as Record<string, unknown>;
-    const lang = (typeof fm.language === "string" && fm.language) || "Common";
-    const group = (typeof fm.slang_of === "string" && fm.slang_of) || "_general";
+    const lang = (typeof fm.language === 'string' && fm.language) || 'Common';
+    const group =
+      (typeof fm.slang_of === 'string' && fm.slang_of) || '_general';
     if (!byLang.has(lang)) byLang.set(lang, new Map());
     const g = byLang.get(lang)!;
     if (!g.has(group)) g.set(group, []);
@@ -628,40 +672,46 @@ async function exportSlangMd(sagaPath: string, outFile: string): Promise<void> {
   }
 
   const lines: string[] = [];
-  lines.push(`# ${loaded.manifest.title ?? loaded.manifest.id} — Slang & Lexicon\n`);
+  lines.push(
+    `# ${loaded.manifest.title ?? loaded.manifest.id} — Slang & Lexicon\n`
+  );
   lines.push(`*Generated ${new Date().toISOString().slice(0, 10)}*\n`);
   for (const [lang, groups] of [...byLang.entries()].sort()) {
     lines.push(`\n## ${lang}\n`);
     for (const [group, gTerms] of [...groups.entries()].sort()) {
-      const sigilName = group === "_general" ? "General terms" : sigils.get(group) ?? group;
+      const sigilName =
+        group === '_general' ? 'General terms' : sigils.get(group) ?? group;
       lines.push(`\n### ${sigilName}`);
-      if (group !== "_general") {
+      if (group !== '_general') {
         const who = speakers.get(group) ?? [];
         if (who.length) {
-          lines.push(`*Spoken by:* ${who.map((w) => `\`${w}\``).join(", ")}\n`);
+          lines.push(`*Spoken by:* ${who.map((w) => `\`${w}\``).join(', ')}\n`);
         }
       }
       gTerms.sort((a, b) =>
         (a.frontmatter.name ?? a.frontmatter.id).localeCompare(
-          b.frontmatter.name ?? b.frontmatter.id,
-        ),
+          b.frontmatter.name ?? b.frontmatter.id
+        )
       );
       for (const t of gTerms) {
         const fm = t.frontmatter as unknown as Record<string, unknown>;
         const name = t.frontmatter.name ?? t.frontmatter.id;
-        const pron = typeof fm.pronunciation === "string" ? ` /${fm.pronunciation}/` : "";
+        const pron =
+          typeof fm.pronunciation === 'string' ? ` /${fm.pronunciation}/` : '';
         const def =
-          (typeof fm.definition === "string" && fm.definition) ||
-          t.body.split("\n").find((l) => l.trim()) ||
-          "";
+          (typeof fm.definition === 'string' && fm.definition) ||
+          t.body.split('\n').find((l) => l.trim()) ||
+          '';
         lines.push(`- **${name}**${pron} — ${def.trim()}`);
-        const examples = Array.isArray(fm.examples) ? (fm.examples as unknown[]) : [];
+        const examples = Array.isArray(fm.examples)
+          ? (fm.examples as unknown[])
+          : [];
         for (const ex of examples) {
-          if (typeof ex === "string") lines.push(`    - *"${ex}"*`);
+          if (typeof ex === 'string') lines.push(`    - *"${ex}"*`);
         }
       }
     }
   }
   await fs.mkdir(path.dirname(outFile), { recursive: true });
-  await fs.writeFile(outFile, lines.join("\n") + "\n", "utf8");
+  await fs.writeFile(outFile, lines.join('\n') + '\n', 'utf8');
 }

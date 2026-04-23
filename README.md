@@ -1,6 +1,6 @@
 # Loreweave
 
-A local-first, agentic book-writing workbench. Your canon lives as plain markdown and YAML on disk; VS Code Copilot agents (Muse, Scribe, Warden, Polisher, Archivist) help you ideate, draft, and keep your world consistent; a Tauri + React desktop UI gives you a navigable Codex, Lexicon, Thread (timeline), notes, a constellation graph, git-based versions, and inline editing.
+A local-first, agentic book-writing workbench. Your canon lives as plain markdown and YAML on disk; VS Code Copilot agents (Muse, Scribe, Warden, Polisher, Archivist) help you ideate, draft, and keep your world consistent; a Tauri + React desktop UI gives you a navigable Codex, Lexicon, Thread (timeline), traces, a constellation graph, git-based versions, and inline editing.
 
 > **Status:** early scaffolding. Core library, CLI, agents, and desktop shell are usable end-to-end against the example Saga.
 
@@ -8,18 +8,18 @@ A local-first, agentic book-writing workbench. Your canon lives as plain markdow
 
 ## Vocabulary
 
-| Term | What it is |
-|---|---|
-| **Saga** | Series. Top-level project. `sagas/<saga-slug>/` |
-| **Tome** | A book within a Saga. Holds **only prose** under `tomes/<slug>/story/`. |
-| **Codex** | Characters, locations, concepts, lore, waypoints. `codex/` |
-| **Lexicon** | Terms, slang, pronunciations. `lexicon/` |
-| **Sigil** | Tag / group / inheritance source. `sigils/` |
-| **Thread** | Timeline of waypoints. `threads/` |
+| Term         | What it is                                                                      |
+| ------------ | ------------------------------------------------------------------------------- |
+| **Saga**     | Series. Top-level project. `sagas/<saga-slug>/`                                 |
+| **Tome**     | A book within a Saga. Holds **only prose** under `tomes/<slug>/story/`.         |
+| **Codex**    | Characters, locations, concepts, lore, waypoints. `codex/`                      |
+| **Lexicon**  | Terms, slang, pronunciations. `lexicon/`                                        |
+| **Sigil**    | Tag / group / inheritance source. `sigils/`                                     |
+| **Thread**   | Timeline of waypoints. `threads/`                                               |
 | **Waypoint** | A waypoint entry placed on a Thread (absolute date, relational edges, or both). |
-| **Echo** | An `@type/id` reference written inline in prose or frontmatter. |
-| **Weave** | The resolved view of an entry: own properties + inherited Sigils + overrides. |
-| **Note** | Sticky note (idea / todo / question / remark). `notes/` |
+| **Echo**     | An `@type/id` reference written inline in prose or frontmatter.                 |
+| **Weave**    | The resolved view of an entry: own properties + inherited Sigils + overrides.   |
+| **Trace**    | Sticky trace (idea / todo / question / remark). `traces/`                       |
 
 See [docs/conventions.md](docs/conventions.md) for the full spec.
 
@@ -47,7 +47,7 @@ sagas/<saga>/
   sigils/        tags & groups
   threads/       <id>.yaml
   calendars/     <id>.yaml
-  notes/         <id>.md
+  traces/        <id>.md
   tomes/<tome>/
     tome.yaml
     story/NN-<chapter>/chapter.md  +  _meta.yaml
@@ -139,13 +139,13 @@ lw git merge-abort | merge-continue <saga>
 Sections in the **Grimoire** sidebar:
 
 - **Story** — write chapter prose with inline `@type/id` autocomplete and decorations.
-- **Codex** — browse and edit characters, locations, concepts, lore, waypoints. Each entry has *Rename* and *Edit frontmatter* buttons; renames cascade through every Echo, Sigil `inherits`, and Thread waypoint reference via `lw rename`.
+- **Codex** — browse and edit characters, locations, concepts, lore, waypoints. Each entry has _Rename_ and _Edit frontmatter_ buttons; renames cascade through every Echo, Sigil `inherits`, and Thread waypoint reference via `lw rename`.
 - **Lexicon** — terms & slang.
 - **Sigils** — tags & groups (incl. slang-groups).
 - **Threads** — dated axis / relational flow / branching lane view of a Thread's waypoints.
-- **Notes** — sticky notes; create with the **+ New note** button.
+- **Traces** — sticky traces; create with the **+ New trace** button.
 - **Constellation** — read-only SVG graph of every entry (positioned on concentric rings by type) with edges for every Echo and `inherits` link. Filter by type; hover to highlight neighbors; click to jump.
-- **Versions** — branch + dirty-files panel, commit message + *Commit all*, branch switcher, *Create & switch*, recent commits, remotes + fetch/pull/push, and inline snapshot controls. Falls back to a *git init* button if the Saga isn't in a repo yet.
+- **Versions** — branch + dirty-files panel, commit message + _Commit all_, branch switcher, _Create & switch_, recent commits, remotes + fetch/pull/push, and inline snapshot controls. Falls back to a _git init_ button if the Saga isn't in a repo yet.
 
 Across the top of the **Shelf** sidebar:
 
@@ -155,7 +155,7 @@ Across the top of the **Shelf** sidebar:
 - **Search…** — global text or Echo search across entries + prose (or press `Ctrl+P` / `Ctrl+K`)
 - **Backups…** — list snapshots, take a fresh one, dry-run a restore, apply with automatic safety backup
 
-The right-hand **Weave** panel shows the resolved view of the selected entry, with **Echoes**, **Notes**, and **Diff** (against HEAD) tabs.
+The right-hand **Weave** panel shows the resolved view of the selected entry, with **Echoes**, **Traces**, and **Diff** (against HEAD) tabs.
 
 ---
 
@@ -169,7 +169,7 @@ Open this repo in VS Code; agents in `.github/agents/` appear in the chat agent 
 - **`@polisher`** — grammar/style only; never touches canon
 - **`@archivist`** — drafts Codex/Lexicon entries from material staged via `lw ingest` (always `status: draft`)
 
-Instructions in `.github/instructions/` auto-apply when you edit files under `codex/`, `lexicon/`, `sigils/`, `notes/`, or any tome's `story/`.
+Instructions in `.github/instructions/` auto-apply when you edit files under `codex/`, `lexicon/`, `sigils/`, `traces/`, or any tome's `story/`.
 
 ---
 

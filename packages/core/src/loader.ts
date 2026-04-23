@@ -1,28 +1,28 @@
 // Filesystem loader: walk a Saga dir and return a parsed `Saga` object.
-import { promises as fs } from "node:fs";
-import path from "node:path";
-import matter from "gray-matter";
-import YAML from "yaml";
+import matter from 'gray-matter';
+import { promises as fs } from 'node:fs';
+import path from 'node:path';
+import YAML from 'yaml';
 import {
-  ChapterMetaSchema,
   CalendarFileSchema,
+  ChapterMetaSchema,
   EntryFrontmatterSchema,
-  NoteFrontmatterSchema,
   SagaManifestSchema,
   ThreadFileSchema,
   TomeManifestSchema,
-} from "./schemas.js";
+  TraceFrontmatterSchema,
+} from './schemas.js';
 import type {
   CalendarSpec,
   Chapter,
   Entry,
-  Note,
-  NoteFrontmatter,
   Saga,
   SagaManifest,
   Thread,
   Tome,
-} from "./types.js";
+  Trace,
+  TraceFrontmatter,
+} from './types.js';
 
 export class LoadError extends Error {
   constructor(message: string, public readonly file: string) {
@@ -31,7 +31,7 @@ export class LoadError extends Error {
 }
 
 async function readText(p: string): Promise<string> {
-  return fs.readFile(p, "utf8");
+  return fs.readFile(p, 'utf8');
 }
 
 async function exists(p: string): Promise<boolean> {
@@ -56,7 +56,7 @@ async function walk(dir: string): Promise<string[]> {
 }
 
 function toRel(root: string, p: string): string {
-  return path.relative(root, p).split(path.sep).join("/");
+  return path.relative(root, p).split(path.sep).join('/');
 }
 
 async function parseEntry(file: string, root: string): Promise<Entry> {
@@ -66,9 +66,9 @@ async function parseEntry(file: string, root: string): Promise<Entry> {
   if (!result.success) {
     throw new LoadError(
       `invalid frontmatter: ${result.error.issues
-        .map((i) => `${i.path.join(".")}: ${i.message}`)
-        .join("; ")}`,
-      file,
+        .map((i) => `${i.path.join('.')}: ${i.message}`)
+        .join('; ')}`,
+      file
     );
   }
   const fm = result.data;
@@ -76,7 +76,7 @@ async function parseEntry(file: string, root: string): Promise<Entry> {
   if (fm.id !== expectedId) {
     throw new LoadError(
       `id "${fm.id}" does not match filename stem "${expectedId}"`,
-      file,
+      file
     );
   }
   return {
@@ -89,7 +89,7 @@ async function parseEntry(file: string, root: string): Promise<Entry> {
 
 async function parseYamlFile<T>(
   file: string,
-  schema: { safeParse: (v: unknown) => { success: boolean } },
+  schema: { safeParse: (v: unknown) => { success: boolean } }
 ): Promise<T> {
   const raw = await readText(file);
   let data: unknown;
@@ -98,50 +98,50 @@ async function parseYamlFile<T>(
   } catch (err) {
     throw new LoadError(`invalid YAML: ${(err as Error).message}`, file);
   }
-  const result = (schema.safeParse(data) as unknown) as {
+  const result = schema.safeParse(data) as unknown as {
     success: boolean;
     data?: T;
     error?: { issues: Array<{ path: (string | number)[]; message: string }> };
   };
   if (!result.success || !result.data) {
     const issues = result.error?.issues
-      .map((i) => `${i.path.join(".")}: ${i.message}`)
-      .join("; ");
-    throw new LoadError(`schema mismatch: ${issues ?? "unknown"}`, file);
+      .map((i) => `${i.path.join('.')}: ${i.message}`)
+      .join('; ');
+    throw new LoadError(`schema mismatch: ${issues ?? 'unknown'}`, file);
   }
   return result.data;
 }
 
 async function loadEntriesIn(dir: string, root: string): Promise<Entry[]> {
-  const files = (await walk(dir)).filter((f) => f.endsWith(".md"));
+  const files = (await walk(dir)).filter((f) => f.endsWith('.md'));
   const entries: Entry[] = [];
   for (const f of files) entries.push(await parseEntry(f, root));
   return entries;
 }
 
-async function loadNotes(root: string): Promise<Note[]> {
-  const dir = path.join(root, "notes");
+async function loadTraces(root: string): Promise<Trace[]> {
+  const dir = path.join(root, 'traces');
   if (!(await exists(dir))) return [];
-  const files = (await walk(dir)).filter((f) => f.endsWith(".md"));
-  const out: Note[] = [];
+  const files = (await walk(dir)).filter((f) => f.endsWith('.md'));
+  const out: Trace[] = [];
   for (const f of files) {
     const raw = await readText(f);
     const parsed = matter(raw);
-    const result = NoteFrontmatterSchema.safeParse(parsed.data);
+    const result = TraceFrontmatterSchema.safeParse(parsed.data);
     if (!result.success) {
       throw new LoadError(
-        `invalid note frontmatter: ${result.error.issues
-          .map((i) => `${i.path.join(".")}: ${i.message}`)
-          .join("; ")}`,
-        f,
+        `invalid trace frontmatter: ${result.error.issues
+          .map((i) => `${i.path.join('.')}: ${i.message}`)
+          .join('; ')}`,
+        f
       );
     }
-    const fm = result.data as NoteFrontmatter;
+    const fm = result.data as TraceFrontmatter;
     const expectedId = path.basename(f, path.extname(f));
     if (fm.id !== expectedId) {
       throw new LoadError(
-        `note id "${fm.id}" does not match filename stem "${expectedId}"`,
-        f,
+        `trace id "${fm.id}" does not match filename stem "${expectedId}"`,
+        f
       );
     }
     out.push({
@@ -155,19 +155,20 @@ async function loadNotes(root: string): Promise<Note[]> {
 }
 
 async function loadTomes(root: string): Promise<Tome[]> {
-  const tomesDir = path.join(root, "tomes");
+  const tomesDir = path.join(root, 'tomes');
   if (!(await exists(tomesDir))) return [];
   const names = await fs.readdir(tomesDir, { withFileTypes: true });
   const tomes: Tome[] = [];
   for (const entry of names) {
     if (!entry.isDirectory()) continue;
     const tomePath = path.join(tomesDir, entry.name);
-    const manifestPath = path.join(tomePath, "tome.yaml");
+    const manifestPath = path.join(tomePath, 'tome.yaml');
     if (!(await exists(manifestPath))) continue;
-    const manifest = await parseYamlFile<
-      import("./types.js").TomeManifest
-    >(manifestPath, TomeManifestSchema);
-    const storyDir = path.join(tomePath, "story");
+    const manifest = await parseYamlFile<import('./types.js').TomeManifest>(
+      manifestPath,
+      TomeManifestSchema
+    );
+    const storyDir = path.join(tomePath, 'story');
     const chapters = await loadChapters(storyDir, root, manifest.id);
     tomes.push({
       manifest,
@@ -182,7 +183,7 @@ async function loadTomes(root: string): Promise<Tome[]> {
 async function loadChapters(
   storyDir: string,
   root: string,
-  tomeId: string,
+  tomeId: string
 ): Promise<Chapter[]> {
   if (!(await exists(storyDir))) return [];
   const names = await fs.readdir(storyDir, { withFileTypes: true });
@@ -190,15 +191,15 @@ async function loadChapters(
   for (const entry of names) {
     if (!entry.isDirectory()) continue;
     const chapterDir = path.join(storyDir, entry.name);
-    const chapterFile = path.join(chapterDir, "chapter.md");
+    const chapterFile = path.join(chapterDir, 'chapter.md');
     if (!(await exists(chapterFile))) continue;
     const body = await readText(chapterFile);
-    const metaFile = path.join(chapterDir, "_meta.yaml");
-    let meta: import("./types.js").ChapterMeta = {};
+    const metaFile = path.join(chapterDir, '_meta.yaml');
+    let meta: import('./types.js').ChapterMeta = {};
     if (await exists(metaFile)) {
-      meta = await parseYamlFile<import("./types.js").ChapterMeta>(
+      meta = await parseYamlFile<import('./types.js').ChapterMeta>(
         metaFile,
-        ChapterMetaSchema,
+        ChapterMetaSchema
       );
     }
     chapters.push({
@@ -211,23 +212,24 @@ async function loadChapters(
     });
   }
   chapters.sort(
-    (a, b) => (a.meta.ordinal ?? 0) - (b.meta.ordinal ?? 0) ||
-      a.slug.localeCompare(b.slug),
+    (a, b) =>
+      (a.meta.ordinal ?? 0) - (b.meta.ordinal ?? 0) ||
+      a.slug.localeCompare(b.slug)
   );
   return chapters;
 }
 
 async function loadThreads(root: string): Promise<Thread[]> {
-  const dir = path.join(root, "threads");
+  const dir = path.join(root, 'threads');
   const threads: Thread[] = [];
   if (!(await exists(dir))) return threads;
-  const files = (await walk(dir)).filter((f) => f.endsWith(".yaml"));
+  const files = (await walk(dir)).filter((f) => f.endsWith('.yaml'));
   for (const f of files) {
     const parsed = await parseYamlFile<{
       id: string;
       calendar?: string;
       branches_from?: { thread: string; at_waypoint: string };
-      waypoints: Thread["waypoints"];
+      waypoints: Thread['waypoints'];
     }>(f, ThreadFileSchema);
     threads.push({
       ...parsed,
@@ -239,9 +241,9 @@ async function loadThreads(root: string): Promise<Thread[]> {
 }
 
 async function loadCalendars(root: string): Promise<CalendarSpec[]> {
-  const dir = path.join(root, "calendars");
+  const dir = path.join(root, 'calendars');
   if (!(await exists(dir))) return [];
-  const files = (await walk(dir)).filter((f) => f.endsWith(".yaml"));
+  const files = (await walk(dir)).filter((f) => f.endsWith('.yaml'));
   const cals: CalendarSpec[] = [];
   for (const f of files) {
     cals.push(await parseYamlFile<CalendarSpec>(f, CalendarFileSchema));
@@ -251,26 +253,26 @@ async function loadCalendars(root: string): Promise<CalendarSpec[]> {
 
 export async function loadSaga(root: string): Promise<Saga> {
   const absRoot = path.resolve(root);
-  const manifestPath = path.join(absRoot, "saga.yaml");
+  const manifestPath = path.join(absRoot, 'saga.yaml');
   if (!(await exists(manifestPath))) {
-    throw new LoadError("saga.yaml not found", manifestPath);
+    throw new LoadError('saga.yaml not found', manifestPath);
   }
   const manifest = await parseYamlFile<SagaManifest>(
     manifestPath,
-    SagaManifestSchema,
+    SagaManifestSchema
   );
-  // Canonical layout: codex/ lexicon/ sigils/ threads/ tomes/ notes/.
+  // Canonical layout: codex/ lexicon/ sigils/ threads/ tomes/ traces/.
   // Legacy folders (wiki/ glossary/ tags/ timelines/) are no longer loaded —
   // run `lw migrate` on a legacy saga to rename them first.
-  const [codex, lexicon, sigils, tomes, threads, calendars, notes] =
+  const [codex, lexicon, sigils, tomes, threads, calendars, traces] =
     await Promise.all([
-      loadEntriesIn(path.join(absRoot, "codex"), absRoot),
-      loadEntriesIn(path.join(absRoot, "lexicon"), absRoot),
-      loadEntriesIn(path.join(absRoot, "sigils"), absRoot),
+      loadEntriesIn(path.join(absRoot, 'codex'), absRoot),
+      loadEntriesIn(path.join(absRoot, 'lexicon'), absRoot),
+      loadEntriesIn(path.join(absRoot, 'sigils'), absRoot),
       loadTomes(absRoot),
       loadThreads(absRoot),
       loadCalendars(absRoot),
-      loadNotes(absRoot),
+      loadTraces(absRoot),
     ]);
   return {
     manifest,
@@ -279,6 +281,6 @@ export async function loadSaga(root: string): Promise<Saga> {
     tomes,
     threads,
     calendars,
-    notes,
+    traces,
   };
 }

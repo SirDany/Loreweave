@@ -1,37 +1,35 @@
-import type { Note } from "../lib/lw.js";
+import type { Trace } from '../lib/lw.js';
 
 interface Props {
-  notes: Note[];
-  /** When set, filter to notes attached to this target.
+  traces: Trace[];
+  /** When set, filter to traces attached to this target.
    * Accepted: "@type/id" or "chapter:tome/slug" or "saga" */
   forTarget?: string | null;
   onJump?: (target: string) => void;
 }
 
-const KIND_LABEL: Record<Note["kind"], string> = {
-  idea: "💡",
-  todo: "✅",
-  remark: "🗒",
-  question: "❓",
-  done: "✔",
+const KIND_LABEL: Record<Trace['kind'], string> = {
+  idea: '💡',
+  todo: '✅',
+  remark: '🗒',
+  question: '❓',
+  done: '✔',
 };
 
-export function NotesList({ notes, forTarget, onJump }: Props) {
+export function TracesList({ traces, forTarget, onJump }: Props) {
   const visible = forTarget
-    ? notes.filter((n) => {
+    ? traces.filter((n) => {
         const t = n.target ?? null;
         if (t === forTarget) return true;
         // allow "@" prefix tolerance
-        if (forTarget.startsWith("@") && t === forTarget.slice(1)) return true;
-        if (t?.startsWith("@") && t.slice(1) === forTarget) return true;
+        if (forTarget.startsWith('@') && t === forTarget.slice(1)) return true;
+        if (t?.startsWith('@') && t.slice(1) === forTarget) return true;
         return false;
       })
-    : notes;
+    : traces;
 
   if (visible.length === 0) {
-    return (
-      <div className="text-xs text-stone-500 italic">no notes</div>
-    );
+    return <div className="text-xs text-stone-500 italic">no traces</div>;
   }
 
   return (
@@ -40,16 +38,16 @@ export function NotesList({ notes, forTarget, onJump }: Props) {
         <li
           key={n.id}
           className={
-            "rounded border p-3 text-sm " +
-            (n.status === "resolved"
-              ? "border-stone-800 bg-stone-900/40 opacity-60"
-              : n.kind === "todo"
-                ? "border-amber-900/70 bg-amber-950/30"
-                : n.kind === "question"
-                  ? "border-sky-900/70 bg-sky-950/30"
-                  : n.kind === "idea"
-                    ? "border-violet-900/70 bg-violet-950/30"
-                    : "border-stone-800 bg-stone-900/40")
+            'rounded border p-3 text-sm ' +
+            (n.status === 'resolved'
+              ? 'border-stone-800 bg-stone-900/40 opacity-60'
+              : n.kind === 'todo'
+              ? 'border-amber-900/70 bg-amber-950/30'
+              : n.kind === 'question'
+              ? 'border-sky-900/70 bg-sky-950/30'
+              : n.kind === 'idea'
+              ? 'border-violet-900/70 bg-violet-950/30'
+              : 'border-stone-800 bg-stone-900/40')
           }
         >
           <div className="flex items-start gap-2">
@@ -78,7 +76,7 @@ export function NotesList({ notes, forTarget, onJump }: Props) {
               </div>
               {n.tags.length > 0 && (
                 <div className="mt-1 text-[10px] text-stone-500">
-                  {n.tags.map((t) => `#${t}`).join(" ")}
+                  {n.tags.map((t) => `#${t}`).join(' ')}
                 </div>
               )}
             </div>

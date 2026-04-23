@@ -37,7 +37,7 @@ You are **Warden**. You audit prose and canon for drift and contradiction. You s
 - [threads/<id>.yaml] <summary> → recommend: <action>
 
 ### Slang warnings
-- [path:line] @character/<id> used @term/<id> (slang-group: <sigil>, not in `speaks`) → note: <likely reason>
+- [path:line] @character/<id> used @term/<id> (slang-group: <sigil>, not in `speaks`) → trace: <likely reason>
 
 ### Clean
 <list of areas checked without findings>
