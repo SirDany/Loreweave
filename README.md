@@ -55,14 +55,43 @@ sagas/<saga>/
 
 ---
 
+## Requirements
+
+- Node.js `>=20.10` (required)
+- `pnpm` `9.12.0` or newer (recommended via `corepack enable` or `npm install -g pnpm`)
+- Git (recommended for Saga versioning and `lw git` commands)
+- Rust / Cargo (required only for Tauri desktop development and builds)
+- Optional: `pandoc` on PATH for `lw export --format tome-pdf|tome-docx|tome-epub`
+
+> The workspace is configured for `pnpm` and the root `package.json` specifies `packageManager: "pnpm@9.12.0"`.
+
 ## Getting started
+
+1. Install prerequisites
+   - Node 20.10+ and pnpm
+   - Git for repository and Saga workflows
+   - Rust/Cargo only if you want `tauri:dev` or `tauri build`
+2. Install dependencies
 
 ```pwsh
 pnpm install
-pnpm -r build
-pnpm -r test
+```
 
-# Try the CLI against the example Saga
+3. Build the workspace
+
+```pwsh
+pnpm -r build
+```
+
+4. Run the test suite
+
+```pwsh
+pnpm -r test
+```
+
+5. Try the CLI against the example Saga
+
+```pwsh
 pnpm lw validate sagas/example-saga
 pnpm lw weave    sagas/example-saga character/aaron      # alias of `resolve`
 pnpm lw echoes   sagas/example-saga character/aaron      # alias of `refs`
@@ -70,12 +99,22 @@ pnpm lw thread   sagas/example-saga main --linear
 pnpm lw audit    sagas/example-saga --tome book-one
 ```
 
-Run the desktop UI:
+## Run the desktop UI
+
+Use the plain Vite app for fast UI development:
 
 ```pwsh
-pnpm --filter @loreweave/desktop dev          # plain Vite (no Tauri)
-pnpm --filter @loreweave/desktop tauri:dev    # full Tauri shell
+pnpm --filter @loreweave/desktop dev
 ```
+
+Use the Tauri shell when you want the real native desktop experience:
+
+```pwsh
+pnpm --filter @loreweave/desktop tauri:dev
+```
+
+- `dev` runs the React UI in Vite without requiring Rust/Cargo
+- `tauri:dev` requires `cargo` and starts the app in the Tauri desktop container
 
 ---
 
