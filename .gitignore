@@ -1,0 +1,61 @@
+# --- Dependencies -----------------------------------------------------------
+node_modules/
+.pnpm-store/
+.pnp.*
+.yarn/cache
+.yarn/install-state.gz
+
+# --- Build outputs ----------------------------------------------------------
+dist/
+build/
+out/
+.next/
+.turbo/
+*.tsbuildinfo
+
+# --- Rust / Tauri -----------------------------------------------------------
+target/
+**/target/
+*.rs.bk
+Cargo.lock.bak
+
+# --- Logs & reports ---------------------------------------------------------
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+coverage/
+.nyc_output/
+*.lcov
+
+# --- Env & secrets ----------------------------------------------------------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# --- Editors & OS -----------------------------------------------------------
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json.example
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Tests ------------------------------------------------------------------
+.vitest-cache/
+playwright-report/
+test-results/
+
+# --- Misc -------------------------------------------------------------------
+tmp/
+.cache/
+
+# --- Loreweave local state --------------------------------------------------
+# Ingest staging and other per-saga runtime scratch.
+sagas/**/.loreweave/

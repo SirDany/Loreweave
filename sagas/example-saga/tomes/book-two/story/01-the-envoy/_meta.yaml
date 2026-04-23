@@ -1,0 +1,10 @@
+title: "The Envoy"
+ordinal: 1
+status: draft
+pov: ["@character/cassia"]
+voice: "Measured, formal. Cassia does not speak northern slang."
+tense: past
+summary: >
+  Cassia walks the ruins of Vellmar with Aaron, ten years after the fall.
+  (Intentionally plants a slang-misuse warning: Cassia uses @term/grukh.)
+linked_events: ["@waypoint/aarons-return"]

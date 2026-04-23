@@ -1,0 +1,9 @@
+title: "Arrival at Vellmar"
+ordinal: 1
+status: draft
+pov: ["@character/bella"]
+voice: "Bright, blunt, northern-slang sprinkled."
+tense: past
+summary: >
+  Bella and Aaron march into Vellmar the day before the attack.
+linked_events: ["@waypoint/battle-of-vellmar"]

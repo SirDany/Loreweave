@@ -1,0 +1,31 @@
+{
+  "$schema": "https://schema.tauri.app/config/2.0.0",
+  "productName": "Loreweave",
+  "version": "0.1.0",
+  "identifier": "app.loreweave.desktop",
+  "build": {
+    "beforeDevCommand": "pnpm --filter @loreweave/desktop dev",
+    "beforeBuildCommand": "pnpm --filter @loreweave/desktop build",
+    "devUrl": "http://localhost:5173",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Loreweave",
+        "width": 1280,
+        "height": 800,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": []
+  }
+}

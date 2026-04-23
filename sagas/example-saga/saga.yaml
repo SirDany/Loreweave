@@ -1,0 +1,6 @@
+id: example-saga
+title: "The Vellmar Cycle"
+default_calendar: gregorian
+tome_order:
+  - book-one
+  - book-two

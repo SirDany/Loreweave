@@ -1,0 +1,10 @@
+id: alt
+calendar: gregorian
+branches_from:
+  thread: main
+  at_waypoint: wp-battle
+waypoints:
+  - id: wp-truce
+    event: "@waypoint/aarons-truce"
+    at: "1222-09-14"
+    appears_in: [book-two]

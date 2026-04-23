@@ -1,0 +1,43 @@
+{
+  "name": "@loreweave/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "typecheck": "tsc -b --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "preview": "vite preview",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build"
+  },
+  "dependencies": {
+    "@codemirror/autocomplete": "6.18.0",
+    "@codemirror/commands": "6.6.2",
+    "@codemirror/lang-markdown": "6.3.0",
+    "@codemirror/language": "6.10.3",
+    "@codemirror/state": "6.4.1",
+    "@codemirror/view": "6.34.1",
+    "@loreweave/core": "workspace:*",
+    "@tauri-apps/api": "2.0.1",
+    "codemirror": "6.0.1",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "yaml": "2.5.1"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "2.0.1",
+    "@types/react": "18.3.5",
+    "@types/react-dom": "18.3.0",
+    "@vitejs/plugin-react": "4.3.1",
+    "autoprefixer": "10.4.20",
+    "postcss": "8.4.47",
+    "tailwindcss": "3.4.11",
+    "typescript": "5.6.2",
+    "vite": "5.4.5",
+    "vitest": "2.1.1"
+  }
+}

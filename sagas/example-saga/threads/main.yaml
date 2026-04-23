@@ -1,0 +1,12 @@
+id: main
+calendar: gregorian
+waypoints:
+  - id: wp-battle
+    event: "@waypoint/battle-of-vellmar"
+    at: "1212-04-05"
+    appears_in: [book-one]
+  - id: wp-return
+    event: "@waypoint/aarons-return"
+    at: "1222-09-14"
+    after: [wp-battle]
+    appears_in: [book-two]
