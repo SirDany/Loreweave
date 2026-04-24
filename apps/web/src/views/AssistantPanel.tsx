@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowRight,
   Bot,
   Check,
   ChevronDown,
   ChevronRight,
+  Clipboard,
   Gauge,
   Loader2,
   RotateCcw,
@@ -13,6 +14,7 @@ import {
   Sparkles,
   StopCircle,
   Trash2,
+  Undo2,
   Wrench,
   X,
 } from 'lucide-react';
@@ -42,11 +44,14 @@ interface Props {
   onApplied?: () => void;
 }
 
-const POLICY_KEY = 'lw.chat.approvalPolicy';
+const POLICY_KEY = (sagaRoot: string) => `lw.chat.approvalPolicy.${sagaRoot}`;
+const LEGACY_POLICY_KEY = 'lw.chat.approvalPolicy';
 
-function loadPolicy(): ApprovalPolicy {
+function loadPolicy(sagaRoot: string): ApprovalPolicy {
   try {
-    const v = localStorage.getItem(POLICY_KEY) as ApprovalPolicy | null;
+    const v =
+      (localStorage.getItem(POLICY_KEY(sagaRoot)) as ApprovalPolicy | null) ??
+      (localStorage.getItem(LEGACY_POLICY_KEY) as ApprovalPolicy | null);
     if (v === 'auto-reads' || v === 'writes-approval' || v === 'approve-all') {
       return v;
     }
@@ -64,14 +69,20 @@ export function AssistantPanel({
   initialPrompt,
   onApplied,
 }: Props) {
-  const [policy, setPolicy] = useState<ApprovalPolicy>(loadPolicy);
+  const [policy, setPolicy] = useState<ApprovalPolicy>(() =>
+    loadPolicy(sagaRoot),
+  );
+  useEffect(() => {
+    // Switching Sagas re-loads that Saga's stored policy.
+    setPolicy(loadPolicy(sagaRoot));
+  }, [sagaRoot]);
   useEffect(() => {
     try {
-      localStorage.setItem(POLICY_KEY, policy);
+      localStorage.setItem(POLICY_KEY(sagaRoot), policy);
     } catch {
       /* ignore */
     }
-  }, [policy]);
+  }, [sagaRoot, policy]);
 
   const chat = useChat({ sagaRoot, approvalPolicy: policy });
   const [draft, setDraft] = useState(initialPrompt ?? '');
@@ -105,9 +116,46 @@ export function AssistantPanel({
 
   const selectedAgent = chat.agents.find((a) => a.id === chat.agentId);
   const pendingVisible = chat.pending.filter(
-    (p) => p.status === 'pending' || p.status === 'stale',
+    (p) =>
+      p.status === 'pending' ||
+      p.status === 'stale' ||
+      p.status === 'applied',
   );
   const tokenTotal = chat.usageTotal.totalTokens ?? 0;
+
+  const copyTranscript = useCallback(() => {
+    const lines: string[] = [
+      `# Loreweave chat — ${selectedAgent?.name ?? chat.agentId}`,
+      '',
+    ];
+    for (const m of chat.messages) {
+      lines.push(m.role === 'user' ? '## You' : `## ${selectedAgent?.name ?? 'Assistant'}`);
+      lines.push('');
+      lines.push(m.content || '_(empty)_');
+      if (m.toolCalls && m.toolCalls.length > 0) {
+        lines.push('');
+        lines.push('**Tools used:**');
+        for (const tc of m.toolCalls) {
+          lines.push(`- \`${tc.name}\` — ${tc.result?.ok === false ? 'error' : 'ok'}`);
+        }
+      }
+      lines.push('');
+    }
+    const md = lines.join('\n');
+    navigator.clipboard?.writeText(md).catch(() => {
+      /* ignore */
+    });
+  }, [chat.agentId, chat.messages, selectedAgent]);
+
+  const handoffTo = useCallback(
+    (to: string, instructions: string) => {
+      chat.setAgentId(to);
+      // Pre-fill the next message with the handoff rationale so the writer
+      // can edit it instead of retyping.
+      setDraft(instructions);
+    },
+    [chat],
+  );
 
   return (
     <aside className="w-[420px] shrink-0 flex flex-col border-l border-border bg-card/60 h-full overflow-hidden">
@@ -122,6 +170,16 @@ export function AssistantPanel({
           title="Settings"
         >
           <Settings className="h-3.5 w-3.5" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 px-2 text-muted-foreground hover:text-foreground"
+          onClick={copyTranscript}
+          disabled={chat.messages.length === 0}
+          title="Copy conversation as markdown"
+        >
+          <Clipboard className="h-3.5 w-3.5" />
         </Button>
         <Button
           variant="ghost"
@@ -176,11 +234,7 @@ export function AssistantPanel({
                 </option>
               ))}
             </select>
-            {selectedAgent?.description && (
-              <div className="text-[11px] text-muted-foreground leading-snug">
-                {selectedAgent.description}
-              </div>
-            )}
+            {selectedAgent && <AgentRoleBanner agent={selectedAgent} />}
           </>
         )}
       </div>
@@ -212,7 +266,7 @@ export function AssistantPanel({
             <MessageBubble
               key={m.id}
               message={m}
-              onHandoff={(to) => chat.setAgentId(to)}
+              onHandoff={handoffTo}
               onRetry={
                 isLastAssistant && chat.canRetry && !chat.streaming
                   ? () => void chat.retry()
@@ -232,6 +286,10 @@ export function AssistantPanel({
               onApplied?.();
             }}
             onDiscard={() => chat.discardPending(action.id)}
+            onRevert={async () => {
+              await chat.revertApplied(action.id);
+              onApplied?.();
+            }}
           />
         ))}
 
@@ -272,15 +330,18 @@ export function AssistantPanel({
             if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
               e.preventDefault();
               void onSubmit();
+            } else if (e.key === 'Escape' && chat.streaming) {
+              e.preventDefault();
+              chat.cancel();
             }
           }}
           placeholder={
             selectedAgent
-              ? `Ask ${selectedAgent.name}… (Ctrl+Enter to send)`
+              ? `Ask ${selectedAgent.name}… (Ctrl+Enter to send, Esc to stop)`
               : 'Loading…'
           }
           className="w-full min-h-[80px] max-h-[200px] resize-y rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-          disabled={chat.streaming || !chat.agentId}
+          disabled={!chat.agentId}
         />
         <div className="flex items-center gap-2">
           {chat.streaming ? (
@@ -412,7 +473,7 @@ function MessageBubble({
   onRetry,
 }: {
   message: ChatMessage;
-  onHandoff: (agentId: string) => void;
+  onHandoff: (agentId: string, instructions: string) => void;
   onRetry?: () => void;
 }) {
   const isUser = message.role === 'user';
@@ -458,7 +519,7 @@ function MessageBubble({
           {message.handoffs.map((h, i) => (
             <button
               key={i}
-              onClick={() => onHandoff(h.to)}
+              onClick={() => onHandoff(h.to, h.instructions)}
               className="flex w-full items-center gap-2 rounded-md border border-primary/50 bg-primary/10 px-2 py-1.5 text-left text-xs hover:bg-primary/20"
             >
               <ArrowRight className="h-3.5 w-3.5 text-primary" />
@@ -530,19 +591,24 @@ function PendingActionCard({
   action,
   onApply,
   onDiscard,
+  onRevert,
 }: {
   action: PendingAction;
   onApply: () => void | Promise<void>;
   onDiscard: () => void;
+  onRevert: () => void | Promise<void>;
 }) {
   const stale = action.status === 'stale';
+  const applied = action.status === 'applied';
   return (
     <div
       className={cn(
         'rounded-md border-2 p-3 space-y-2',
         stale
           ? 'border-amber-500/60 bg-amber-500/5'
-          : 'border-primary/60 bg-primary/5',
+          : applied
+            ? 'border-emerald-500/50 bg-emerald-500/5'
+            : 'border-primary/60 bg-primary/5',
       )}
     >
       <div className="flex items-center gap-2">
@@ -558,6 +624,7 @@ function PendingActionCard({
           <Badge variant="warning">overwrites</Badge>
         )}
         {stale && <Badge variant="warning">stale</Badge>}
+        {applied && <Badge variant="success">applied</Badge>}
       </div>
       <div className="font-mono text-[11px] text-foreground/80">
         {action.relPath}
@@ -595,20 +662,81 @@ function PendingActionCard({
         )}
       </div>
       <div className="flex gap-2">
-        <Button
-          size="sm"
-          className="gap-1.5"
-          onClick={() => void onApply()}
-          disabled={stale}
-        >
-          <Check className="h-3.5 w-3.5" />
-          Apply
-        </Button>
-        <Button variant="outline" size="sm" className="gap-1.5" onClick={onDiscard}>
-          <X className="h-3.5 w-3.5" />
-          Discard
-        </Button>
+        {applied ? (
+          <>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={() => void onRevert()}
+              title="Write the original contents back"
+            >
+              <Undo2 className="h-3.5 w-3.5" />
+              Revert
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-1.5 text-muted-foreground"
+              onClick={onDiscard}
+            >
+              <X className="h-3.5 w-3.5" />
+              Dismiss
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button
+              size="sm"
+              className="gap-1.5"
+              onClick={() => void onApply()}
+              disabled={stale}
+            >
+              <Check className="h-3.5 w-3.5" />
+              Apply
+            </Button>
+            <Button variant="outline" size="sm" className="gap-1.5" onClick={onDiscard}>
+              <X className="h-3.5 w-3.5" />
+              Discard
+            </Button>
+          </>
+        )}
       </div>
+    </div>
+  );
+}
+
+function AgentRoleBanner({
+  agent,
+}: {
+  agent: { description: string; tools: string[] };
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="text-[11px] leading-snug">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center gap-1 text-muted-foreground hover:text-foreground"
+      >
+        {open ? (
+          <ChevronDown className="h-3 w-3" />
+        ) : (
+          <ChevronRight className="h-3 w-3" />
+        )}
+        <span className="flex-1 text-left">{agent.description}</span>
+      </button>
+      {open && agent.tools.length > 0 && (
+        <div className="mt-1 flex flex-wrap gap-1 pl-4">
+          {agent.tools.map((t) => (
+            <span
+              key={t}
+              className="rounded bg-muted/50 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
+            >
+              {t}
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

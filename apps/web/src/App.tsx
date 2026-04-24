@@ -14,6 +14,7 @@ import {
   Network,
   RefreshCw,
   Search,
+  Shield,
   Sparkles,
   Tags,
   Upload,
@@ -416,6 +417,23 @@ export default function App() {
                 agent: 'muse',
                 prompt:
                   'Discuss this chapter with me — structure, pacing, what works, what doesn\'t.',
+                context: {
+                  path: currentChapter.chapter.relPath,
+                  likelyRefs,
+                },
+              });
+              setAssistantOpen(true);
+            }}
+            onAudit={() => {
+              const likelyRefs = Array.from(
+                new Set(
+                  currentChapter.chapter.refs.map((r) => `${r.type}/${r.id}`),
+                ),
+              );
+              setAssistantSeed({
+                agent: 'warden',
+                prompt:
+                  'Audit this chapter against the Codex: list contradictions, broken @refs, slang misuse, and Thread conflicts. Cite files.',
                 context: {
                   path: currentChapter.chapter.relPath,
                   likelyRefs,
@@ -969,6 +987,7 @@ function ChapterView({
   onSaved,
   onAskAssistant,
   onAsk,
+  onAudit,
 }: {
   chapter: { tome: string; chapter: DumpChapter };
   catalog: RefCatalog;
@@ -980,6 +999,7 @@ function ChapterView({
     path: string,
   ) => void;
   onAsk?: () => void;
+  onAudit?: () => void;
 }) {
   const [draft, setDraft] = useState(chapter.chapter.body);
   const [saving, setSaving] = useState(false);
@@ -1040,6 +1060,18 @@ function ChapterView({
             >
               <Bot className="h-3.5 w-3.5" />
               Ask
+            </Button>
+          )}
+          {onAudit && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-1.5"
+              onClick={onAudit}
+              title="Run @warden audit on this chapter"
+            >
+              <Shield className="h-3.5 w-3.5" />
+              Audit
             </Button>
           )}
           <Button

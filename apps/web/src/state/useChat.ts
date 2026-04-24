@@ -39,6 +39,8 @@ export interface PendingAction {
   diff?: string;
   /** sha256-prefix of `original` at proposal time — enables stale detection on Apply. */
   originalHash?: string;
+  /** sha256-prefix of the file after Apply. Enables Revert to detect external changes. */
+  appliedHash?: string;
   exists?: boolean;
   rationale?: string | null;
   patch?: boolean;
@@ -496,6 +498,20 @@ export function useChat({ sagaRoot, approvalPolicy: _policy = 'writes-approval' 
         if (!resp.ok) {
           throw new Error(`/lw/apply ${resp.status}`);
         }
+        // Capture the new hash so Revert can validate it hasn't drifted.
+        try {
+          const body = (await resp.json()) as { newHash?: string };
+          if (body?.newHash) {
+            updateThread((t) => ({
+              ...t,
+              pending: t.pending.map((p) =>
+                p.id === id ? { ...p, appliedHash: body.newHash } : p,
+              ),
+            }));
+          }
+        } catch {
+          /* ignore */
+        }
       } catch (e) {
         updateThread((t) => ({
           ...t,
@@ -522,6 +538,64 @@ export function useChat({ sagaRoot, approvalPolicy: _policy = 'writes-approval' 
     [updateThread],
   );
 
+  /** Revert a previously-applied action by writing `original` back. */
+  const revertApplied = useCallback(
+    async (id: string): Promise<void> => {
+      const action = threadsRef.current[agentId]?.pending.find(
+        (p) => p.id === id,
+      );
+      if (!action || action.status !== 'applied' || action.original == null) {
+        return;
+      }
+      try {
+        const resp = await fetch('/lw/apply', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            sagaRoot: action.sagaRoot,
+            relPath: action.relPath,
+            content: action.original,
+            // Require the file to still match our applied content before we
+            // overwrite it with the original — otherwise we'd clobber the
+            // writer's manual edits.
+            originalHash: action.appliedHash,
+          }),
+        });
+        if (resp.status === 409) {
+          updateThread((t) => ({
+            ...t,
+            pending: t.pending.map((p) =>
+              p.id === id
+                ? {
+                    ...p,
+                    status: 'stale',
+                    error:
+                      'File changed since apply. Revert would clobber new edits.',
+                  }
+                : p,
+            ),
+          }));
+          return;
+        }
+        if (!resp.ok) throw new Error(`/lw/apply ${resp.status}`);
+        updateThread((t) => ({
+          ...t,
+          pending: t.pending.map((p) =>
+            p.id === id ? { ...p, status: 'discarded' } : p,
+          ),
+        }));
+      } catch (e) {
+        updateThread((t) => ({
+          ...t,
+          pending: t.pending.map((p) =>
+            p.id === id ? { ...p, error: (e as Error).message } : p,
+          ),
+        }));
+      }
+    },
+    [agentId, updateThread],
+  );
+
   /** Keep a ref of the threads map for async callbacks. */
   const threadsRef = useRef(threads);
   useEffect(() => {
@@ -544,6 +618,7 @@ export function useChat({ sagaRoot, approvalPolicy: _policy = 'writes-approval' 
     retry,
     applyPending,
     discardPending,
+    revertApplied,
     canRetry: !!lastUserMessageRef.current && !streaming,
   };
 }
