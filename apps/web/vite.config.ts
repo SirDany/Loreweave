@@ -685,6 +685,10 @@ function safeJoin(root: string, rel: string): string {
 }
 
 export default defineConfig({
+  // `LW_WEB_BASE` lets the GitHub Pages deploy build with a `/Loreweave/`
+  // base while local dev/preview stays on `/`. Anything that starts with
+  // `/` is accepted verbatim; the workflow appends a trailing slash.
+  base: process.env.LW_WEB_BASE ?? '/',
   plugins: [react(), lwSidecar()],
   resolve: {
     alias: {

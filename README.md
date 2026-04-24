@@ -123,6 +123,35 @@ pnpm --filter @loreweave/web preview
 
 ---
 
+## Hosting
+
+Loreweave is local-first by design: the web UI only becomes useful when paired
+with the `/lw` sidecar that reads and writes your Saga on disk. That means no
+pure static host (GitHub Pages, Netlify static, Cloudflare Pages) can run the
+full app — there's no Node process or filesystem behind the served HTML.
+
+Two free-on-GitHub options cover the realistic cases:
+
+- **GitHub Pages — demo preview.** The [`pages` workflow](.github/workflows/pages.yml)
+  builds `apps/web` with `VITE_LW_DEMO=1` and a repo-scoped base path, then
+  deploys the static bundle. Visitors see the UI with a persistent banner
+  explaining that reads/writes are disabled; good as a landing page and
+  screenshot target. To enable: in your fork's **Settings → Pages**, set
+  _Source_ to **GitHub Actions**, then push to `main`.
+- **GitHub Codespaces — full editor in the browser.** The
+  [`.devcontainer/`](.devcontainer/devcontainer.json) config installs pnpm,
+  builds the workspace packages, and forwards port `5173`. Click **Code →
+  Codespaces → Create codespace on main** and run `pnpm dev` inside the
+  Codespace — you get the real sidecar over an authenticated tunnel. The free
+  tier includes enough core-hours for regular personal use.
+
+For a self-hosted instance (Fly.io / Render / a home server) you'd need to
+expose the sidecar as a production HTTP service with auth; that's out of
+scope for the repo as it stands because it changes the local-first threat
+model.
+
+---
+
 ## CLI reference
 
 ```pwsh

@@ -1,0 +1,54 @@
+name: pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # pnpm version is pinned via the root package.json `packageManager` field.
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Workspace packages must exist as `dist/` before the web build can
+      # resolve `@loreweave/core`.
+      - run: pnpm -r --filter "./packages/*" build
+      - name: Build web (demo mode)
+        env:
+          # Repo-scoped base path — GitHub Pages serves project sites at
+          # https://<user>.github.io/<repo>/. Change if you rename the repo.
+          LW_WEB_BASE: /${{ github.event.repository.name }}/
+          VITE_LW_DEMO: '1'
+        run: pnpm --filter @loreweave/web build
+      # SPA fallback: copy index.html to 404.html so deep links don't 404.
+      - name: Add SPA fallback
+        run: cp apps/web/dist/index.html apps/web/dist/404.html
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: apps/web/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

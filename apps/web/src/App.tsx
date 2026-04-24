@@ -85,6 +85,15 @@ const SECTIONS: {
   { id: 'versions', label: 'Versions', hint: 'git: branches & commits', icon: GitBranch },
 ];
 
+/**
+ * Build-time flag set by the GitHub Pages workflow (VITE_LW_DEMO=1). When
+ * true, the app is running as a static preview with no `/lw` sidecar, so
+ * we render a persistent banner and short-circuit the failure splash.
+ */
+const IS_DEMO = import.meta.env.VITE_LW_DEMO === '1';
+const DEMO_SPLASH_DETAIL =
+  "This is a static preview of the Loreweave UI hosted on GitHub Pages. The /lw sidecar that reads and writes your Sagas isn't available here — clone the repo and run `pnpm dev`, or open it in a GitHub Codespace, for the full editing experience.";
+
 export default function App() {
   const saga = useSaga();
   const [section, setSection] = useState<Section>('codex');
@@ -129,9 +138,11 @@ export default function App() {
   if (saga.error) {
     return (
       <Splash
-        message="Failed to load Saga"
-        detail={saga.error}
-        onRetry={() => void saga.reload()}
+        message={
+          IS_DEMO ? 'Demo mode — no Saga filesystem available' : 'Failed to load Saga'
+        }
+        detail={IS_DEMO ? DEMO_SPLASH_DETAIL : saga.error}
+        onRetry={IS_DEMO ? undefined : () => void saga.reload()}
       />
     );
   }
@@ -190,7 +201,9 @@ export default function App() {
   };
 
   return (
-    <div className="flex h-full font-serif text-foreground antialiased">
+    <div className="flex h-full flex-col">
+      {IS_DEMO && <DemoBanner />}
+      <div className="flex min-h-0 flex-1 font-serif text-foreground antialiased">
       {/* ---------- Shelf ---------- */}
       <aside className="w-60 shrink-0 flex flex-col gap-5 border-r border-border bg-card/60 px-4 py-5 bg-parchment-grain">
         <div>
@@ -584,6 +597,28 @@ export default function App() {
           }}
         />
       )}
+      </div>
+    </div>
+  );
+}
+
+function DemoBanner() {
+  return (
+    <div className="shrink-0 border-b border-amber-500/40 bg-amber-500/10 px-4 py-2 text-center text-xs text-amber-100">
+      <span className="font-semibold">Demo preview</span> — the filesystem
+      sidecar isn&apos;t available on GitHub Pages, so reads and writes will
+      fail. Clone the repo and run{' '}
+      <code className="rounded bg-black/30 px-1 font-mono">pnpm dev</code>, or
+      open it in a{' '}
+      <a
+        href="https://github.com/codespaces"
+        target="_blank"
+        rel="noreferrer"
+        className="underline hover:text-white"
+      >
+        GitHub Codespace
+      </a>
+      , for the full editing experience.
     </div>
   );
 }
