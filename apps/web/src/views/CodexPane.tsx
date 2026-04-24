@@ -3,17 +3,17 @@
  * under the writer's cursor (the `@echo` that contains the caret), using
  * the cached canon digest for zero-latency resolution.
  */
-import { BookOpen } from "lucide-react";
-import type { CanonDigestPayload } from "../lib/lw.js";
-import type { RefAtCursor } from "../editor/refAtCursor.js";
+import { BookOpen } from 'lucide-react';
+import type { RefAtCursor } from '../editor/refAtCursor.js';
+import type { CanonDigestPayload } from '../lib/lw.js';
 
 interface Props {
-  ref: RefAtCursor | null;
+  cursorRef: RefAtCursor | null;
   digest: CanonDigestPayload | null;
   onJump?: (type: string, id: string) => void;
 }
 
-export function CodexPane({ ref, digest, onJump }: Props) {
+export function CodexPane({ cursorRef, digest, onJump }: Props) {
   if (!digest) {
     return (
       <div className="h-full p-4 text-xs text-muted-foreground">
@@ -21,7 +21,7 @@ export function CodexPane({ ref, digest, onJump }: Props) {
       </div>
     );
   }
-  if (!ref) {
+  if (!cursorRef) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center text-xs text-muted-foreground">
         <BookOpen className="h-5 w-5 opacity-60" />
@@ -31,7 +31,7 @@ export function CodexPane({ ref, digest, onJump }: Props) {
       </div>
     );
   }
-  const needle = `@${ref.type}/${ref.id}`;
+  const needle = `@${cursorRef.type}/${cursorRef.id}`;
   const entry = digest.phoneBook.find((p) => p.ref === needle);
   const weave = digest.weaves.find((w) => w.ref === needle);
   if (!entry) {
@@ -57,8 +57,8 @@ export function CodexPane({ ref, digest, onJump }: Props) {
         {entry.status && (
           <span
             className={
-              "mt-1 inline-block rounded border border-border px-1.5 py-[1px] text-[10px] uppercase " +
-              (entry.status === "draft" ? "text-amber-300" : "text-emerald-300")
+              'mt-1 inline-block rounded border border-border px-1.5 py-[1px] text-[10px] uppercase ' +
+              (entry.status === 'draft' ? 'text-amber-300' : 'text-emerald-300')
             }
           >
             {entry.status}
@@ -68,12 +68,10 @@ export function CodexPane({ ref, digest, onJump }: Props) {
       <div className="flex-1 overflow-auto px-4 py-3 text-sm">
         {entry.aliases && entry.aliases.length > 0 && (
           <div className="mb-2 text-xs text-muted-foreground">
-            a.k.a. {entry.aliases.join(", ")}
+            a.k.a. {entry.aliases.join(', ')}
           </div>
         )}
-        {entry.summary && (
-          <p className="text-foreground/90">{entry.summary}</p>
-        )}
+        {entry.summary && <p className="text-foreground/90">{entry.summary}</p>}
         {weave && Object.keys(weave.properties).length > 0 && (
           <div className="mt-3">
             <div className="mb-1 text-[11px] uppercase tracking-wider text-muted-foreground">
@@ -97,7 +95,10 @@ export function CodexPane({ ref, digest, onJump }: Props) {
         )}
         {weave && weave.inheritsChain.length > 0 && (
           <div className="mt-3 text-[11px] text-muted-foreground">
-            Inherits: {weave.inheritsChain.map((c) => c.replace(/^sigil:/, "#")).join(" → ")}
+            Inherits:{' '}
+            {weave.inheritsChain
+              .map((c) => c.replace(/^sigil:/, '#'))
+              .join(' → ')}
           </div>
         )}
       </div>
@@ -105,13 +106,24 @@ export function CodexPane({ ref, digest, onJump }: Props) {
   );
 }
 
-function PropRow({ k, value, from }: { k: string; value: unknown; from: string }) {
-  const inherited = from.startsWith("sigil:");
+function PropRow({
+  k,
+  value,
+  from,
+}: {
+  k: string;
+  value: unknown;
+  from: string;
+}) {
+  const inherited = from.startsWith('sigil:');
   return (
     <>
       <div className="text-muted-foreground">{k}</div>
       <div
-        className={"break-words " + (inherited ? "italic text-foreground/80" : "text-foreground/95")}
+        className={
+          'break-words ' +
+          (inherited ? 'italic text-foreground/80' : 'text-foreground/95')
+        }
         title={inherited ? `inherited from ${from}` : undefined}
       >
         {format(value)}
@@ -121,13 +133,13 @@ function PropRow({ k, value, from }: { k: string; value: unknown; from: string }
 }
 
 function format(v: unknown): string {
-  if (v == null) return "—";
-  if (Array.isArray(v)) return v.map((x) => format(x)).join(", ");
-  if (typeof v === "object") {
+  if (v == null) return '—';
+  if (Array.isArray(v)) return v.map((x) => format(x)).join(', ');
+  if (typeof v === 'object') {
     try {
       return JSON.stringify(v);
     } catch {
-      return "[object]";
+      return '[object]';
     }
   }
   return String(v);

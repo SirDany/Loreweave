@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react';
 import {
   AlertTriangle,
   BookOpen,
@@ -21,6 +20,7 @@ import {
   Upload,
   Waypoints,
 } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { Badge } from './components/ui/badge.js';
 import { Button } from './components/ui/button.js';
 import { Input } from './components/ui/input.js';
@@ -31,20 +31,23 @@ import {
   TabsList,
   TabsTrigger,
 } from './components/ui/tabs.js';
-import { cn } from './lib/utils.js';
 import { Editor } from './editor/LazyEditor.js';
-import type { RefCatalog } from './editor/ReferenceExtension.js';
-import type { DumpChapter, DumpEntry, DumpPayload } from './lib/lw.js';
-import { lwWrite } from './lib/lw.js';
-import type { CanonDigestPayload } from './lib/lw.js';
-import { buildCatalog } from './lib/catalog.js';
 import type { RefAtCursor } from './editor/refAtCursor.js';
-import { CodexPane } from './views/CodexPane.js';
-import { useSaga } from './state/useSaga.js';
+import type { RefCatalog } from './editor/ReferenceExtension.js';
+import { buildCatalog } from './lib/catalog.js';
+import type {
+  CanonDigestPayload,
+  DumpChapter,
+  DumpEntry,
+  DumpPayload,
+} from './lib/lw.js';
+import { lwWrite } from './lib/lw.js';
+import { cn } from './lib/utils.js';
 import type { ChatContextAttachment } from './state/useChat.js';
+import { useSaga } from './state/useSaga.js';
 import { AssistantPanel } from './views/AssistantPanel.js';
 import { BackupsDialog } from './views/BackupsDialog.js';
-import { SettingsDialog } from './views/SettingsDialog.js';
+import { CodexPane } from './views/CodexPane.js';
 import { ConstellationView } from './views/ConstellationView.js';
 import { EntryEditor } from './views/EntryEditor.js';
 import { ExportDialog } from './views/ExportDialog.js';
@@ -55,6 +58,7 @@ import { RenameDialog } from './views/RenameDialog.js';
 import { ResolvedPanel } from './views/ResolvedPanel.js';
 import { SagaPicker } from './views/SagaPicker.js';
 import { SearchPanel } from './views/SearchPanel.js';
+import { SettingsDialog } from './views/SettingsDialog.js';
 import { ThreadView } from './views/ThreadView.js';
 import { TracesList } from './views/TracesList.js';
 import { UsagesPanel } from './views/UsagesPanel.js';
@@ -82,13 +86,33 @@ const SECTIONS: {
   icon: React.ComponentType<{ className?: string }>;
 }[] = [
   { id: 'story', label: 'Story', hint: 'prose', icon: BookOpen },
-  { id: 'codex', label: 'Codex', hint: 'characters, locations, lore', icon: Library },
+  {
+    id: 'codex',
+    label: 'Codex',
+    hint: 'characters, locations, lore',
+    icon: Library,
+  },
   { id: 'lexicon', label: 'Lexicon', hint: 'terms & slang', icon: FileText },
   { id: 'sigils', label: 'Sigils', hint: 'tags & groups', icon: Tags },
-  { id: 'threads', label: 'Threads', hint: 'timelines & waypoints', icon: Waypoints },
+  {
+    id: 'threads',
+    label: 'Threads',
+    hint: 'timelines & waypoints',
+    icon: Waypoints,
+  },
   { id: 'traces', label: 'Traces', hint: 'ideas & todos', icon: Sparkles },
-  { id: 'constellation', label: 'Constellation', hint: 'graph of echoes', icon: Network },
-  { id: 'versions', label: 'Versions', hint: 'git: branches & commits', icon: GitBranch },
+  {
+    id: 'constellation',
+    label: 'Constellation',
+    hint: 'graph of echoes',
+    icon: Network,
+  },
+  {
+    id: 'versions',
+    label: 'Versions',
+    hint: 'git: branches & commits',
+    icon: GitBranch,
+  },
 ];
 
 /**
@@ -130,7 +154,11 @@ export default function App() {
         e.preventDefault();
         setSearching(true);
       }
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'A' || e.key === 'a')) {
+      if (
+        (e.ctrlKey || e.metaKey) &&
+        e.shiftKey &&
+        (e.key === 'A' || e.key === 'a')
+      ) {
         e.preventDefault();
         setAssistantOpen((v) => !v);
       }
@@ -146,7 +174,9 @@ export default function App() {
     return (
       <Splash
         message={
-          IS_DEMO ? 'Demo mode — no Saga filesystem available' : 'Failed to load Saga'
+          IS_DEMO
+            ? 'Demo mode — no Saga filesystem available'
+            : 'Failed to load Saga'
         }
         detail={IS_DEMO ? DEMO_SPLASH_DETAIL : saga.error}
         onRetry={IS_DEMO ? undefined : () => void saga.reload()}
@@ -211,414 +241,426 @@ export default function App() {
     <div className="flex h-full flex-col">
       {IS_DEMO && <DemoBanner />}
       <div className="flex min-h-0 flex-1 font-serif text-foreground antialiased">
-      {/* ---------- Shelf ---------- */}
-      <aside className="w-60 shrink-0 flex flex-col gap-5 border-r border-border bg-card/60 px-4 py-5 bg-parchment-grain">
-        <div>
-          <div className="flex items-center gap-2">
-            <Compass className="h-4 w-4 text-primary" />
-            <span className="label-rune">Shelf</span>
-          </div>
-          <div className="mt-2 font-serif text-xl leading-tight text-foreground">
-            {data.saga.title ?? data.saga.id}
-          </div>
-          <div className="font-mono text-[11px] text-muted-foreground truncate">
-            {data.saga.id}
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            className="mt-3 w-full justify-start gap-2"
-            onClick={() => setPickingSaga(true)}
-          >
-            <Database className="h-3.5 w-3.5" />
-            Open Saga…
-          </Button>
-          <div className="mt-2 grid grid-cols-2 gap-1.5">
-            <ShelfAction icon={Upload} label="Export" onClick={() => setExporting(true)} />
-            <ShelfAction icon={Inbox} label="Import" onClick={() => setImporting(true)} />
-            <ShelfAction
-              icon={Search}
-              label="Search"
-              onClick={() => setSearching(true)}
-              title="Ctrl+P"
-            />
-            <ShelfAction
-              icon={Bookmark}
-              label="Backups"
-              onClick={() => setShowingBackups(true)}
-            />
-            <ShelfAction
-              icon={Settings}
-              label="Settings"
-              onClick={() => setShowingSettings(true)}
-              title="AI providers & keys"
-            />
-            <ShelfAction
-              icon={Bot}
-              label={assistantOpen ? 'Hide AI' : 'Assistant'}
-              onClick={() => setAssistantOpen((v) => !v)}
-              title="Ctrl+Shift+A"
-            />
-          </div>
-        </div>
-
-        <Separator />
-
-        <div>
-          <div className="flex items-center gap-2">
-            <Globe className="h-4 w-4 text-primary/80" />
-            <span className="label-rune">Tome lens</span>
-          </div>
-          <ul className="mt-2 space-y-0.5">
-            <TomeItem
-              active={saga.tomeLens === null}
-              onClick={() => saga.setTomeLens(null)}
-              label="All Tomes"
-            />
-            {data.tomes.map((t) => (
-              <TomeItem
-                key={t.id}
-                active={saga.tomeLens === t.id}
-                onClick={() => saga.setTomeLens(t.id)}
-                label={t.title}
+        {/* ---------- Shelf ---------- */}
+        <aside className="w-60 shrink-0 flex flex-col gap-5 border-r border-border bg-card/60 px-4 py-5 bg-parchment-grain">
+          <div>
+            <div className="flex items-center gap-2">
+              <Compass className="h-4 w-4 text-primary" />
+              <span className="label-rune">Shelf</span>
+            </div>
+            <div className="mt-2 font-serif text-xl leading-tight text-foreground">
+              {data.saga.title ?? data.saga.id}
+            </div>
+            <div className="font-mono text-[11px] text-muted-foreground truncate">
+              {data.saga.id}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-3 w-full justify-start gap-2"
+              onClick={() => setPickingSaga(true)}
+            >
+              <Database className="h-3.5 w-3.5" />
+              Open Saga…
+            </Button>
+            <div className="mt-2 grid grid-cols-2 gap-1.5">
+              <ShelfAction
+                icon={Upload}
+                label="Export"
+                onClick={() => setExporting(true)}
               />
-            ))}
-          </ul>
-        </div>
-
-        <div className="mt-auto space-y-2">
-          <Separator />
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="h-3.5 w-3.5 text-muted-foreground" />
-            <span className="label-rune">Status</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <Badge variant={errors ? 'danger' : 'success'}>
-              {errors} error{errors !== 1 ? 's' : ''}
-            </Badge>
-            <Badge variant={warnings ? 'warning' : 'secondary'}>
-              {warnings} warn{warnings !== 1 ? 's' : ''}
-            </Badge>
-          </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground"
-            onClick={() => void saga.reload()}
-            disabled={saga.loading}
-          >
-            <RefreshCw
-              className={cn('h-3.5 w-3.5', saga.loading && 'animate-spin')}
-            />
-            {saga.loading ? 'Reloading…' : 'Reload'}
-          </Button>
-        </div>
-      </aside>
-
-      {/* ---------- Grimoire ---------- */}
-      <nav className="w-72 shrink-0 flex flex-col border-r border-border bg-background/40 overflow-hidden">
-        <div className="px-4 pt-5 pb-3">
-          <span className="label-rune">Grimoire</span>
-          <ul className="mt-2 space-y-0.5">
-            {SECTIONS.map((s) => {
-              const Icon = s.icon;
-              const active = section === s.id;
-              return (
-                <li key={s.id}>
-                  <button
-                    onClick={() => setSection(s.id)}
-                    className={cn(
-                      'group flex w-full items-center gap-3 rounded-md px-2.5 py-1.5 text-left transition-colors',
-                      active
-                        ? 'bg-accent text-accent-foreground'
-                        : 'text-foreground/80 hover:bg-muted hover:text-foreground',
-                    )}
-                  >
-                    <Icon
-                      className={cn(
-                        'h-4 w-4 shrink-0',
-                        active
-                          ? 'text-primary'
-                          : 'text-muted-foreground group-hover:text-foreground',
-                      )}
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium">{s.label}</div>
-                      <div className="text-[11px] text-muted-foreground truncate">
-                        {s.hint}
-                      </div>
-                    </div>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-
-        <Separator />
-
-        <div className="flex-1 overflow-auto scrollbar-ember px-4 py-3">
-          <SectionList
-            section={section}
-            data={data}
-            visibleEntries={visibleEntries}
-            selection={selection}
-            onSelect={setSelection}
-            onRename={(e) =>
-              setPendingRename({ type: e.type, id: e.id, name: e.name })
-            }
-          />
-        </div>
-      </nav>
-
-      {/* ---------- Main area ---------- */}
-      <main className="flex-1 flex flex-col overflow-hidden bg-background">
-        {currentEntry && (
-          <EntryView
-            entry={currentEntry}
-            catalog={catalog}
-            sagaPath={saga.sagaPath}
-            onSaved={() => void saga.reload()}
-            onAsk={() => {
-              setAssistantSeed({
-                agent: 'muse',
-                prompt: `Tell me about \`@${currentEntry.type}/${currentEntry.id}\`. Read the Codex and list what's established vs. open questions.`,
-                context: {
-                  path: currentEntry.relPath,
-                  likelyRefs: [`${currentEntry.type}/${currentEntry.id}`],
-                },
-              });
-              setAssistantOpen(true);
-            }}
-            key={selection?.key}
-          />
-        )}
-        {currentChapter && section === 'story' && (
-          <div className="border-b border-border bg-card/40">
-            <div className="flex px-2 py-1 gap-1">
-              <StoryTabButton
-                active={storyTab === 'edit'}
-                onClick={() => setStoryTab('edit')}
-                label="Edit"
+              <ShelfAction
+                icon={Inbox}
+                label="Import"
+                onClick={() => setImporting(true)}
               />
-              <StoryTabButton
-                active={storyTab === 'preview'}
-                onClick={() => setStoryTab('preview')}
-                label="Preview"
+              <ShelfAction
+                icon={Search}
+                label="Search"
+                onClick={() => setSearching(true)}
+                title="Ctrl+P"
+              />
+              <ShelfAction
+                icon={Bookmark}
+                label="Backups"
+                onClick={() => setShowingBackups(true)}
+              />
+              <ShelfAction
+                icon={Settings}
+                label="Settings"
+                onClick={() => setShowingSettings(true)}
+                title="AI providers & keys"
+              />
+              <ShelfAction
+                icon={Bot}
+                label={assistantOpen ? 'Hide AI' : 'Assistant'}
+                onClick={() => setAssistantOpen((v) => !v)}
+                title="Ctrl+Shift+A"
               />
             </div>
           </div>
-        )}
-        {currentChapter && section === 'story' && storyTab === 'edit' && (
-          <ChapterView
-            chapter={currentChapter}
-            catalog={catalog}
-            sagaPath={saga.sagaPath}
-            digest={saga.digest}
-            onJumpToEntry={(type, id) =>
-              handleJump({ kind: 'entry', key: `${type}/${id}` })
-            }
-            onSaved={() => void saga.reload()}
-            onAskAssistant={(action, sel, relPath) => {
-              const likelyRefs = Array.from(
-                new Set(
-                  currentChapter.chapter.refs.map((r) => `${r.type}/${r.id}`),
-                ),
-              );
-              setAssistantSeed({
-                agent: action,
-                prompt: assistantPromptFor(action),
-                context: {
-                  selection: sel.text,
-                  path: relPath,
-                  lines: sel.lines,
-                  likelyRefs,
-                },
-              });
-              setAssistantOpen(true);
-            }}
-            onAsk={() => {
-              const likelyRefs = Array.from(
-                new Set(
-                  currentChapter.chapter.refs.map((r) => `${r.type}/${r.id}`),
-                ),
-              );
-              setAssistantSeed({
-                agent: 'muse',
-                prompt:
-                  'Discuss this chapter with me — structure, pacing, what works, what doesn\'t.',
-                context: {
-                  path: currentChapter.chapter.relPath,
-                  likelyRefs,
-                },
-              });
-              setAssistantOpen(true);
-            }}
-            onAudit={() => {
-              const likelyRefs = Array.from(
-                new Set(
-                  currentChapter.chapter.refs.map((r) => `${r.type}/${r.id}`),
-                ),
-              );
-              setAssistantSeed({
-                agent: 'warden',
-                prompt:
-                  'Audit this chapter against the Codex: list contradictions, broken @refs, slang misuse, and Thread conflicts. Cite files.',
-                context: {
-                  path: currentChapter.chapter.relPath,
-                  likelyRefs,
-                },
-              });
-              setAssistantOpen(true);
-            }}
-            key={selection?.key}
-          />
-        )}
-        {currentChapter && section === 'story' && storyTab === 'preview' && (
-          <ChapterPreview
-            chapter={currentChapter.chapter}
-            data={data}
-            onJump={handleJump}
-          />
-        )}
-        {!currentEntry && !currentChapter && section === 'threads' && (
-          <ThreadView
-            data={data}
-            sagaPath={saga.sagaPath}
-            tomeLens={saga.tomeLens}
-            onReloaded={() => void saga.reload()}
-          />
-        )}
-        {!currentEntry && !currentChapter && section === 'traces' && (
-          <TracesView
-            data={data}
-            sagaPath={saga.sagaPath}
-            onJump={handleJump}
-            onReload={() => void saga.reload()}
-          />
-        )}
-        {!currentEntry && !currentChapter && section === 'versions' && (
-          <VersionsPanel
-            sagaPath={saga.sagaPath}
-            onChanged={() => void saga.reload()}
-          />
-        )}
-        {!currentEntry && !currentChapter && section === 'constellation' && (
-          <ConstellationView data={data} onJump={handleJump} />
-        )}
-        {!currentEntry &&
-          !currentChapter &&
-          section !== 'threads' &&
-          section !== 'traces' &&
-          section !== 'versions' &&
-          section !== 'constellation' && (
-            <EmptyState section={section} diagnostics={data.diagnostics} />
-          )}
-      </main>
 
-      <ResolvedPanel
-        entry={currentEntry}
-        sagaPath={saga.sagaPath}
-        usagesCount={usagesCount}
-        tracesCount={relatedTraces.length}
-        usagesContent={
-          currentEntry && (
-            <UsagesPanel entry={currentEntry} data={data} onJump={handleJump} />
-          )
-        }
-        tracesContent={
-          currentEntry && (
-            <TracesList
-              traces={relatedTraces}
-              onJump={(t) => handleJumpToTarget(t)}
+          <Separator />
+
+          <div>
+            <div className="flex items-center gap-2">
+              <Globe className="h-4 w-4 text-primary/80" />
+              <span className="label-rune">Tome lens</span>
+            </div>
+            <ul className="mt-2 space-y-0.5">
+              <TomeItem
+                active={saga.tomeLens === null}
+                onClick={() => saga.setTomeLens(null)}
+                label="All Tomes"
+              />
+              {data.tomes.map((t) => (
+                <TomeItem
+                  key={t.id}
+                  active={saga.tomeLens === t.id}
+                  onClick={() => saga.setTomeLens(t.id)}
+                  label={t.title}
+                />
+              ))}
+            </ul>
+          </div>
+
+          <div className="mt-auto space-y-2">
+            <Separator />
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="label-rune">Status</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Badge variant={errors ? 'danger' : 'success'}>
+                {errors} error{errors !== 1 ? 's' : ''}
+              </Badge>
+              <Badge variant={warnings ? 'warning' : 'secondary'}>
+                {warnings} warn{warnings !== 1 ? 's' : ''}
+              </Badge>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground"
+              onClick={() => void saga.reload()}
+              disabled={saga.loading}
+            >
+              <RefreshCw
+                className={cn('h-3.5 w-3.5', saga.loading && 'animate-spin')}
+              />
+              {saga.loading ? 'Reloading…' : 'Reload'}
+            </Button>
+          </div>
+        </aside>
+
+        {/* ---------- Grimoire ---------- */}
+        <nav className="w-72 shrink-0 flex flex-col border-r border-border bg-background/40 overflow-hidden">
+          <div className="px-4 pt-5 pb-3">
+            <span className="label-rune">Grimoire</span>
+            <ul className="mt-2 space-y-0.5">
+              {SECTIONS.map((s) => {
+                const Icon = s.icon;
+                const active = section === s.id;
+                return (
+                  <li key={s.id}>
+                    <button
+                      onClick={() => setSection(s.id)}
+                      className={cn(
+                        'group flex w-full items-center gap-3 rounded-md px-2.5 py-1.5 text-left transition-colors',
+                        active
+                          ? 'bg-accent text-accent-foreground'
+                          : 'text-foreground/80 hover:bg-muted hover:text-foreground',
+                      )}
+                    >
+                      <Icon
+                        className={cn(
+                          'h-4 w-4 shrink-0',
+                          active
+                            ? 'text-primary'
+                            : 'text-muted-foreground group-hover:text-foreground',
+                        )}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium">{s.label}</div>
+                        <div className="text-[11px] text-muted-foreground truncate">
+                          {s.hint}
+                        </div>
+                      </div>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+
+          <Separator />
+
+          <div className="flex-1 overflow-auto scrollbar-ember px-4 py-3">
+            <SectionList
+              section={section}
+              data={data}
+              visibleEntries={visibleEntries}
+              selection={selection}
+              onSelect={setSelection}
+              onRename={(e) =>
+                setPendingRename({ type: e.type, id: e.id, name: e.name })
+              }
             />
-          )
-        }
-      />
+          </div>
+        </nav>
 
-      {assistantOpen && (
-        <AssistantPanel
-          sagaRoot={saga.sagaPath}
-          initialAgent={assistantSeed?.agent}
-          initialPrompt={assistantSeed?.prompt}
-          initialContext={assistantSeed?.context}
-          onClose={() => {
-            setAssistantOpen(false);
-            setAssistantSeed(null);
-          }}
-          onApplied={() => void saga.reload()}
-        />
-      )}
-      {pickingSaga && (
-        <SagaPicker
-          current={saga.sagaPath}
-          onPick={(p) => {
-            saga.setSagaPath(p);
-            setSelection(null);
-            setPickingSaga(false);
-          }}
-          onClose={() => setPickingSaga(false)}
-        />
-      )}
+        {/* ---------- Main area ---------- */}
+        <main className="flex-1 flex flex-col overflow-hidden bg-background">
+          {currentEntry && (
+            <EntryView
+              entry={currentEntry}
+              catalog={catalog}
+              sagaPath={saga.sagaPath}
+              onSaved={() => void saga.reload()}
+              onAsk={() => {
+                setAssistantSeed({
+                  agent: 'muse',
+                  prompt: `Tell me about \`@${currentEntry.type}/${currentEntry.id}\`. Read the Codex and list what's established vs. open questions.`,
+                  context: {
+                    path: currentEntry.relPath,
+                    likelyRefs: [`${currentEntry.type}/${currentEntry.id}`],
+                  },
+                });
+                setAssistantOpen(true);
+              }}
+              key={selection?.key}
+            />
+          )}
+          {currentChapter && section === 'story' && (
+            <div className="border-b border-border bg-card/40">
+              <div className="flex px-2 py-1 gap-1">
+                <StoryTabButton
+                  active={storyTab === 'edit'}
+                  onClick={() => setStoryTab('edit')}
+                  label="Edit"
+                />
+                <StoryTabButton
+                  active={storyTab === 'preview'}
+                  onClick={() => setStoryTab('preview')}
+                  label="Preview"
+                />
+              </div>
+            </div>
+          )}
+          {currentChapter && section === 'story' && storyTab === 'edit' && (
+            <ChapterView
+              chapter={currentChapter}
+              catalog={catalog}
+              sagaPath={saga.sagaPath}
+              digest={saga.digest}
+              onJumpToEntry={(type, id) =>
+                handleJump({ kind: 'entry', key: `${type}/${id}` })
+              }
+              onSaved={() => void saga.reload()}
+              onAskAssistant={(action, sel, relPath) => {
+                const likelyRefs = Array.from(
+                  new Set(
+                    currentChapter.chapter.refs.map((r) => `${r.type}/${r.id}`),
+                  ),
+                );
+                setAssistantSeed({
+                  agent: action,
+                  prompt: assistantPromptFor(action),
+                  context: {
+                    selection: sel.text,
+                    path: relPath,
+                    lines: sel.lines,
+                    likelyRefs,
+                  },
+                });
+                setAssistantOpen(true);
+              }}
+              onAsk={() => {
+                const likelyRefs = Array.from(
+                  new Set(
+                    currentChapter.chapter.refs.map((r) => `${r.type}/${r.id}`),
+                  ),
+                );
+                setAssistantSeed({
+                  agent: 'muse',
+                  prompt:
+                    "Discuss this chapter with me — structure, pacing, what works, what doesn't.",
+                  context: {
+                    path: currentChapter.chapter.relPath,
+                    likelyRefs,
+                  },
+                });
+                setAssistantOpen(true);
+              }}
+              onAudit={() => {
+                const likelyRefs = Array.from(
+                  new Set(
+                    currentChapter.chapter.refs.map((r) => `${r.type}/${r.id}`),
+                  ),
+                );
+                setAssistantSeed({
+                  agent: 'warden',
+                  prompt:
+                    'Audit this chapter against the Codex: list contradictions, broken @refs, slang misuse, and Thread conflicts. Cite files.',
+                  context: {
+                    path: currentChapter.chapter.relPath,
+                    likelyRefs,
+                  },
+                });
+                setAssistantOpen(true);
+              }}
+              key={selection?.key}
+            />
+          )}
+          {currentChapter && section === 'story' && storyTab === 'preview' && (
+            <ChapterPreview
+              chapter={currentChapter.chapter}
+              data={data}
+              onJump={handleJump}
+            />
+          )}
+          {!currentEntry && !currentChapter && section === 'threads' && (
+            <ThreadView
+              data={data}
+              sagaPath={saga.sagaPath}
+              tomeLens={saga.tomeLens}
+              onReloaded={() => void saga.reload()}
+            />
+          )}
+          {!currentEntry && !currentChapter && section === 'traces' && (
+            <TracesView
+              data={data}
+              sagaPath={saga.sagaPath}
+              onJump={handleJump}
+              onReload={() => void saga.reload()}
+            />
+          )}
+          {!currentEntry && !currentChapter && section === 'versions' && (
+            <VersionsPanel
+              sagaPath={saga.sagaPath}
+              onChanged={() => void saga.reload()}
+            />
+          )}
+          {!currentEntry && !currentChapter && section === 'constellation' && (
+            <ConstellationView data={data} onJump={handleJump} />
+          )}
+          {!currentEntry &&
+            !currentChapter &&
+            section !== 'threads' &&
+            section !== 'traces' &&
+            section !== 'versions' &&
+            section !== 'constellation' && (
+              <EmptyState section={section} diagnostics={data.diagnostics} />
+            )}
+        </main>
 
-      {pendingRename && (
-        <RenameDialog
+        <ResolvedPanel
+          entry={currentEntry}
           sagaPath={saga.sagaPath}
-          type={pendingRename.type}
-          id={pendingRename.id}
-          name={pendingRename.name}
-          onClose={() => setPendingRename(null)}
-          onRenamed={() => {
-            setPendingRename(null);
-            void saga.reload();
-          }}
+          usagesCount={usagesCount}
+          tracesCount={relatedTraces.length}
+          usagesContent={
+            currentEntry && (
+              <UsagesPanel
+                entry={currentEntry}
+                data={data}
+                onJump={handleJump}
+              />
+            )
+          }
+          tracesContent={
+            currentEntry && (
+              <TracesList
+                traces={relatedTraces}
+                onJump={(t) => handleJumpToTarget(t)}
+              />
+            )
+          }
         />
-      )}
 
-      {exporting && (
-        <ExportDialog
-          sagaPath={saga.sagaPath}
-          data={data}
-          onClose={() => setExporting(false)}
-        />
-      )}
+        {assistantOpen && (
+          <AssistantPanel
+            sagaRoot={saga.sagaPath}
+            initialAgent={assistantSeed?.agent}
+            initialPrompt={assistantSeed?.prompt}
+            initialContext={assistantSeed?.context}
+            onClose={() => {
+              setAssistantOpen(false);
+              setAssistantSeed(null);
+            }}
+            onApplied={() => void saga.reload()}
+          />
+        )}
+        {pickingSaga && (
+          <SagaPicker
+            current={saga.sagaPath}
+            onPick={(p) => {
+              saga.setSagaPath(p);
+              setSelection(null);
+              setPickingSaga(false);
+            }}
+            onClose={() => setPickingSaga(false)}
+          />
+        )}
 
-      {importing && (
-        <ImportDialog
-          onClose={() => setImporting(false)}
-          onImported={(target) => {
-            saga.setSagaPath(target);
-            setSelection(null);
-            setImporting(false);
-          }}
-        />
-      )}
+        {pendingRename && (
+          <RenameDialog
+            sagaPath={saga.sagaPath}
+            type={pendingRename.type}
+            id={pendingRename.id}
+            name={pendingRename.name}
+            onClose={() => setPendingRename(null)}
+            onRenamed={() => {
+              setPendingRename(null);
+              void saga.reload();
+            }}
+          />
+        )}
 
-      {searching && (
-        <SearchPanel
-          sagaPath={saga.sagaPath}
-          onClose={() => setSearching(false)}
-          onJump={(loc) => {
-            handleJump(loc);
-            setSearching(false);
-          }}
-        />
-      )}
+        {exporting && (
+          <ExportDialog
+            sagaPath={saga.sagaPath}
+            data={data}
+            onClose={() => setExporting(false)}
+          />
+        )}
 
-      {showingBackups && (
-        <BackupsDialog
-          sagaPath={saga.sagaPath}
-          onClose={() => setShowingBackups(false)}
-          onRestored={() => {
-            void saga.reload();
-            setShowingBackups(false);
-          }}
-        />
-      )}
+        {importing && (
+          <ImportDialog
+            onClose={() => setImporting(false)}
+            onImported={(target) => {
+              saga.setSagaPath(target);
+              setSelection(null);
+              setImporting(false);
+            }}
+          />
+        )}
 
-      {showingSettings && (
-        <SettingsDialog onClose={() => setShowingSettings(false)} />
-      )}
+        {searching && (
+          <SearchPanel
+            sagaPath={saga.sagaPath}
+            onClose={() => setSearching(false)}
+            onJump={(loc) => {
+              handleJump(loc);
+              setSearching(false);
+            }}
+          />
+        )}
+
+        {showingBackups && (
+          <BackupsDialog
+            sagaPath={saga.sagaPath}
+            onClose={() => setShowingBackups(false)}
+            onRestored={() => {
+              void saga.reload();
+              setShowingBackups(false);
+            }}
+          />
+        )}
+
+        {showingSettings && (
+          <SettingsDialog onClose={() => setShowingSettings(false)} />
+        )}
       </div>
     </div>
   );
@@ -893,9 +935,7 @@ function EntryList({
               title="Right-click to rename"
               className={cn(
                 'flex w-full items-center justify-between gap-2 rounded-md px-2 py-1 text-left transition-colors',
-                sel
-                  ? 'bg-accent text-accent-foreground'
-                  : 'hover:bg-muted',
+                sel ? 'bg-accent text-accent-foreground' : 'hover:bg-muted',
               )}
             >
               <span className="truncate">{e.name}</span>
@@ -957,9 +997,7 @@ function EntryView({
             <span className="font-serif text-lg">{entry.name}</span>
             <Badge variant="secondary">{entry.type}</Badge>
             {entry.appears_in && entry.appears_in.length > 0 && (
-              <Badge variant="default">
-                {entry.appears_in.join(', ')}
-              </Badge>
+              <Badge variant="default">{entry.appears_in.join(', ')}</Badge>
             )}
           </div>
         </div>
@@ -988,18 +1026,10 @@ function EntryView({
               Ask
             </Button>
           )}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setRenaming(true)}
-          >
+          <Button variant="ghost" size="sm" onClick={() => setRenaming(true)}>
             Rename
           </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setEditing(true)}
-          >
+          <Button variant="ghost" size="sm" onClick={() => setEditing(true)}>
             Frontmatter
           </Button>
           <Button
@@ -1192,7 +1222,7 @@ function ChapterView({
         {paneOpen && (
           <aside className="w-80 shrink-0 border-l border-border bg-card/30">
             <CodexPane
-              ref={cursorRef}
+              cursorRef={cursorRef}
               digest={digest}
               onJump={onJumpToEntry}
             />
@@ -1262,9 +1292,7 @@ function EmptyState({
                   key={i}
                   className={cn(
                     'flex items-start gap-2',
-                    d.severity === 'error'
-                      ? 'text-rose-300'
-                      : 'text-amber-300',
+                    d.severity === 'error' ? 'text-rose-300' : 'text-amber-300',
                   )}
                 >
                   <Badge
@@ -1350,9 +1378,7 @@ function ChapterPreview({
     line?: number;
   }) => void;
 }) {
-  const entryMap = new Map(
-    data.entries.map((e) => [`${e.type}/${e.id}`, e]),
-  );
+  const entryMap = new Map(data.entries.map((e) => [`${e.type}/${e.id}`, e]));
   const refRe = /@([a-zA-Z]+)\/([a-zA-Z0-9\-_]+)/g;
 
   function renderInline(line: string): React.ReactNode[] {
@@ -1378,7 +1404,10 @@ function ChapterPreview({
         );
       } else {
         out.push(
-          <span key={idx++} className="rounded bg-rose-500/15 px-1 text-rose-300">
+          <span
+            key={idx++}
+            className="rounded bg-rose-500/15 px-1 text-rose-300"
+          >
             {m[0]}
           </span>,
         );
@@ -1526,8 +1555,7 @@ function TracesView({
                   : 'border-border hover:bg-muted',
               )}
             >
-              {f}{' '}
-              <span className="text-muted-foreground">({counts[f]})</span>
+              {f} <span className="text-muted-foreground">({counts[f]})</span>
             </button>
           ))}
         </div>
