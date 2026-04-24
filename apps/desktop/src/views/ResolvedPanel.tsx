@@ -61,27 +61,28 @@ export function ResolvedPanel({
   const [tab, setTab] = useState<Tab>("resolved");
   if (!entry) {
     return (
-      <aside className="w-80 bg-stone-900/60 border-l border-stone-800 p-4 text-stone-500 text-sm">
+      <aside className="w-80 bg-card/40 border-l border-border p-6 text-muted-foreground text-sm">
+        <div className="label-rune mb-2">Inspector</div>
         Select an entry to see its Weave, Echoes, and Traces.
       </aside>
     );
   }
   const keys = Object.keys(entry.properties).sort();
   return (
-    <aside className="w-80 bg-stone-900/60 border-l border-stone-800 flex flex-col">
-        <div className="text-xs uppercase tracking-widest text-stone-500">
-          {entry.type}
-        </div>
-        <div className="mt-1 text-lg font-semibold">{entry.name}</div>
-        <div className="text-xs text-stone-500 font-mono">
+    <aside className="w-80 bg-card/40 border-l border-border flex flex-col">
+      <div className="px-4 pt-4 pb-3 border-b border-border">
+        <div className="label-rune">{entry.type}</div>
+        <div className="mt-1 font-serif text-lg text-foreground">{entry.name}</div>
+        <div className="font-mono text-[11px] text-muted-foreground">
           {entry.type}/{entry.id}
         </div>
         {entry.appears_in && entry.appears_in.length > 0 && (
-          <div className="mt-1 text-xs text-amber-400/80">
+          <div className="mt-1 text-[11px] text-primary/80">
             appears in: {entry.appears_in.join(", ")}
           </div>
         )}
-      <nav className="flex text-xs border-b border-stone-800">
+      </div>
+      <nav className="flex text-xs border-b border-border">
         <TabButton
           active={tab === "resolved"}
           onClick={() => setTab("resolved")}
@@ -103,15 +104,15 @@ export function ResolvedPanel({
           label="Diff"
         />
       </nav>
-      <div className="flex-1 overflow-auto p-4">
+      <div className="flex-1 overflow-auto scrollbar-ember p-4">
         {tab === "resolved" && (
           <ResolvedTab entry={entry} keys={keys} />
         )}
         {tab === "usages" && (
-          <div>{usagesContent ?? <div className="text-xs text-stone-500 italic">no data</div>}</div>
+          <div>{usagesContent ?? <div className="text-xs text-muted-foreground italic">no data</div>}</div>
         )}
         {tab === "traces" && (
-          <div>{tracesContent ?? <div className="text-xs text-stone-500 italic">no traces</div>}</div>
+          <div>{tracesContent ?? <div className="text-xs text-muted-foreground italic">no traces</div>}</div>
         )}
         {tab === "diff" && (
           <DiffTab entry={entry} sagaPath={sagaPath} />
@@ -178,10 +179,10 @@ function TabButton({
     <button
       onClick={onClick}
       className={
-        "flex-1 px-3 py-2 uppercase tracking-widest " +
+        "flex-1 px-3 py-2 uppercase tracking-widest transition-colors " +
         (active
-          ? "bg-amber-900/30 text-amber-200 border-b-2 border-amber-500"
-          : "text-stone-500 hover:text-stone-300 hover:bg-stone-800/60")
+          ? "bg-accent text-accent-foreground border-b-2 border-primary"
+          : "text-muted-foreground hover:text-foreground hover:bg-muted/60")
       }
     >
       {label}

@@ -1,11 +1,34 @@
 import { useEffect, useState } from 'react';
+import {
+  AlertTriangle,
+  BookOpen,
+  Bookmark,
+  Compass,
+  Database,
+  FileText,
+  GitBranch,
+  Globe,
+  Inbox,
+  Library,
+  Network,
+  RefreshCw,
+  Search,
+  Sparkles,
+  Tags,
+  Upload,
+  Waypoints,
+} from 'lucide-react';
+import { Badge } from './components/ui/badge.js';
+import { Button } from './components/ui/button.js';
 import { Input } from './components/ui/input.js';
+import { Separator } from './components/ui/separator.js';
 import {
   Tabs,
   TabsContent,
   TabsList,
   TabsTrigger,
 } from './components/ui/tabs.js';
+import { cn } from './lib/utils.js';
 import { Editor } from './editor/Editor.js';
 import type { RefCatalog } from './editor/ReferenceExtension.js';
 import type { DumpChapter, DumpEntry, DumpPayload } from './lib/lw.js';
@@ -42,15 +65,20 @@ interface Selection {
   key: string;
 }
 
-const SECTIONS: { id: Section; label: string; hint: string }[] = [
-  { id: 'story', label: 'Story', hint: 'prose' },
-  { id: 'codex', label: 'Codex', hint: 'characters, locations, lore' },
-  { id: 'lexicon', label: 'Lexicon', hint: 'terms & slang' },
-  { id: 'sigils', label: 'Sigils', hint: 'tags & groups' },
-  { id: 'threads', label: 'Threads', hint: 'timelines & waypoints' },
-  { id: 'traces', label: 'Traces', hint: 'ideas & todos' },
-  { id: 'constellation', label: 'Constellation', hint: 'graph of echoes' },
-  { id: 'versions', label: 'Versions', hint: 'git: branches & commits' },
+const SECTIONS: {
+  id: Section;
+  label: string;
+  hint: string;
+  icon: React.ComponentType<{ className?: string }>;
+}[] = [
+  { id: 'story', label: 'Story', hint: 'prose', icon: BookOpen },
+  { id: 'codex', label: 'Codex', hint: 'characters, locations, lore', icon: Library },
+  { id: 'lexicon', label: 'Lexicon', hint: 'terms & slang', icon: FileText },
+  { id: 'sigils', label: 'Sigils', hint: 'tags & groups', icon: Tags },
+  { id: 'threads', label: 'Threads', hint: 'timelines & waypoints', icon: Waypoints },
+  { id: 'traces', label: 'Traces', hint: 'ideas & todos', icon: Sparkles },
+  { id: 'constellation', label: 'Constellation', hint: 'graph of echoes', icon: Network },
+  { id: 'versions', label: 'Versions', hint: 'git: branches & commits', icon: GitBranch },
 ];
 
 export default function App() {
@@ -99,39 +127,6 @@ export default function App() {
   const catalog = buildCatalog(data);
   const visibleEntries = applyLens(data.entries, saga.tomeLens);
 
-  const REF_RE = /@([a-zA-Z]+)\/([a-zA-Z0-9\-_]+)/g;
-
-  function getUsagesCount(entry: DumpEntry, data: DumpPayload): number {
-    const sources = [
-      ...data.entries.map((e) => ({
-        key: `${e.type}/${e.id}`,
-        kind: 'entry' as const,
-        label: e.name,
-        body: e.body,
-      })),
-      ...data.tomes.flatMap((t) =>
-        t.chapters.map((c) => ({
-          key: `${t.id}::${c.slug}`,
-          kind: 'chapter' as const,
-          label: c.title,
-          body: c.body,
-        })),
-      ),
-    ];
-    const needle = `${entry.type}/${entry.id}`;
-    let count = 0;
-    for (const src of sources) {
-      for (const line of src.body.split('\n')) {
-        for (const m of line.matchAll(REF_RE)) {
-          if (`${m[1]}/${m[2]}` === needle) {
-            count++;
-          }
-        }
-      }
-    }
-    return count;
-  }
-
   const currentEntry =
     selection?.kind === 'entry'
       ? (data.entries.find((e) => `${e.type}/${e.id}` === selection.key) ??
@@ -155,17 +150,6 @@ export default function App() {
         return clean === `${currentEntry.type}/${currentEntry.id}`;
       })
     : [];
-
-  const entryMap = new Map(
-    data.entries.map((e) => [`${e.type}/${e.id}`, e.name]),
-  );
-
-  const resolveContent = (content: string) => {
-    return content.replace(/@(\w+)\/(\w+)/g, (match, type, id) => {
-      const key = `${type}/${id}`;
-      return entryMap.get(key) || match;
-    });
-  };
 
   const handleJump = (loc: {
     kind: 'entry' | 'chapter';
@@ -192,54 +176,54 @@ export default function App() {
   };
 
   return (
-    <div className="flex h-full font-serif">
-      {/* Shelf */}
-      <aside className="w-56 bg-stone-900 border-r border-stone-800 p-4 flex flex-col gap-4 shrink-0">
+    <div className="flex h-full font-serif text-foreground antialiased">
+      {/* ---------- Shelf ---------- */}
+      <aside className="w-60 shrink-0 flex flex-col gap-5 border-r border-border bg-card/60 px-4 py-5 bg-parchment-grain">
         <div>
-          <div className="text-xs uppercase tracking-widest text-stone-500">
-            Shelf
+          <div className="flex items-center gap-2">
+            <Compass className="h-4 w-4 text-primary" />
+            <span className="label-rune">Shelf</span>
           </div>
-          <div className="mt-2 text-lg">{data.saga.title ?? data.saga.id}</div>
-          <div className="text-xs text-stone-500">{data.saga.id}</div>
-          <button
+          <div className="mt-2 font-serif text-xl leading-tight text-foreground">
+            {data.saga.title ?? data.saga.id}
+          </div>
+          <div className="font-mono text-[11px] text-muted-foreground truncate">
+            {data.saga.id}
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="mt-3 w-full justify-start gap-2"
             onClick={() => setPickingSaga(true)}
-            className="mt-2 text-xs px-2 py-1 rounded border border-stone-700 hover:bg-stone-800 w-full text-left"
           >
+            <Database className="h-3.5 w-3.5" />
             Open Saga…
-          </button>
-          <div className="mt-1 grid grid-cols-2 gap-1">
-            <button
-              onClick={() => setExporting(true)}
-              className="text-xs px-2 py-1 rounded border border-stone-700 hover:bg-stone-800"
-            >
-              Export…
-            </button>
-            <button
-              onClick={() => setImporting(true)}
-              className="text-xs px-2 py-1 rounded border border-stone-700 hover:bg-stone-800"
-            >
-              Import…
-            </button>
-            <button
+          </Button>
+          <div className="mt-2 grid grid-cols-2 gap-1.5">
+            <ShelfAction icon={Upload} label="Export" onClick={() => setExporting(true)} />
+            <ShelfAction icon={Inbox} label="Import" onClick={() => setImporting(true)} />
+            <ShelfAction
+              icon={Search}
+              label="Search"
               onClick={() => setSearching(true)}
-              className="text-xs px-2 py-1 rounded border border-stone-700 hover:bg-stone-800"
               title="Ctrl+P"
-            >
-              Search…
-            </button>
-            <button
+            />
+            <ShelfAction
+              icon={Bookmark}
+              label="Backups"
               onClick={() => setShowingBackups(true)}
-              className="text-xs px-2 py-1 rounded border border-stone-700 hover:bg-stone-800"
-            >
-              Backups…
-            </button>
+            />
           </div>
         </div>
+
+        <Separator />
+
         <div>
-          <div className="text-xs uppercase tracking-widest text-stone-500">
-            Tome lens
+          <div className="flex items-center gap-2">
+            <Globe className="h-4 w-4 text-primary/80" />
+            <span className="label-rune">Tome lens</span>
           </div>
-          <ul className="mt-1 space-y-1">
+          <ul className="mt-2 space-y-0.5">
             <TomeItem
               active={saga.tomeLens === null}
               onClick={() => saga.setTomeLens(null)}
@@ -255,49 +239,79 @@ export default function App() {
             ))}
           </ul>
         </div>
-        <div className="mt-auto text-xs">
-          <div className="text-stone-500 uppercase tracking-widest">Status</div>
-          <div className={errors ? 'text-rose-400' : 'text-emerald-400'}>
-            {errors} error{errors !== 1 ? 's' : ''}
+
+        <div className="mt-auto space-y-2">
+          <Separator />
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-3.5 w-3.5 text-muted-foreground" />
+            <span className="label-rune">Status</span>
           </div>
-          <div className={warnings ? 'text-amber-400' : 'text-stone-500'}>
-            {warnings} warning{warnings !== 1 ? 's' : ''}
+          <div className="flex items-center gap-1.5">
+            <Badge variant={errors ? 'danger' : 'success'}>
+              {errors} error{errors !== 1 ? 's' : ''}
+            </Badge>
+            <Badge variant={warnings ? 'warning' : 'secondary'}>
+              {warnings} warn{warnings !== 1 ? 's' : ''}
+            </Badge>
           </div>
-          <button
-            className="mt-2 text-xs px-2 py-1 rounded border border-stone-700 hover:bg-stone-800"
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground"
             onClick={() => void saga.reload()}
             disabled={saga.loading}
           >
+            <RefreshCw
+              className={cn('h-3.5 w-3.5', saga.loading && 'animate-spin')}
+            />
             {saga.loading ? 'Reloading…' : 'Reload'}
-          </button>
+          </Button>
         </div>
       </aside>
 
-      {/* Grimoire */}
-      <nav className="w-64 bg-stone-900/60 border-r border-stone-800 p-4 shrink-0 overflow-auto">
-        <div className="text-xs uppercase tracking-widest text-stone-500">
-          Grimoire
+      {/* ---------- Grimoire ---------- */}
+      <nav className="w-72 shrink-0 flex flex-col border-r border-border bg-background/40 overflow-hidden">
+        <div className="px-4 pt-5 pb-3">
+          <span className="label-rune">Grimoire</span>
+          <ul className="mt-2 space-y-0.5">
+            {SECTIONS.map((s) => {
+              const Icon = s.icon;
+              const active = section === s.id;
+              return (
+                <li key={s.id}>
+                  <button
+                    onClick={() => setSection(s.id)}
+                    className={cn(
+                      'group flex w-full items-center gap-3 rounded-md px-2.5 py-1.5 text-left transition-colors',
+                      active
+                        ? 'bg-accent text-accent-foreground'
+                        : 'text-foreground/80 hover:bg-muted hover:text-foreground',
+                    )}
+                  >
+                    <Icon
+                      className={cn(
+                        'h-4 w-4 shrink-0',
+                        active
+                          ? 'text-primary'
+                          : 'text-muted-foreground group-hover:text-foreground',
+                      )}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium">{s.label}</div>
+                      <div className="text-[11px] text-muted-foreground truncate">
+                        {s.hint}
+                      </div>
+                    </div>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
         </div>
-        <ul className="mt-2 space-y-1">
-          {SECTIONS.map((s) => (
-            <li key={s.id}>
-              <button
-                className={
-                  'w-full text-left px-2 py-1 rounded ' +
-                  (section === s.id
-                    ? 'bg-amber-800/40 text-amber-100'
-                    : 'hover:bg-stone-800')
-                }
-                onClick={() => setSection(s.id)}
-              >
-                <div>{s.label}</div>
-                <div className="text-xs text-stone-500">{s.hint}</div>
-              </button>
-            </li>
-          ))}
-        </ul>
 
-        <div className="mt-6 border-t border-stone-800 pt-4">
+        <Separator />
+
+        <div className="flex-1 overflow-auto scrollbar-ember px-4 py-3">
           <SectionList
             section={section}
             data={data}
@@ -311,8 +325,8 @@ export default function App() {
         </div>
       </nav>
 
-      {/* Main area */}
-      <main className="flex-1 flex flex-col overflow-hidden">
+      {/* ---------- Main area ---------- */}
+      <main className="flex-1 flex flex-col overflow-hidden bg-background">
         {currentEntry && (
           <EntryView
             entry={currentEntry}
@@ -323,29 +337,19 @@ export default function App() {
           />
         )}
         {currentChapter && section === 'story' && (
-          <div className="flex text-xs border-b border-stone-800">
-            <button
-              onClick={() => setStoryTab('edit')}
-              className={
-                'flex-1 px-3 py-2 uppercase tracking-widest ' +
-                (storyTab === 'edit'
-                  ? 'bg-amber-900/30 text-amber-200 border-b-2 border-amber-500'
-                  : 'text-stone-500 hover:text-stone-300 hover:bg-stone-800/60')
-              }
-            >
-              Edit
-            </button>
-            <button
-              onClick={() => setStoryTab('preview')}
-              className={
-                'flex-1 px-3 py-2 uppercase tracking-widest ' +
-                (storyTab === 'preview'
-                  ? 'bg-amber-900/30 text-amber-200 border-b-2 border-amber-500'
-                  : 'text-stone-500 hover:text-stone-300 hover:bg-stone-800/60')
-              }
-            >
-              Preview
-            </button>
+          <div className="border-b border-border bg-card/40">
+            <div className="flex px-2 py-1 gap-1">
+              <StoryTabButton
+                active={storyTab === 'edit'}
+                onClick={() => setStoryTab('edit')}
+                label="Edit"
+              />
+              <StoryTabButton
+                active={storyTab === 'preview'}
+                onClick={() => setStoryTab('preview')}
+                label="Preview"
+              />
+            </div>
           </div>
         )}
         {currentChapter && section === 'story' && storyTab === 'edit' && (
@@ -359,7 +363,7 @@ export default function App() {
         )}
         {currentChapter && section === 'story' && storyTab === 'preview' && (
           <ChapterPreview
-            chapter={currentChapter}
+            chapter={currentChapter.chapter}
             data={data}
             onJump={handleJump}
           />
@@ -490,6 +494,55 @@ export default function App() {
 
 // ---------- subcomponents ----------
 
+function ShelfAction({
+  icon: Icon,
+  label,
+  onClick,
+  title,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  onClick: () => void;
+  title?: string;
+}) {
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      className="h-8 justify-start gap-2 px-2 text-xs"
+      onClick={onClick}
+      title={title}
+    >
+      <Icon className="h-3.5 w-3.5" />
+      {label}
+    </Button>
+  );
+}
+
+function StoryTabButton({
+  active,
+  onClick,
+  label,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        'rounded-md px-4 py-1.5 text-xs uppercase tracking-widest transition-colors',
+        active
+          ? 'bg-accent text-accent-foreground'
+          : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+      )}
+    >
+      {label}
+    </button>
+  );
+}
+
 function TomeItem({
   active,
   onClick,
@@ -503,10 +556,12 @@ function TomeItem({
     <li>
       <button
         onClick={onClick}
-        className={
-          'w-full text-left text-sm px-2 py-1 rounded ' +
-          (active ? 'bg-amber-800/40 text-amber-100' : 'hover:bg-stone-800')
-        }
+        className={cn(
+          'w-full rounded-md px-2 py-1 text-left text-sm transition-colors',
+          active
+            ? 'bg-accent text-accent-foreground'
+            : 'text-foreground/85 hover:bg-muted hover:text-foreground',
+        )}
       >
         {label}
       </button>
@@ -534,12 +589,10 @@ function SectionList({
 
   if (section === 'story') {
     return (
-      <ul className="space-y-2 text-sm">
+      <ul className="space-y-3 text-sm">
         {data.tomes.map((t) => (
           <li key={t.id}>
-            <div className="text-xs uppercase tracking-widest text-stone-500">
-              {t.title}
-            </div>
+            <div className="label-rune px-1">{t.title}</div>
             <ul className="mt-1 space-y-0.5">
               {t.chapters.map((c) => {
                 const key = `${t.id}::${c.slug}`;
@@ -549,12 +602,12 @@ function SectionList({
                   <li key={key}>
                     <button
                       onClick={() => onSelect({ kind: 'chapter', key })}
-                      className={
-                        'w-full text-left px-2 py-1 rounded ' +
-                        (sel
-                          ? 'bg-amber-800/40 text-amber-100'
-                          : 'hover:bg-stone-800')
-                      }
+                      className={cn(
+                        'w-full rounded-md px-2 py-1 text-left transition-colors',
+                        sel
+                          ? 'bg-accent text-accent-foreground'
+                          : 'hover:bg-muted',
+                      )}
                     >
                       {c.title}
                     </button>
@@ -582,59 +635,37 @@ function SectionList({
         .filter((e) => e.name.toLowerCase().includes(search.toLowerCase()));
 
     return (
-      <div className="space-y-4">
+      <div className="space-y-3">
         <Input
-          placeholder="Search entries..."
+          placeholder="Search entries…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
+          className="h-8 text-sm"
         />
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-5 h-8 p-0.5">
             {types.map((type) => (
-              <TabsTrigger key={type} value={type}>
-                {type}s ({filteredItems(type).length})
+              <TabsTrigger
+                key={type}
+                value={type}
+                className="text-[10px] px-1 py-0.5 capitalize"
+                title={`${type}s`}
+              >
+                {type[0]}
+                <span className="ml-1 text-muted-foreground">
+                  {filteredItems(type).length}
+                </span>
               </TabsTrigger>
             ))}
           </TabsList>
           {types.map((type) => (
-            <TabsContent key={type} value={type}>
-              <ul className="space-y-0.5 text-sm">
-                {filteredItems(type).length === 0 && (
-                  <li className="text-stone-500 text-xs italic">
-                    nothing to show
-                  </li>
-                )}
-                {filteredItems(type).map((e) => {
-                  const key = `${e.type}/${e.id}`;
-                  const sel =
-                    selection?.kind === 'entry' && selection.key === key;
-                  return (
-                    <li key={key}>
-                      <button
-                        onClick={() => onSelect({ kind: 'entry', key })}
-                        onContextMenu={(ev) => {
-                          ev.preventDefault();
-                          onRename(e);
-                        }}
-                        title="Right-click to rename"
-                        className={
-                          'w-full text-left px-2 py-1 rounded flex items-center justify-between gap-2 ' +
-                          (sel
-                            ? 'bg-amber-800/40 text-amber-100'
-                            : 'hover:bg-stone-800')
-                        }
-                      >
-                        <span>{e.name}</span>
-                        {e.appears_in && e.appears_in.length > 0 && (
-                          <span className="text-[10px] text-amber-400/80">
-                            {e.appears_in.join(',')}
-                          </span>
-                        )}
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
+            <TabsContent key={type} value={type} className="mt-3">
+              <EntryList
+                items={filteredItems(type)}
+                selection={selection}
+                onSelect={onSelect}
+                onRename={onRename}
+              />
             </TabsContent>
           ))}
         </Tabs>
@@ -656,10 +687,45 @@ function SectionList({
 
   const items = visibleEntries.filter(filter);
   return (
+    <div className="space-y-2">
+      <Input
+        placeholder="Search…"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        className="h-8 text-sm"
+      />
+      <EntryList
+        items={items.filter((e) =>
+          e.name.toLowerCase().includes(search.toLowerCase()),
+        )}
+        selection={selection}
+        onSelect={onSelect}
+        onRename={onRename}
+      />
+    </div>
+  );
+}
+
+function EntryList({
+  items,
+  selection,
+  onSelect,
+  onRename,
+}: {
+  items: DumpEntry[];
+  selection: Selection | null;
+  onSelect: (s: Selection) => void;
+  onRename: (entry: DumpEntry) => void;
+}) {
+  if (items.length === 0) {
+    return (
+      <div className="px-2 py-4 text-center text-xs italic text-muted-foreground">
+        nothing to show
+      </div>
+    );
+  }
+  return (
     <ul className="space-y-0.5 text-sm">
-      {items.length === 0 && (
-        <li className="text-stone-500 text-xs italic">nothing to show</li>
-      )}
       {items.map((e) => {
         const key = `${e.type}/${e.id}`;
         const sel = selection?.kind === 'entry' && selection.key === key;
@@ -672,14 +738,16 @@ function SectionList({
                 onRename(e);
               }}
               title="Right-click to rename"
-              className={
-                'w-full text-left px-2 py-1 rounded flex items-center justify-between gap-2 ' +
-                (sel ? 'bg-amber-800/40 text-amber-100' : 'hover:bg-stone-800')
-              }
+              className={cn(
+                'flex w-full items-center justify-between gap-2 rounded-md px-2 py-1 text-left transition-colors',
+                sel
+                  ? 'bg-accent text-accent-foreground'
+                  : 'hover:bg-muted',
+              )}
             >
-              <span>{e.name}</span>
+              <span className="truncate">{e.name}</span>
               {e.appears_in && e.appears_in.length > 0 && (
-                <span className="text-[10px] text-amber-400/80">
+                <span className="shrink-0 font-mono text-[10px] text-primary/80">
                   {e.appears_in.join(',')}
                 </span>
               )}
@@ -725,44 +793,57 @@ function EntryView({
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
-      <header className="px-6 py-3 border-b border-stone-800 flex items-start gap-4">
+      <header className="px-6 py-3 border-b border-border bg-card/40 flex items-center gap-4">
         <div className="flex-1 min-w-0">
-          <div className="text-xs text-stone-500 truncate">{entry.relPath}</div>
-          <div className="text-lg">{entry.name}</div>
+          <div className="font-mono text-[11px] text-muted-foreground truncate">
+            {entry.relPath}
+          </div>
+          <div className="mt-0.5 flex items-center gap-2">
+            <span className="font-serif text-lg">{entry.name}</span>
+            <Badge variant="secondary">{entry.type}</Badge>
+            {entry.appears_in && entry.appears_in.length > 0 && (
+              <Badge variant="default">
+                {entry.appears_in.join(', ')}
+              </Badge>
+            )}
+          </div>
         </div>
         <div className="flex items-center gap-2 text-xs">
           {status && (
             <span
-              className={
+              className={cn(
                 status.startsWith('error')
                   ? 'text-rose-400'
-                  : 'text-emerald-400'
-              }
+                  : 'text-emerald-400',
+              )}
             >
               {status}
             </span>
           )}
           {dirty && <span className="text-amber-400">• unsaved</span>}
-          <button
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setRenaming(true)}
+          >
+            Rename
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setEditing(true)}
+          >
+            Frontmatter
+          </Button>
+          <Button
+            variant={dirty ? 'default' : 'outline'}
+            size="sm"
             onClick={save}
             disabled={!dirty || saving}
-            className="px-3 py-1 rounded border border-stone-700 text-stone-200 hover:bg-stone-800 disabled:opacity-50"
           >
-            {saving ? 'Saving...' : 'Save'}
-          </button>
+            {saving ? 'Saving…' : 'Save'}
+          </Button>
         </div>
-        <button
-          onClick={() => setRenaming(true)}
-          className="px-3 py-1 rounded border border-stone-700 text-stone-200 hover:bg-stone-800 text-xs"
-        >
-          Rename
-        </button>
-        <button
-          onClick={() => setEditing(true)}
-          className="px-3 py-1 rounded border border-stone-700 text-stone-200 hover:bg-stone-800 text-xs"
-        >
-          Edit frontmatter
-        </button>
       </header>
       <div className="flex-1 overflow-hidden">
         <Editor value={draft} catalog={catalog} onChange={setDraft} />
@@ -819,44 +900,44 @@ function ChapterView({
     }
   };
 
+  const refCount = chapter.chapter.refs.length;
+
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
-      <header className="px-6 py-3 border-b border-stone-800 flex items-start gap-4">
+      <header className="px-6 py-3 border-b border-border bg-card/40 flex items-center gap-4">
         <div className="flex-1 min-w-0">
-          <div className="text-xs text-stone-500 truncate">
+          <div className="font-mono text-[11px] text-muted-foreground truncate">
             {chapter.chapter.relPath}
           </div>
-          <div className="text-lg">{chapter.chapter.title}</div>
-          <div className="text-xs text-stone-500">
-            Tome: {chapter.tome} · {chapter.chapter.refs.length} reference
-            {chapter.chapter.refs.length !== 1 ? 's' : ''}
+          <div className="mt-0.5 flex items-center gap-2">
+            <span className="font-serif text-lg">{chapter.chapter.title}</span>
+            <Badge variant="secondary">{chapter.tome}</Badge>
+            <Badge variant="outline">
+              {refCount} echo{refCount !== 1 ? 'es' : ''}
+            </Badge>
           </div>
         </div>
         <div className="flex items-center gap-2 text-xs">
           {status && (
             <span
-              className={
+              className={cn(
                 status.startsWith('error')
                   ? 'text-rose-400'
-                  : 'text-emerald-400'
-              }
+                  : 'text-emerald-400',
+              )}
             >
               {status}
             </span>
           )}
           {dirty && <span className="text-amber-400">• unsaved</span>}
-          <button
+          <Button
+            variant={dirty ? 'default' : 'outline'}
+            size="sm"
             onClick={save}
             disabled={!dirty || saving}
-            className={
-              'px-3 py-1 rounded border ' +
-              (dirty && !saving
-                ? 'border-amber-500 bg-amber-900/40 text-amber-100 hover:bg-amber-800/50'
-                : 'border-stone-700 text-stone-500')
-            }
           >
             {saving ? 'Saving…' : 'Save'}
-          </button>
+          </Button>
         </div>
       </header>
       <div className="flex-1 overflow-hidden">
@@ -905,41 +986,53 @@ function EmptyState({
     title: section,
     lines: ['Select something from the Grimoire.'],
   };
+
   return (
-    <div className="p-8 text-stone-300 space-y-4 overflow-auto max-w-3xl">
-      <h2 className="text-xl text-stone-100">{copy.title}</h2>
-      {copy.lines.map((line, i) => (
-        <p key={i} className="text-sm">
-          {line}
-        </p>
-      ))}
-      {diagnostics.length > 0 && (
-        <div className="mt-6">
-          <h3 className="text-sm uppercase tracking-widest text-stone-500 mb-2">
-            Diagnostics
-          </h3>
-          <ul className="space-y-1 text-sm">
-            {diagnostics.map((d, i) => (
-              <li
-                key={i}
-                className={
-                  d.severity === 'error' ? 'text-rose-400' : 'text-amber-400'
-                }
-              >
-                <span className="font-mono text-xs">[{d.code}]</span>{' '}
-                {d.message}
-                {d.file && (
-                  <span className="text-stone-500 text-xs">
-                    {' '}
-                    — {d.file}
-                    {d.line ? `:${d.line}` : ''}
-                  </span>
-                )}
-              </li>
-            ))}
-          </ul>
+    <div className="flex-1 overflow-auto scrollbar-ember">
+      <div className="mx-auto max-w-3xl p-10 animate-fade-in">
+        <div className="label-rune mb-2">Section</div>
+        <h2 className="font-serif text-3xl text-foreground">{copy.title}</h2>
+        <div className="mt-5 space-y-2 text-sm text-muted-foreground leading-relaxed">
+          {copy.lines.map((line, i) => (
+            <p key={i}>{line}</p>
+          ))}
         </div>
-      )}
+        {diagnostics.length > 0 && (
+          <div className="mt-10">
+            <div className="label-rune mb-3">Diagnostics</div>
+            <ul className="space-y-1.5 rounded-lg border border-border bg-card/40 p-4 text-sm">
+              {diagnostics.map((d, i) => (
+                <li
+                  key={i}
+                  className={cn(
+                    'flex items-start gap-2',
+                    d.severity === 'error'
+                      ? 'text-rose-300'
+                      : 'text-amber-300',
+                  )}
+                >
+                  <Badge
+                    variant={d.severity === 'error' ? 'danger' : 'warning'}
+                    className="shrink-0"
+                  >
+                    {d.code}
+                  </Badge>
+                  <span>
+                    {d.message}
+                    {d.file && (
+                      <span className="text-muted-foreground">
+                        {' '}
+                        — {d.file}
+                        {d.line ? `:${d.line}` : ''}
+                      </span>
+                    )}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -954,20 +1047,19 @@ function Splash({
   onRetry?: () => void;
 }) {
   return (
-    <div className="h-full flex flex-col items-center justify-center text-stone-400 gap-3">
-      <div className="text-lg">{message}</div>
+    <div className="h-full flex flex-col items-center justify-center gap-4 text-muted-foreground bg-parchment-grain">
+      <Compass className="h-10 w-10 text-primary/70 animate-pulse" />
+      <div className="font-serif text-xl text-foreground">{message}</div>
       {detail && (
-        <pre className="max-w-2xl text-xs text-rose-300 whitespace-pre-wrap bg-stone-900 p-3 rounded border border-stone-800">
+        <pre className="max-w-2xl text-xs text-rose-300 whitespace-pre-wrap rounded-md border border-border bg-card p-3">
           {detail}
         </pre>
       )}
       {onRetry && (
-        <button
-          onClick={onRetry}
-          className="text-sm px-3 py-1 rounded border border-stone-700 hover:bg-stone-800"
-        >
+        <Button variant="outline" size="sm" onClick={onRetry}>
+          <RefreshCw className="mr-2 h-3.5 w-3.5" />
           Retry
-        </button>
+        </Button>
       )}
     </div>
   );
@@ -989,45 +1081,103 @@ function ChapterPreview({
   }) => void;
 }) {
   const entryMap = new Map(
-    data.entries.map((e) => [`${e.type}/${e.id}`, e.name]),
+    data.entries.map((e) => [`${e.type}/${e.id}`, e]),
   );
+  const refRe = /@([a-zA-Z]+)\/([a-zA-Z0-9\-_]+)/g;
 
-  const resolveContent = (content: string) => {
-    return content.replace(/@(\w+)\/(\w+)/g, (match, type, id) => {
+  function renderInline(line: string): React.ReactNode[] {
+    const out: React.ReactNode[] = [];
+    let last = 0;
+    let idx = 0;
+    for (const m of line.matchAll(refRe)) {
+      const start = m.index ?? 0;
+      if (start > last) out.push(line.slice(last, start));
+      const [, type, id] = m;
       const key = `${type}/${id}`;
-      const name = entryMap.get(key);
-      if (name) {
-        return `[${name}](entry:${key})`;
+      const hit = entryMap.get(key);
+      if (hit) {
+        out.push(
+          <button
+            key={idx++}
+            type="button"
+            onClick={() => onJump({ kind: 'entry', key })}
+            className="rounded bg-primary/15 px-1 text-primary underline-offset-2 hover:bg-primary/25 hover:underline"
+          >
+            {hit.name}
+          </button>,
+        );
+      } else {
+        out.push(
+          <span key={idx++} className="rounded bg-rose-500/15 px-1 text-rose-300">
+            {m[0]}
+          </span>,
+        );
       }
-      return match;
-    });
-  };
+      last = start + m[0].length;
+    }
+    if (last < line.length) out.push(line.slice(last));
+    return out;
+  }
 
-  const resolved = resolveContent(chapter.body);
+  const blocks = chapter.body.split(/\n\n+/).map((block, i) => {
+    const trimmed = block.trim();
+    if (!trimmed) return null;
+    if (trimmed.startsWith('# ')) {
+      return (
+        <h2 key={i} className="font-serif text-2xl text-foreground">
+          {renderInline(trimmed.slice(2))}
+        </h2>
+      );
+    }
+    if (trimmed.startsWith('## ')) {
+      return (
+        <h3 key={i} className="font-serif text-xl text-foreground">
+          {renderInline(trimmed.slice(3))}
+        </h3>
+      );
+    }
+    return (
+      <p key={i} className="leading-relaxed">
+        {trimmed.split('\n').map((line, j, arr) => (
+          <span key={j}>
+            {renderInline(line)}
+            {j < arr.length - 1 && <br />}
+          </span>
+        ))}
+      </p>
+    );
+  });
 
   return (
-    <div className="h-full overflow-auto p-6">
-      <div className="max-w-4xl mx-auto prose prose-invert">
-        <h1>{chapter.title}</h1>
-        <div
-          dangerouslySetInnerHTML={{
-            __html: resolved
-              .split('\n')
-              .map((line) => {
-                if (line.startsWith('#')) {
-                  return `<h2>${line.slice(1).trim()}</h2>`;
-                }
-                return `<p>${line}</p>`;
-              })
-              .join(''),
-          }}
-        />
-      </div>
+    <div className="flex-1 overflow-auto scrollbar-ember bg-parchment-grain">
+      <article className="mx-auto max-w-2xl px-10 py-12 font-serif text-[1.05rem] text-foreground/90 animate-fade-in">
+        <header className="mb-8">
+          <div className="label-rune">Chapter</div>
+          <h1 className="mt-1 font-serif text-4xl">{chapter.title}</h1>
+        </header>
+        <div className="space-y-5">{blocks}</div>
+      </article>
     </div>
   );
 }
 
 // ---------- helpers ----------
+
+const REF_RE = /@([a-zA-Z]+)\/([a-zA-Z0-9\-_]+)/g;
+
+function getUsagesCount(entry: DumpEntry, data: DumpPayload): number {
+  const bodies: string[] = [];
+  for (const e of data.entries) bodies.push(e.body);
+  for (const t of data.tomes) for (const c of t.chapters) bodies.push(c.body);
+  const needle = `${entry.type}/${entry.id}`;
+  let count = 0;
+  for (const body of bodies) {
+    for (const m of body.matchAll(REF_RE)) {
+      if (`${m[1]}/${m[2]}` === needle) count++;
+    }
+  }
+  return count;
+}
 
 function buildCatalog(data: DumpPayload): RefCatalog {
   const sigils = data.entries
@@ -1045,12 +1195,10 @@ function buildCatalog(data: DumpPayload): RefCatalog {
 }
 
 function entrySummary(e: DumpEntry): string | undefined {
-  // For Lexicon terms, prefer the definition.
   const fm = e.frontmatter as Record<string, unknown>;
   if (e.type === 'term' && typeof fm.definition === 'string') {
     return fm.definition as string;
   }
-  // Otherwise, first non-empty prose line.
   const first = e.body
     .split('\n')
     .map((l) => l.trim())
@@ -1083,23 +1231,6 @@ function entryTypeToSection(key: string): Section {
   if (type === 'term') return 'lexicon';
   if (type === 'sigil') return 'sigils';
   return 'codex';
-}
-
-const REF_RE = /@([a-zA-Z]+)\/([a-zA-Z0-9\-_]+)/g;
-
-function countInbound(type: string, id: string, data: DumpPayload): number {
-  const needle = `${type}/${id}`;
-  let count = 0;
-  const bodies: string[] = [];
-  for (const e of data.entries)
-    if (!(e.type === type && e.id === id)) bodies.push(e.body);
-  for (const t of data.tomes) for (const c of t.chapters) bodies.push(c.body);
-  for (const b of bodies) {
-    for (const m of b.matchAll(REF_RE)) {
-      if (`${m[1]}/${m[2]}` === needle) count++;
-    }
-  }
-  return count;
 }
 
 function TracesView({
@@ -1136,33 +1267,34 @@ function TracesView({
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
-      <header className="px-6 py-3 border-b border-stone-800 flex items-center gap-3">
-        <div className="text-lg">Traces</div>
-        <div className="flex gap-1 text-xs">
+      <header className="px-6 py-3 border-b border-border bg-card/40 flex items-center gap-3">
+        <div className="flex items-center gap-2">
+          <Sparkles className="h-4 w-4 text-primary/80" />
+          <span className="font-serif text-lg">Traces</span>
+        </div>
+        <div className="flex flex-wrap gap-1 text-xs">
           {(['all', 'open', 'todo', 'idea', 'question'] as const).map((f) => (
             <button
               key={f}
               onClick={() => setFilter(f)}
-              className={
-                'px-2 py-1 rounded border ' +
-                (filter === f
-                  ? 'border-amber-500 bg-amber-800/40 text-amber-100'
-                  : 'border-stone-700 hover:bg-stone-800')
-              }
+              className={cn(
+                'rounded-md border px-2 py-1 capitalize transition-colors',
+                filter === f
+                  ? 'border-primary bg-primary/15 text-primary-foreground/90'
+                  : 'border-border hover:bg-muted',
+              )}
             >
-              {f} ({counts[f]})
+              {f}{' '}
+              <span className="text-muted-foreground">({counts[f]})</span>
             </button>
           ))}
         </div>
         <div className="flex-1" />
-        <button
-          onClick={() => setCreating(true)}
-          className="text-xs px-3 py-1 rounded bg-amber-700 hover:bg-amber-600 text-amber-50"
-        >
+        <Button size="sm" onClick={() => setCreating(true)}>
           + New trace
-        </button>
+        </Button>
       </header>
-      <div className="flex-1 overflow-auto p-6">
+      <div className="flex-1 overflow-auto scrollbar-ember p-6">
         <TracesList
           traces={filtered}
           onJump={(target) => {
