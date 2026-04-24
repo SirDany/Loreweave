@@ -61,6 +61,48 @@ export function useSaga(initialPath: string = DEFAULT_SAGA): SagaState {
     void reload();
   }, [reload]);
 
+  // Auto-reload on filesystem changes (dev server SSE).
+  // Debounced inside the sidecar; this listener just schedules a reload
+  // whenever an external edit lands on the Saga root we're viewing.
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof EventSource === 'undefined') {
+      return;
+    }
+    const url = `/lw/events?sagaRoot=${encodeURIComponent(sagaPath)}`;
+    let cancelled = false;
+    let source: EventSource | null = null;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    let scheduled: ReturnType<typeof setTimeout> | null = null;
+
+    const scheduleReload = () => {
+      if (scheduled) clearTimeout(scheduled);
+      scheduled = setTimeout(() => {
+        scheduled = null;
+        void reload();
+      }, 200);
+    };
+
+    const connect = () => {
+      if (cancelled) return;
+      source = new EventSource(url);
+      source.addEventListener('change', scheduleReload);
+      source.onerror = () => {
+        source?.close();
+        source = null;
+        // Retry with backoff; the dev server may still be warming up.
+        retryTimer = setTimeout(connect, 2000);
+      };
+    };
+    connect();
+
+    return () => {
+      cancelled = true;
+      if (retryTimer) clearTimeout(retryTimer);
+      if (scheduled) clearTimeout(scheduled);
+      source?.close();
+    };
+  }, [sagaPath, reload]);
+
   return {
     sagaPath,
     data,

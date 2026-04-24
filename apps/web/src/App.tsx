@@ -29,7 +29,7 @@ import {
   TabsTrigger,
 } from './components/ui/tabs.js';
 import { cn } from './lib/utils.js';
-import { Editor } from './editor/Editor.js';
+import { Editor } from './editor/LazyEditor.js';
 import type { RefCatalog } from './editor/ReferenceExtension.js';
 import type { DumpChapter, DumpEntry, DumpPayload } from './lib/lw.js';
 import { lwWrite } from './lib/lw.js';

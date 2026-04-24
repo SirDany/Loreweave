@@ -18,33 +18,33 @@ export function DiffViewer({ file, patch, onClose }: Props) {
       }}
     >
       <div
-        className="w-full max-w-4xl h-[80vh] bg-stone-900 border border-stone-700 rounded-lg shadow-2xl flex flex-col"
+        className="w-full max-w-4xl h-[80vh] bg-card border border-border rounded-lg shadow-2xl flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        <header className="px-5 py-3 border-b border-stone-800 flex items-center gap-3">
+        <header className="px-5 py-3 border-b border-border flex items-center gap-3">
           <div className="flex-1 min-w-0">
-            <div className="text-xs text-stone-500">diff</div>
-            <div className="text-sm font-mono text-stone-100 truncate">{file || "(working tree)"}</div>
+            <div className="text-xs text-muted-foreground">diff</div>
+            <div className="text-sm font-mono text-foreground truncate">{file || "(working tree)"}</div>
           </div>
           <button
             onClick={onClose}
-            className="px-3 py-1 rounded border border-stone-700 text-stone-300 hover:bg-stone-800 text-xs"
+            className="px-3 py-1 rounded border border-border text-foreground/90 hover:bg-muted text-xs"
           >
             Close
           </button>
         </header>
-        <div className="flex-1 overflow-auto bg-stone-950 font-mono text-xs leading-relaxed">
+        <div className="flex-1 overflow-auto bg-background font-mono text-xs leading-relaxed">
           {patch.trim().length === 0 ? (
-            <div className="p-6 text-stone-400">No changes.</div>
+            <div className="p-6 text-muted-foreground">No changes.</div>
           ) : (
             <pre className="p-4 whitespace-pre">
               {patch.split("\n").map((line, i) => {
-                let cls = "text-stone-300";
-                if (line.startsWith("+++") || line.startsWith("---")) cls = "text-stone-500";
+                let cls = "text-foreground/90";
+                if (line.startsWith("+++") || line.startsWith("---")) cls = "text-muted-foreground";
                 else if (line.startsWith("@@")) cls = "text-cyan-400";
                 else if (line.startsWith("+")) cls = "text-emerald-400";
                 else if (line.startsWith("-")) cls = "text-rose-400";
-                else if (line.startsWith("diff ") || line.startsWith("index ")) cls = "text-stone-600";
+                else if (line.startsWith("diff ") || line.startsWith("index ")) cls = "text-muted-foreground/70";
                 return (
                   <div key={i} className={cls}>
                     {line || "\u00A0"}

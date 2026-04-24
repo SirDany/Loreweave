@@ -83,25 +83,25 @@ export function UsagesPanel({ entry, data, onJump }: Props) {
   return (
     <div className="space-y-4">
       <section>
-        <div className="text-xs uppercase tracking-widest text-stone-500 mb-1">
+        <div className="text-xs uppercase tracking-widest text-muted-foreground mb-1">
           mentioned in ({inbound.length})
         </div>
         {inbound.length === 0 && (
-          <div className="text-xs text-stone-500 italic">no mentions yet</div>
+          <div className="text-xs text-muted-foreground italic">no mentions yet</div>
         )}
         <ul className="space-y-1 text-sm">
           {inbound.map((h, i) => (
             <li key={i}>
               <button
-                className="text-left w-full hover:bg-stone-800/60 rounded px-1 py-0.5"
+                className="text-left w-full hover:bg-muted/60 rounded px-1 py-0.5"
                 onClick={() =>
                   onJump?.({ kind: h.kind, key: h.key, line: h.line })
                 }
               >
-                <div className="font-mono text-xs text-amber-300">
+                <div className="font-mono text-xs text-primary">
                   {h.from}:{h.line}
                 </div>
-                <div className="text-stone-400 text-xs truncate">
+                <div className="text-muted-foreground text-xs truncate">
                   {h.snippet || "—"}
                 </div>
               </button>
@@ -110,11 +110,11 @@ export function UsagesPanel({ entry, data, onJump }: Props) {
         </ul>
       </section>
       <section>
-        <div className="text-xs uppercase tracking-widest text-stone-500 mb-1">
+        <div className="text-xs uppercase tracking-widest text-muted-foreground mb-1">
           references from this entry ({outbound.length})
         </div>
         {outbound.length === 0 && (
-          <div className="text-xs text-stone-500 italic">none</div>
+          <div className="text-xs text-muted-foreground italic">none</div>
         )}
         <ul className="space-y-0.5 text-sm font-mono">
           {outbound.map((o, i) => (
@@ -127,7 +127,7 @@ export function UsagesPanel({ entry, data, onJump }: Props) {
               >
                 @{o.type}/{o.id}
               </button>
-              <span className="text-stone-500 text-xs"> :{o.line}</span>
+              <span className="text-muted-foreground text-xs"> :{o.line}</span>
             </li>
           ))}
         </ul>

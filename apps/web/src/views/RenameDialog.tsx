@@ -80,22 +80,22 @@ export function RenameDialog({
         if (e.key === "Escape") onClose();
       }}
     >
-      <div className="w-full max-w-xl bg-stone-900 border border-stone-700 rounded-lg shadow-2xl">
-        <header className="px-5 py-3 border-b border-stone-800">
-          <div className="text-xs text-stone-500">{type}/{id}</div>
-          <div className="text-base text-stone-100">Rename "{name}"</div>
+      <div className="w-full max-w-xl bg-card border border-border rounded-lg shadow-2xl">
+        <header className="px-5 py-3 border-b border-border">
+          <div className="text-xs text-muted-foreground">{type}/{id}</div>
+          <div className="text-base text-foreground">Rename "{name}"</div>
         </header>
 
         <div className="p-5 space-y-3 text-sm">
           <label className="block">
-            <div className="text-xs text-stone-400 mb-1">
-              new id <span className="text-stone-600">· kebab-case</span>
+            <div className="text-xs text-muted-foreground mb-1">
+              new id <span className="text-muted-foreground/70">· kebab-case</span>
             </div>
             <input
               autoFocus
               value={newId}
               onChange={(e) => setNewId(e.target.value)}
-              className="w-full bg-stone-950 border border-stone-700 rounded px-2 py-1 font-mono"
+              className="w-full bg-background border border-border rounded px-2 py-1 font-mono"
             />
           </label>
 
@@ -106,36 +106,36 @@ export function RenameDialog({
           )}
 
           {planning && (
-            <div className="text-stone-400 text-xs">Computing impact…</div>
+            <div className="text-muted-foreground text-xs">Computing impact…</div>
           )}
 
           {plan && (
-            <div className="border border-stone-800 rounded p-3 text-xs space-y-1 bg-stone-950">
+            <div className="border border-border rounded p-3 text-xs space-y-1 bg-background">
               <div>
-                <span className="text-stone-400">file:</span>{" "}
-                <span className="font-mono text-stone-200">
+                <span className="text-muted-foreground">file:</span>{" "}
+                <span className="font-mono text-foreground">
                   {plan.sourceFile ?? "(none)"}
                 </span>
                 {plan.targetFile && plan.targetFile !== plan.sourceFile && (
                   <>
                     {" → "}
-                    <span className="font-mono text-amber-300">
+                    <span className="font-mono text-primary">
                       {plan.targetFile}
                     </span>
                   </>
                 )}
               </div>
               <div>
-                <span className="text-stone-400">echoes:</span>{" "}
-                <span className="text-stone-200">
+                <span className="text-muted-foreground">echoes:</span>{" "}
+                <span className="text-foreground">
                   {totalEchoes} in {plan.hits.length} file
                   {plan.hits.length === 1 ? "" : "s"}
                 </span>
               </div>
               {plan.extraHits.length > 0 && (
                 <div>
-                  <span className="text-stone-400">other refs:</span>{" "}
-                  <span className="text-stone-200">{totalExtra}</span>
+                  <span className="text-muted-foreground">other refs:</span>{" "}
+                  <span className="text-foreground">{totalExtra}</span>
                 </div>
               )}
               {plan.conflicts.length > 0 && (
@@ -154,10 +154,10 @@ export function RenameDialog({
           {err && <div className="text-rose-400 text-xs whitespace-pre-wrap">{err}</div>}
         </div>
 
-        <footer className="px-5 py-3 border-t border-stone-800 flex justify-end gap-2">
+        <footer className="px-5 py-3 border-t border-border flex justify-end gap-2">
           <button
             onClick={onClose}
-            className="px-3 py-1 rounded border border-stone-700 text-stone-300 hover:bg-stone-800 text-xs"
+            className="px-3 py-1 rounded border border-border text-foreground/90 hover:bg-muted text-xs"
           >
             Cancel
           </button>
@@ -170,7 +170,7 @@ export function RenameDialog({
               newId === id ||
               !validId
             }
-            className="px-3 py-1 rounded border border-amber-500 bg-amber-900/40 text-amber-100 hover:bg-amber-800/50 disabled:opacity-40 text-xs"
+            className="px-3 py-1 rounded border border-primary bg-primary/20 text-primary-foreground hover:bg-primary/30 disabled:opacity-40 text-xs"
           >
             {applying ? "Renaming…" : "Apply rename"}
           </button>

@@ -57,30 +57,30 @@ export function BackupsDialog({ sagaPath, onClose, onRestored }: Props) {
       onClick={onClose}
     >
       <div
-        className="w-full max-w-2xl rounded-lg border border-stone-700 bg-stone-950 shadow-2xl flex flex-col max-h-[80vh]"
+        className="w-full max-w-2xl rounded-lg border border-border bg-background shadow-2xl flex flex-col max-h-[80vh]"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="p-4 border-b border-stone-800 flex items-center gap-3">
+        <div className="p-4 border-b border-border flex items-center gap-3">
           <div className="text-base">Backups</div>
-          <div className="text-xs text-stone-500 font-mono truncate">
+          <div className="text-xs text-muted-foreground font-mono truncate">
             {sagaPath}
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="ml-auto px-2 py-1 text-xs rounded border border-stone-700 hover:bg-stone-800"
+            className="ml-auto px-2 py-1 text-xs rounded border border-border hover:bg-muted"
           >
             Close
           </button>
         </div>
 
-        <div className="p-4 border-b border-stone-800 flex flex-wrap items-center gap-2">
+        <div className="p-4 border-b border-border flex flex-wrap items-center gap-2">
           <input
             type="text"
             value={label}
             onChange={(e) => setLabel(e.target.value)}
             placeholder="label (optional)"
-            className="flex-1 min-w-[180px] px-2 py-1 rounded bg-stone-900 border border-stone-700 text-stone-100 text-xs"
+            className="flex-1 min-w-[180px] px-2 py-1 rounded bg-card border border-border text-foreground text-xs"
           />
           <button
             type="button"
@@ -102,7 +102,7 @@ export function BackupsDialog({ sagaPath, onClose, onRestored }: Props) {
           <button
             type="button"
             onClick={refresh}
-            className="px-3 py-1 rounded border border-stone-700 hover:bg-stone-800 text-xs"
+            className="px-3 py-1 rounded border border-border hover:bg-muted text-xs"
           >
             Refresh
           </button>
@@ -110,7 +110,7 @@ export function BackupsDialog({ sagaPath, onClose, onRestored }: Props) {
 
         <div className="flex-1 overflow-auto">
           {snapshots.length === 0 ? (
-            <div className="p-6 text-center text-stone-500 text-sm">
+            <div className="p-6 text-center text-muted-foreground text-sm">
               No snapshots yet.
             </div>
           ) : (
@@ -122,19 +122,19 @@ export function BackupsDialog({ sagaPath, onClose, onRestored }: Props) {
                     key={s.path}
                     className={
                       "px-4 py-2 " +
-                      (selected ? "bg-amber-950/20" : "hover:bg-stone-900/50")
+                      (selected ? "bg-primary/10" : "hover:bg-muted/50")
                     }
                   >
                     <div className="flex items-center gap-2 text-sm">
                       <div className="flex-1 min-w-0">
-                        <div className="font-mono text-xs truncate text-stone-200">
+                        <div className="font-mono text-xs truncate text-foreground">
                           {s.file}
                         </div>
-                        <div className="text-[11px] text-stone-500">
+                        <div className="text-[11px] text-muted-foreground">
                           {(s.bytes / 1024).toFixed(1)} KB ·{" "}
                           {new Date(s.modified).toLocaleString()}
                           {s.label ? (
-                            <span className="ml-2 text-amber-300">
+                            <span className="ml-2 text-primary">
                               [{s.label}]
                             </span>
                           ) : null}
@@ -150,17 +150,17 @@ export function BackupsDialog({ sagaPath, onClose, onRestored }: Props) {
                             setPlan(p);
                           })
                         }
-                        className="px-2 py-1 rounded border border-amber-500 bg-amber-900/40 text-amber-100 hover:bg-amber-800/50 disabled:opacity-40 text-xs"
+                        className="px-2 py-1 rounded border border-primary bg-primary/20 text-primary-foreground hover:bg-primary/30 disabled:opacity-40 text-xs"
                       >
                         Restore…
                       </button>
                     </div>
                     {selected && plan && (
-                      <div className="mt-2 ml-1 rounded border border-amber-700 bg-stone-950 p-3 text-xs">
-                        <div className="text-stone-300 mb-2">
+                      <div className="mt-2 ml-1 rounded border border-primary/60 bg-background p-3 text-xs">
+                        <div className="text-foreground/90 mb-2">
                           will write{" "}
                           <span className="text-emerald-300">+{plan.newFiles} new</span>,{" "}
-                          <span className="text-amber-300">
+                          <span className="text-primary">
                             ~{plan.overwritten} overwritten
                           </span>
                           ,{" "}
@@ -171,7 +171,7 @@ export function BackupsDialog({ sagaPath, onClose, onRestored }: Props) {
                         </div>
                         {plan.removedFiles && plan.removedFiles.length > 0 && (
                           <details className="mb-2">
-                            <summary className="cursor-pointer text-stone-400">
+                            <summary className="cursor-pointer text-muted-foreground">
                               Files that will be removed ({plan.removedFiles.length})
                             </summary>
                             <ul className="mt-1 ml-4 font-mono text-[11px] text-rose-300 max-h-40 overflow-auto">
@@ -179,14 +179,14 @@ export function BackupsDialog({ sagaPath, onClose, onRestored }: Props) {
                                 <li key={f}>- {f}</li>
                               ))}
                               {plan.removedFiles.length > 100 && (
-                                <li className="text-stone-500">
+                                <li className="text-muted-foreground">
                                   …and {plan.removedFiles.length - 100} more
                                 </li>
                               )}
                             </ul>
                           </details>
                         )}
-                        <label className="flex items-center gap-1 text-stone-400 mb-2">
+                        <label className="flex items-center gap-1 text-muted-foreground mb-2">
                           <input
                             type="checkbox"
                             checked={skipPreBackup}
@@ -225,7 +225,7 @@ export function BackupsDialog({ sagaPath, onClose, onRestored }: Props) {
                               setPlanFor(null);
                               setPlan(null);
                             }}
-                            className="px-3 py-1 rounded border border-stone-700 hover:bg-stone-800 text-xs"
+                            className="px-3 py-1 rounded border border-border hover:bg-muted text-xs"
                           >
                             Cancel
                           </button>
@@ -240,7 +240,7 @@ export function BackupsDialog({ sagaPath, onClose, onRestored }: Props) {
         </div>
 
         {(err || info) && (
-          <div className="border-t border-stone-800 p-3">
+          <div className="border-t border-border p-3">
             {err && (
               <pre className="text-xs text-rose-400 whitespace-pre-wrap">{err}</pre>
             )}

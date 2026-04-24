@@ -62,22 +62,22 @@ export function ImportDialog({ onClose, onImported }: Props) {
         if (e.key === "Escape") onClose();
       }}
     >
-      <div className="w-full max-w-2xl bg-stone-900 border border-stone-700 rounded-lg shadow-2xl">
-        <header className="px-5 py-3 border-b border-stone-800 flex items-center justify-between">
+      <div className="w-full max-w-2xl bg-card border border-border rounded-lg shadow-2xl">
+        <header className="px-5 py-3 border-b border-border flex items-center justify-between">
           <div>
-            <div className="text-base text-stone-100">Import Saga zip</div>
-            <div className="text-xs text-stone-500">
+            <div className="text-base text-foreground">Import Saga zip</div>
+            <div className="text-xs text-muted-foreground">
               Drop a Loreweave .zip; preview the plan; apply with conflict policy.
             </div>
           </div>
-          <button onClick={onClose} className="text-xs text-stone-500 hover:text-stone-200">
+          <button onClick={onClose} className="text-xs text-muted-foreground hover:text-foreground">
             esc
           </button>
         </header>
 
         <div className="p-5 space-y-4 text-sm">
           <label className="block text-xs">
-            <span className="text-stone-400">zip path</span>
+            <span className="text-muted-foreground">zip path</span>
             <input
               value={zipPath}
               onChange={(e) => {
@@ -86,12 +86,12 @@ export function ImportDialog({ onClose, onImported }: Props) {
                 setResult(null);
               }}
               placeholder="path/to/saga-export.zip"
-              className="mt-1 w-full bg-stone-950 border border-stone-700 rounded px-2 py-1 font-mono text-xs"
+              className="mt-1 w-full bg-background border border-border rounded px-2 py-1 font-mono text-xs"
             />
           </label>
 
           <label className="block text-xs">
-            <span className="text-stone-400">import into</span>
+            <span className="text-muted-foreground">import into</span>
             <input
               value={into}
               onChange={(e) => {
@@ -99,9 +99,9 @@ export function ImportDialog({ onClose, onImported }: Props) {
                 setPlan(null);
                 setResult(null);
               }}
-              className="mt-1 w-full bg-stone-950 border border-stone-700 rounded px-2 py-1 font-mono text-xs"
+              className="mt-1 w-full bg-background border border-border rounded px-2 py-1 font-mono text-xs"
             />
-            <div className="mt-1 text-stone-500">
+            <div className="mt-1 text-muted-foreground">
               The bundle root becomes a subdirectory of this folder.
             </div>
           </label>
@@ -110,29 +110,29 @@ export function ImportDialog({ onClose, onImported }: Props) {
             <button
               onClick={() => void doPlan()}
               disabled={busy || !zipPath.trim()}
-              className="px-3 py-1 rounded border border-stone-700 text-stone-200 hover:bg-stone-800 text-xs disabled:opacity-40"
+              className="px-3 py-1 rounded border border-border text-foreground hover:bg-muted text-xs disabled:opacity-40"
             >
               {busy && !plan ? "Planning…" : plan ? "Re-plan" : "Plan"}
             </button>
           </div>
 
           {plan && (
-            <div className="border border-stone-800 rounded p-3 bg-stone-950 text-xs space-y-2">
+            <div className="border border-border rounded p-3 bg-background text-xs space-y-2">
               <div>
-                <span className="text-stone-400">target:</span>{" "}
-                <span className="font-mono text-amber-300">{plan.targetSaga}</span>
+                <span className="text-muted-foreground">target:</span>{" "}
+                <span className="font-mono text-primary">{plan.targetSaga}</span>
               </div>
               <div className="flex gap-3">
                 <span className="text-emerald-400">+{plan.newFiles.length} new</span>
-                <span className="text-amber-400">~{plan.conflicts.length} conflicts</span>
-                <span className="text-stone-500">·{plan.unchanged.length} unchanged</span>
+                <span className="text-amber-300">~{plan.conflicts.length} conflicts</span>
+                <span className="text-muted-foreground">·{plan.unchanged.length} unchanged</span>
               </div>
               {plan.conflicts.length > 0 && (
                 <details>
-                  <summary className="text-stone-400 cursor-pointer">
+                  <summary className="text-muted-foreground cursor-pointer">
                     show {plan.conflicts.length} conflict file(s)
                   </summary>
-                  <ul className="mt-1 max-h-32 overflow-auto font-mono text-[11px] text-amber-300/80">
+                  <ul className="mt-1 max-h-32 overflow-auto font-mono text-[11px] text-primary/80">
                     {plan.conflicts.map((c) => (
                       <li key={c.relPath}>~ {c.relPath}</li>
                     ))}
@@ -141,7 +141,7 @@ export function ImportDialog({ onClose, onImported }: Props) {
               )}
               {plan.newFiles.length > 0 && (
                 <details>
-                  <summary className="text-stone-400 cursor-pointer">
+                  <summary className="text-muted-foreground cursor-pointer">
                     show {plan.newFiles.length} new file(s)
                   </summary>
                   <ul className="mt-1 max-h-32 overflow-auto font-mono text-[11px] text-emerald-300/80">
@@ -153,8 +153,8 @@ export function ImportDialog({ onClose, onImported }: Props) {
               )}
 
               {plan.conflicts.length > 0 && (
-                <fieldset className="border border-stone-800 rounded p-2 mt-2">
-                  <legend className="text-stone-500 px-1">conflict policy</legend>
+                <fieldset className="border border-border rounded p-2 mt-2">
+                  <legend className="text-muted-foreground px-1">conflict policy</legend>
                   <label className="flex items-center gap-2 text-xs">
                     <input
                       type="radio"
@@ -185,10 +185,10 @@ export function ImportDialog({ onClose, onImported }: Props) {
                 <li className="text-emerald-300">
                   {result.actions.filter((a) => a.action === "created").length} created
                 </li>
-                <li className="text-amber-300">
+                <li className="text-primary">
                   {result.actions.filter((a) => a.action === "overwritten").length} overwritten
                 </li>
-                <li className="text-stone-400">
+                <li className="text-muted-foreground">
                   {result.actions.filter((a) => a.action === "kept").length} kept
                 </li>
               </ul>
@@ -200,17 +200,17 @@ export function ImportDialog({ onClose, onImported }: Props) {
           )}
         </div>
 
-        <footer className="px-5 py-3 border-t border-stone-800 flex justify-end gap-2">
+        <footer className="px-5 py-3 border-t border-border flex justify-end gap-2">
           <button
             onClick={onClose}
-            className="px-3 py-1 rounded border border-stone-700 text-stone-300 hover:bg-stone-800 text-xs"
+            className="px-3 py-1 rounded border border-border text-foreground/90 hover:bg-muted text-xs"
           >
             Close
           </button>
           <button
             onClick={() => void doApply()}
             disabled={busy || !plan || (plan.newFiles.length === 0 && plan.conflicts.length === 0)}
-            className="px-3 py-1 rounded border border-amber-500 bg-amber-900/40 text-amber-100 hover:bg-amber-800/50 disabled:opacity-40 text-xs"
+            className="px-3 py-1 rounded border border-primary bg-primary/20 text-primary-foreground hover:bg-primary/30 disabled:opacity-40 text-xs"
           >
             {busy && plan ? "Importing…" : "Apply import"}
           </button>

@@ -29,7 +29,7 @@ export function TracesList({ traces, forTarget, onJump }: Props) {
     : traces;
 
   if (visible.length === 0) {
-    return <div className="text-xs text-stone-500 italic">no traces</div>;
+    return <div className="text-xs text-muted-foreground italic">no traces</div>;
   }
 
   return (
@@ -40,22 +40,22 @@ export function TracesList({ traces, forTarget, onJump }: Props) {
           className={
             'rounded border p-3 text-sm ' +
             (n.status === 'resolved'
-              ? 'border-stone-800 bg-stone-900/40 opacity-60'
+              ? 'border-border bg-card/40 opacity-60'
               : n.kind === 'todo'
-              ? 'border-amber-900/70 bg-amber-950/30'
+              ? 'border-primary/40 bg-primary/10'
               : n.kind === 'question'
               ? 'border-sky-900/70 bg-sky-950/30'
               : n.kind === 'idea'
               ? 'border-violet-900/70 bg-violet-950/30'
-              : 'border-stone-800 bg-stone-900/40')
+              : 'border-border bg-card/40')
           }
         >
           <div className="flex items-start gap-2">
             <span>{KIND_LABEL[n.kind]}</span>
             <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between gap-2">
-                <div className="font-mono text-xs text-stone-400">{n.id}</div>
-                <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-stone-500">
+                <div className="font-mono text-xs text-muted-foreground">{n.id}</div>
+                <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-muted-foreground">
                   <span>{n.kind}</span>
                   {n.author && <span>· {n.author}</span>}
                   {n.created && <span>· {n.created}</span>}
@@ -64,18 +64,18 @@ export function TracesList({ traces, forTarget, onJump }: Props) {
               {n.target && (
                 <div className="mt-0.5 text-[11px]">
                   <button
-                    className="text-amber-300 hover:underline font-mono"
+                    className="text-primary hover:underline font-mono"
                     onClick={() => onJump?.(n.target!)}
                   >
                     {n.target}
                   </button>
                 </div>
               )}
-              <div className="mt-1.5 text-stone-300 whitespace-pre-wrap">
+              <div className="mt-1.5 text-foreground/90 whitespace-pre-wrap">
                 {n.body}
               </div>
               {n.tags.length > 0 && (
-                <div className="mt-1 text-[10px] text-stone-500">
+                <div className="mt-1 text-[10px] text-muted-foreground">
                   {n.tags.map((t) => `#${t}`).join(' ')}
                 </div>
               )}

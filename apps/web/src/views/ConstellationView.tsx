@@ -140,7 +140,7 @@ export function ConstellationView({ data, onJump }: Props) {
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
-      <header className="px-6 py-3 border-b border-stone-800 flex items-center gap-3">
+      <header className="px-6 py-3 border-b border-border flex items-center gap-3">
         <div className="text-lg flex-1">Constellation</div>
         <div className="flex gap-1 text-xs">
           {TYPE_ORDER.map((t) => (
@@ -150,8 +150,8 @@ export function ConstellationView({ data, onJump }: Props) {
               className={
                 "px-2 py-0.5 rounded border " +
                 (filter.has(t)
-                  ? "border-stone-600 bg-stone-800"
-                  : "border-stone-800 text-stone-600")
+                  ? "border-border bg-muted"
+                  : "border-border text-muted-foreground/70")
               }
               style={
                 filter.has(t)
@@ -163,11 +163,11 @@ export function ConstellationView({ data, onJump }: Props) {
             </button>
           ))}
         </div>
-        <div className="text-xs text-stone-500">
+        <div className="text-xs text-muted-foreground">
           {nodes.length} entries · {edges.length} echoes
         </div>
       </header>
-      <div className="flex-1 overflow-auto bg-stone-950">
+      <div className="flex-1 overflow-auto bg-background">
         <svg
           viewBox="0 0 800 800"
           className="w-full h-full min-h-[600px]"

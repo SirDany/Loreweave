@@ -134,7 +134,7 @@ export function VersionsPanel({ sagaPath, onChanged }: Props) {
 
   if (needsInit) {
     return (
-      <div className="p-6 text-sm text-stone-300">
+      <div className="p-6 text-sm text-foreground/90">
         <div className="mb-3">
           This Saga is not in a git repository yet. Initialize one to track
           versions, switch between branches (e.g. drafts vs canon), and roll
@@ -143,7 +143,7 @@ export function VersionsPanel({ sagaPath, onChanged }: Props) {
         <button
           onClick={() => void wrap("git init", () => gitInit(sagaPath))}
           disabled={busy}
-          className="px-3 py-1 rounded border border-amber-500 bg-amber-900/40 text-amber-100 hover:bg-amber-800/50 disabled:opacity-50"
+          className="px-3 py-1 rounded border border-primary bg-primary/20 text-primary-foreground hover:bg-primary/30 disabled:opacity-50"
         >
           {busy ? "Initializing…" : "git init"}
         </button>
@@ -154,33 +154,33 @@ export function VersionsPanel({ sagaPath, onChanged }: Props) {
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden text-sm">
-      <header className="px-6 py-3 border-b border-stone-800 flex items-center gap-3">
+      <header className="px-6 py-3 border-b border-border flex items-center gap-3">
         <div className="flex-1 min-w-0">
-          <div className="text-stone-100">
+          <div className="text-foreground">
             {status?.branch ? (
               <>
-                <span className="text-amber-300">⎇ {status.branch}</span>
-                <span className="text-stone-500 ml-2">@ {status.head}</span>
+                <span className="text-primary">⎇ {status.branch}</span>
+                <span className="text-muted-foreground ml-2">@ {status.head}</span>
               </>
             ) : (
               <span className="text-yellow-400">(detached HEAD)</span>
             )}
             {status?.upstream && (
-              <span className="text-stone-500 ml-2">⇄ {status.upstream}</span>
+              <span className="text-muted-foreground ml-2">⇄ {status.upstream}</span>
             )}
             {status && (status.ahead || status.behind) ? (
-              <span className="text-stone-500 ml-2">
+              <span className="text-muted-foreground ml-2">
                 {status.ahead ? `↑${status.ahead}` : ""}
                 {status.behind ? ` ↓${status.behind}` : ""}
               </span>
             ) : null}
           </div>
-          <div className="text-xs text-stone-500 truncate">{status?.repoRoot}</div>
+          <div className="text-xs text-muted-foreground truncate">{status?.repoRoot}</div>
         </div>
         <button
           onClick={() => void refresh()}
           disabled={busy}
-          className="px-2 py-1 rounded border border-stone-700 text-stone-300 hover:bg-stone-800 text-xs"
+          className="px-2 py-1 rounded border border-border text-foreground/90 hover:bg-muted text-xs"
         >
           Refresh
         </button>
@@ -238,7 +238,7 @@ export function VersionsPanel({ sagaPath, onChanged }: Props) {
 
         {/* Working tree */}
         <section>
-          <h3 className="text-xs uppercase tracking-wide text-stone-500 mb-2">
+          <h3 className="text-xs uppercase tracking-wide text-muted-foreground mb-2">
             Working tree
           </h3>
           {status?.clean ? (
@@ -263,7 +263,7 @@ export function VersionsPanel({ sagaPath, onChanged }: Props) {
                     onClick={() => void showDiff(f.path)}
                     className={
                       "text-left truncate flex-1 hover:underline " +
-                      (f.conflict ? "text-rose-300" : "text-stone-200")
+                      (f.conflict ? "text-rose-300" : "text-foreground")
                     }
                     title="Show diff"
                   >
@@ -278,7 +278,7 @@ export function VersionsPanel({ sagaPath, onChanged }: Props) {
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               placeholder="commit message"
-              className="flex-1 bg-stone-950 border border-stone-700 rounded px-2 py-1 text-xs"
+              className="flex-1 bg-background border border-border rounded px-2 py-1 text-xs"
             />
             <button
               onClick={() =>
@@ -293,7 +293,7 @@ export function VersionsPanel({ sagaPath, onChanged }: Props) {
                 (status?.clean ?? true) ||
                 (status?.hasConflicts ?? false)
               }
-              className="px-3 py-1 rounded border border-amber-500 bg-amber-900/40 text-amber-100 hover:bg-amber-800/50 disabled:opacity-40 text-xs"
+              className="px-3 py-1 rounded border border-primary bg-primary/20 text-primary-foreground hover:bg-primary/30 disabled:opacity-40 text-xs"
             >
               Commit all
             </button>
@@ -302,7 +302,7 @@ export function VersionsPanel({ sagaPath, onChanged }: Props) {
 
         {/* Branches */}
         <section>
-          <h3 className="text-xs uppercase tracking-wide text-stone-500 mb-2">
+          <h3 className="text-xs uppercase tracking-wide text-muted-foreground mb-2">
             Branches
           </h3>
           <ul className="space-y-0.5">
@@ -310,13 +310,13 @@ export function VersionsPanel({ sagaPath, onChanged }: Props) {
               .filter((b) => !b.remote)
               .map((b) => (
                 <li key={b.name} className="flex items-center gap-2 text-xs">
-                  <span className={"w-3 " + (b.current ? "text-amber-300" : "text-stone-600")}>
+                  <span className={"w-3 " + (b.current ? "text-primary" : "text-muted-foreground/70")}>
                     {b.current ? "●" : "○"}
                   </span>
-                  <span className={b.current ? "text-amber-300" : "text-stone-200"}>
+                  <span className={b.current ? "text-primary" : "text-foreground"}>
                     {b.name}
                   </span>
-                  <span className="text-stone-600">{b.head}</span>
+                  <span className="text-muted-foreground/70">{b.head}</span>
                   {!b.current && (
                     <button
                       onClick={() =>
@@ -325,7 +325,7 @@ export function VersionsPanel({ sagaPath, onChanged }: Props) {
                         )
                       }
                       disabled={busy}
-                      className="ml-auto text-stone-400 hover:text-stone-100"
+                      className="ml-auto text-muted-foreground hover:text-foreground"
                     >
                       switch
                     </button>
@@ -338,7 +338,7 @@ export function VersionsPanel({ sagaPath, onChanged }: Props) {
               value={newBranch}
               onChange={(e) => setNewBranch(e.target.value)}
               placeholder="new branch name"
-              className="flex-1 bg-stone-950 border border-stone-700 rounded px-2 py-1 text-xs"
+              className="flex-1 bg-background border border-border rounded px-2 py-1 text-xs"
             />
             <button
               onClick={() =>
@@ -348,7 +348,7 @@ export function VersionsPanel({ sagaPath, onChanged }: Props) {
                 })
               }
               disabled={busy || !/^[A-Za-z0-9._\-/]+$/.test(newBranch.trim())}
-              className="px-3 py-1 rounded border border-stone-700 text-stone-200 hover:bg-stone-800 text-xs"
+              className="px-3 py-1 rounded border border-border text-foreground hover:bg-muted text-xs"
             >
               Create & switch
             </button>
@@ -357,17 +357,17 @@ export function VersionsPanel({ sagaPath, onChanged }: Props) {
 
         {/* Remotes & sync */}
         <section>
-          <h3 className="text-xs uppercase tracking-wide text-stone-500 mb-2">
+          <h3 className="text-xs uppercase tracking-wide text-muted-foreground mb-2">
             Remotes & sync
           </h3>
           {remotes.length === 0 ? (
-            <div className="text-stone-500 text-xs">No remotes configured.</div>
+            <div className="text-muted-foreground text-xs">No remotes configured.</div>
           ) : (
             <ul className="space-y-0.5 mb-3">
               {remotes.map((r) => (
                 <li key={r.name} className="flex items-center gap-2 text-xs font-mono">
                   <span className="text-cyan-400 w-16 truncate">{r.name}</span>
-                  <span className="text-stone-500 truncate flex-1">{r.fetch}</span>
+                  <span className="text-muted-foreground truncate flex-1">{r.fetch}</span>
                   <button
                     onClick={() =>
                       void wrap("remote remove " + r.name, () =>
@@ -375,7 +375,7 @@ export function VersionsPanel({ sagaPath, onChanged }: Props) {
                       )
                     }
                     disabled={busy}
-                    className="text-stone-500 hover:text-rose-400"
+                    className="text-muted-foreground hover:text-rose-400"
                     title="Remove remote"
                   >
                     ✕
@@ -390,13 +390,13 @@ export function VersionsPanel({ sagaPath, onChanged }: Props) {
               value={remoteName}
               onChange={(e) => setRemoteName(e.target.value)}
               placeholder="origin"
-              className="bg-stone-950 border border-stone-700 rounded px-2 py-1 text-xs font-mono"
+              className="bg-background border border-border rounded px-2 py-1 text-xs font-mono"
             />
             <input
               value={remoteUrl}
               onChange={(e) => setRemoteUrl(e.target.value)}
               placeholder="git@host:user/repo.git"
-              className="bg-stone-950 border border-stone-700 rounded px-2 py-1 text-xs font-mono"
+              className="bg-background border border-border rounded px-2 py-1 text-xs font-mono"
             />
             <button
               onClick={() =>
@@ -407,7 +407,7 @@ export function VersionsPanel({ sagaPath, onChanged }: Props) {
                 })
               }
               disabled={busy || !remoteName.trim() || !remoteUrl.trim()}
-              className="px-3 py-1 rounded border border-stone-700 text-stone-200 hover:bg-stone-800 text-xs"
+              className="px-3 py-1 rounded border border-border text-foreground hover:bg-muted text-xs"
             >
               Add remote
             </button>
@@ -418,7 +418,7 @@ export function VersionsPanel({ sagaPath, onChanged }: Props) {
               <select
                 value={pushRemote}
                 onChange={(e) => setPushRemote(e.target.value)}
-                className="bg-stone-950 border border-stone-700 rounded px-2 py-1 text-xs"
+                className="bg-background border border-border rounded px-2 py-1 text-xs"
               >
                 {remotes.map((r) => (
                   <option key={r.name} value={r.name}>
@@ -429,7 +429,7 @@ export function VersionsPanel({ sagaPath, onChanged }: Props) {
               <button
                 onClick={() => void wrap("fetch", () => gitFetch(sagaPath, pushRemote))}
                 disabled={busy}
-                className="px-3 py-1 rounded border border-stone-700 text-stone-200 hover:bg-stone-800 text-xs"
+                className="px-3 py-1 rounded border border-border text-foreground hover:bg-muted text-xs"
               >
                 Fetch
               </button>
@@ -440,7 +440,7 @@ export function VersionsPanel({ sagaPath, onChanged }: Props) {
                   )
                 }
                 disabled={busy || !status?.branch}
-                className="px-3 py-1 rounded border border-stone-700 text-stone-200 hover:bg-stone-800 text-xs"
+                className="px-3 py-1 rounded border border-border text-foreground hover:bg-muted text-xs"
               >
                 Pull
               </button>
@@ -456,7 +456,7 @@ export function VersionsPanel({ sagaPath, onChanged }: Props) {
                   )
                 }
                 disabled={busy || !status?.branch || (status?.hasConflicts ?? false)}
-                className="px-3 py-1 rounded border border-amber-500 bg-amber-900/40 text-amber-100 hover:bg-amber-800/50 disabled:opacity-40 text-xs"
+                className="px-3 py-1 rounded border border-primary bg-primary/20 text-primary-foreground hover:bg-primary/30 disabled:opacity-40 text-xs"
               >
                 Push{!status?.upstream ? " (set upstream)" : ""}
               </button>
@@ -466,21 +466,21 @@ export function VersionsPanel({ sagaPath, onChanged }: Props) {
 
         {/* Log */}
         <section>
-          <h3 className="text-xs uppercase tracking-wide text-stone-500 mb-2">
+          <h3 className="text-xs uppercase tracking-wide text-muted-foreground mb-2">
             Recent commits
           </h3>
           {log.length === 0 ? (
-            <div className="text-stone-500 text-xs">No commits yet.</div>
+            <div className="text-muted-foreground text-xs">No commits yet.</div>
           ) : (
             <ul className="space-y-1">
               {log.map((e) => (
                 <li key={e.sha} className="text-xs">
                   <span className="text-yellow-400 font-mono">{e.shortSha}</span>{" "}
-                  <span className="text-stone-500">
+                  <span className="text-muted-foreground">
                     {new Date(e.date).toLocaleString()}
                   </span>{" "}
                   <span className="text-cyan-400">{e.author}</span>
-                  <div className="text-stone-200 ml-12 truncate">{e.subject}</div>
+                  <div className="text-foreground ml-12 truncate">{e.subject}</div>
                 </li>
               ))}
             </ul>
@@ -489,10 +489,10 @@ export function VersionsPanel({ sagaPath, onChanged }: Props) {
 
         {/* Backup */}
         <section>
-          <h3 className="text-xs uppercase tracking-wide text-stone-500 mb-2">
+          <h3 className="text-xs uppercase tracking-wide text-muted-foreground mb-2">
             Backup snapshot
           </h3>
-          <p className="text-xs text-stone-500 mb-2">
+          <p className="text-xs text-muted-foreground mb-2">
             Zips the saga (excluding <code>.git</code>, <code>node_modules</code>,
             and prior backups) into <code>.loreweave/backups/</code>.
           </p>
@@ -502,7 +502,7 @@ export function VersionsPanel({ sagaPath, onChanged }: Props) {
               placeholder="label (optional)"
               value={backupLabel}
               onChange={(e) => setBackupLabel(e.target.value)}
-              className="flex-1 min-w-[160px] px-2 py-1 rounded bg-stone-900 border border-stone-700 text-stone-100 text-xs"
+              className="flex-1 min-w-[160px] px-2 py-1 rounded bg-card border border-border text-foreground text-xs"
             />
             <input
               type="number"
@@ -510,7 +510,7 @@ export function VersionsPanel({ sagaPath, onChanged }: Props) {
               placeholder="keep N"
               value={backupKeep}
               onChange={(e) => setBackupKeep(e.target.value)}
-              className="w-24 px-2 py-1 rounded bg-stone-900 border border-stone-700 text-stone-100 text-xs"
+              className="w-24 px-2 py-1 rounded bg-card border border-border text-foreground text-xs"
             />
             <button
               type="button"
@@ -535,7 +535,7 @@ export function VersionsPanel({ sagaPath, onChanged }: Props) {
             </button>
           </div>
           {lastBackup && (
-            <div className="mt-2 text-xs text-stone-400 break-all">
+            <div className="mt-2 text-xs text-muted-foreground break-all">
               Last: <span className="font-mono">{lastBackup.path}</span>
               {lastBackup.pruned.length > 0
                 ? ` · pruned ${lastBackup.pruned.length}`

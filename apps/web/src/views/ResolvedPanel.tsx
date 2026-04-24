@@ -37,7 +37,7 @@ function provenanceBadge(prov: string | undefined) {
     );
   }
   return (
-    <span className="text-xs px-1.5 py-0.5 rounded bg-stone-700 text-stone-200">
+    <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-foreground">
       {prov}
     </span>
   );
@@ -136,8 +136,8 @@ function DiffTab({ entry, sagaPath }: { entry: DumpEntry; sagaPath?: string }) {
       .catch((e) => setErr((e as Error).message))
       .finally(() => setLoading(false));
   }, [sagaPath, entry.type, entry.id]);
-  if (!sagaPath) return <div className="text-xs text-stone-500">no saga path</div>;
-  if (loading) return <div className="text-xs text-stone-500">loading…</div>;
+  if (!sagaPath) return <div className="text-xs text-muted-foreground">no saga path</div>;
+  if (loading) return <div className="text-xs text-muted-foreground">loading…</div>;
   if (err)
     return (
       <div className="text-xs text-rose-400 whitespace-pre-wrap">
@@ -147,14 +147,14 @@ function DiffTab({ entry, sagaPath }: { entry: DumpEntry; sagaPath?: string }) {
       </div>
     );
   if (!patch || !patch.trim())
-    return <div className="text-xs text-stone-500">no changes against HEAD</div>;
+    return <div className="text-xs text-muted-foreground">no changes against HEAD</div>;
   return <pre className="text-[11px] font-mono whitespace-pre-wrap">{colorize(patch)}</pre>;
 }
 
 function colorize(patch: string): ReactNode[] {
   return patch.split("\n").map((line, i) => {
-    let cls = "text-stone-400";
-    if (line.startsWith("+++") || line.startsWith("---")) cls = "text-stone-500";
+    let cls = "text-muted-foreground";
+    if (line.startsWith("+++") || line.startsWith("---")) cls = "text-muted-foreground";
     else if (line.startsWith("+")) cls = "text-emerald-300";
     else if (line.startsWith("-")) cls = "text-rose-300";
     else if (line.startsWith("@@")) cls = "text-cyan-400";
@@ -200,21 +200,21 @@ function ResolvedTab({
   return (
     <div>
       {entry.inheritsChain.length > 0 && (
-        <div className="text-xs text-stone-400 mb-3">
+        <div className="text-xs text-muted-foreground mb-3">
           inherits: {entry.inheritsChain.join(" → ")}
         </div>
       )}
       <div className="space-y-1.5">
         {keys.length === 0 && (
-          <div className="text-sm text-stone-500 italic">no properties</div>
+          <div className="text-sm text-muted-foreground italic">no properties</div>
         )}
         {keys.map((k) => (
           <div key={k} className="text-sm">
             <div className="flex items-center gap-2">
-              <span className="font-mono text-stone-300">{k}</span>
+              <span className="font-mono text-foreground/90">{k}</span>
               {provenanceBadge(entry.provenance[k])}
             </div>
-            <div className="font-mono text-xs text-amber-200/90 pl-2 break-all">
+            <div className="font-mono text-xs text-primary/90 pl-2 break-all">
               {renderValue(entry.properties[k])}
             </div>
           </div>

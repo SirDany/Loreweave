@@ -47,7 +47,7 @@ export function ThreadView({ data, sagaPath, tomeLens }: Props) {
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
-      <header className="px-6 py-3 border-b border-stone-800 flex items-center gap-4 flex-wrap">
+      <header className="px-6 py-3 border-b border-border flex items-center gap-4 flex-wrap">
         <div className="text-lg">Threads</div>
         <div className="flex gap-1 flex-wrap">
           {data.threads.map((t) => (
@@ -57,18 +57,18 @@ export function ThreadView({ data, sagaPath, tomeLens }: Props) {
               className={
                 "text-xs px-2 py-1 rounded border " +
                 (selected === t.id
-                  ? "border-amber-500 bg-amber-800/40 text-amber-100"
-                  : "border-stone-700 hover:bg-stone-800")
+                  ? "border-primary bg-primary/25 text-primary-foreground"
+                  : "border-border hover:bg-muted")
               }
             >
               {t.id}
               {t.branches_from && (
-                <span className="text-stone-500"> ⇢{t.branches_from.thread}</span>
+                <span className="text-muted-foreground"> ⇢{t.branches_from.thread}</span>
               )}
             </button>
           ))}
         </div>
-        <label className="ml-auto flex items-center gap-2 text-xs text-stone-400">
+        <label className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
           <input
             type="checkbox"
             checked={withBranches}
@@ -78,7 +78,7 @@ export function ThreadView({ data, sagaPath, tomeLens }: Props) {
         </label>
       </header>
       <div className="flex-1 overflow-auto p-6">
-        {loading && <div className="text-stone-500">linearizing…</div>}
+        {loading && <div className="text-muted-foreground">linearizing…</div>}
         {error && (
           <pre className="text-rose-400 text-xs whitespace-pre-wrap">{error}</pre>
         )}
@@ -110,9 +110,9 @@ function ThreadTimeline({
   return (
     <div className="space-y-6">
       {thread.branches_from && (
-        <div className="text-xs text-stone-500">
+        <div className="text-xs text-muted-foreground">
           branches from{" "}
-          <code className="text-amber-300">{thread.branches_from.thread}</code>{" "}
+          <code className="text-primary">{thread.branches_from.thread}</code>{" "}
           at{" "}
           <code className="text-cyan-300">
             {thread.branches_from.at_waypoint}
@@ -174,11 +174,11 @@ function DatedAxis({
 
   return (
     <div>
-      <div className="text-xs text-stone-500 mb-2">
+      <div className="text-xs text-muted-foreground mb-2">
         {min} → {max}
       </div>
-      <div className="relative h-32 border-t border-b border-stone-800">
-        <div className="absolute left-0 right-0 top-1/2 h-px bg-stone-700" />
+      <div className="relative h-32 border-t border-b border-border">
+        <div className="absolute left-0 right-0 top-1/2 h-px bg-muted" />
         {linear.waypoints.map((w) => {
           const left = `${(position(w) * 100).toFixed(2)}%`;
           const own = ownIds.has(w.id);
@@ -193,15 +193,15 @@ function DatedAxis({
                 className={
                   "w-3 h-3 rounded-full border " +
                   (own
-                    ? "bg-amber-400 border-amber-200"
-                    : "bg-stone-500 border-stone-300")
+                    ? "bg-primary border-primary/70"
+                    : "bg-muted-foreground border-muted-foreground/50")
                 }
               />
-              <div className="mt-1 text-[10px] font-mono whitespace-nowrap text-stone-300">
+              <div className="mt-1 text-[10px] font-mono whitespace-nowrap text-foreground/90">
                 {w.id}
               </div>
               {w.at && (
-                <div className="text-[10px] text-amber-300/80 font-mono">
+                <div className="text-[10px] text-primary/80 font-mono">
                   {w.at}
                 </div>
               )}
@@ -233,17 +233,17 @@ function RelationalFlow({
                 className={
                   "px-2 py-1 rounded border text-xs font-mono " +
                   (own
-                    ? "border-amber-500 bg-amber-900/40 text-amber-100"
-                    : "border-stone-600 bg-stone-800/50 text-stone-300")
+                    ? "border-primary bg-primary/20 text-primary-foreground"
+                    : "border-border bg-muted/50 text-foreground/90")
                 }
               >
                 {w.id}
                 {w.at && (
-                  <span className="ml-1 text-amber-300/80">@ {w.at}</span>
+                  <span className="ml-1 text-primary/80">@ {w.at}</span>
                 )}
               </div>
               {i < linear.waypoints.length - 1 && (
-                <span className="text-stone-600">→</span>
+                <span className="text-muted-foreground/70">→</span>
               )}
             </div>
           );
@@ -257,13 +257,13 @@ function RelationalFlow({
 
 function Legend() {
   return (
-    <div className="mt-3 flex items-center gap-4 text-[11px] text-stone-500">
+    <div className="mt-3 flex items-center gap-4 text-[11px] text-muted-foreground">
       <div className="flex items-center gap-1.5">
-        <span className="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block" />
+        <span className="w-2.5 h-2.5 rounded-full bg-primary inline-block" />
         own
       </div>
       <div className="flex items-center gap-1.5">
-        <span className="w-2.5 h-2.5 rounded-full bg-stone-500 inline-block" />
+        <span className="w-2.5 h-2.5 rounded-full bg-muted-foreground inline-block" />
         inherited
       </div>
     </div>
@@ -280,7 +280,7 @@ function WaypointTable({
   return (
     <table className="mt-6 w-full text-sm">
       <thead>
-        <tr className="text-left text-xs text-stone-500 uppercase tracking-widest">
+        <tr className="text-left text-xs text-muted-foreground uppercase tracking-widest">
           <th className="py-1 w-8">#</th>
           <th className="py-1">waypoint</th>
           <th className="py-1">date</th>
@@ -290,18 +290,18 @@ function WaypointTable({
       </thead>
       <tbody>
         {linear.waypoints.map((w) => (
-          <tr key={w.id} className="border-t border-stone-900">
-            <td className="py-1 text-stone-500">{w.order + 1}</td>
+          <tr key={w.id} className="border-t border-border">
+            <td className="py-1 text-muted-foreground">{w.order + 1}</td>
             <td className="py-1 font-mono">
-              <span className={ownIds.has(w.id) ? "text-amber-200" : "text-stone-400"}>
+              <span className={ownIds.has(w.id) ? "text-primary" : "text-muted-foreground"}>
                 {w.id}
               </span>
             </td>
-            <td className="py-1 font-mono text-amber-300/80">
-              {w.at ?? <span className="text-stone-600">—</span>}
+            <td className="py-1 font-mono text-primary/80">
+              {w.at ?? <span className="text-muted-foreground/70">—</span>}
             </td>
-            <td className="py-1 font-mono text-stone-400">{w.event}</td>
-            <td className="py-1 text-[11px] text-stone-500">
+            <td className="py-1 font-mono text-muted-foreground">{w.event}</td>
+            <td className="py-1 text-[11px] text-muted-foreground">
               {w.appears_in?.join(", ") ?? ""}
             </td>
           </tr>

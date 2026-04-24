@@ -70,10 +70,10 @@ export function SearchPanel({ sagaPath, onClose, onJump }: Props) {
       onClick={onClose}
     >
       <div
-        className="w-full max-w-3xl rounded-lg border border-stone-700 bg-stone-950 shadow-2xl flex flex-col max-h-[80vh]"
+        className="w-full max-w-3xl rounded-lg border border-border bg-background shadow-2xl flex flex-col max-h-[80vh]"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="p-4 border-b border-stone-800 space-y-3">
+        <div className="p-4 border-b border-border space-y-3">
           <div className="flex items-center gap-2">
             <input
               ref={inputRef}
@@ -81,12 +81,12 @@ export function SearchPanel({ sagaPath, onClose, onJump }: Props) {
               placeholder="search…"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              className="flex-1 px-3 py-2 rounded bg-stone-900 border border-stone-700 text-stone-100 text-sm"
+              className="flex-1 px-3 py-2 rounded bg-card border border-border text-foreground text-sm"
             />
             <button
               type="button"
               onClick={onClose}
-              className="px-2 py-1 text-xs rounded border border-stone-700 hover:bg-stone-800"
+              className="px-2 py-1 text-xs rounded border border-border hover:bg-muted"
             >
               Esc
             </button>
@@ -100,8 +100,8 @@ export function SearchPanel({ sagaPath, onClose, onJump }: Props) {
                 className={
                   "px-2 py-1 rounded border " +
                   (scope === s.id
-                    ? "border-amber-500 bg-amber-900/40 text-amber-100"
-                    : "border-stone-700 hover:bg-stone-800")
+                    ? "border-primary bg-primary/20 text-primary-foreground"
+                    : "border-border hover:bg-muted")
                 }
                 title={s.hint}
               >
@@ -113,9 +113,9 @@ export function SearchPanel({ sagaPath, onClose, onJump }: Props) {
               placeholder="type filter (character, term, …)"
               value={type}
               onChange={(e) => setType(e.target.value)}
-              className="ml-2 flex-1 min-w-[120px] px-2 py-1 rounded bg-stone-900 border border-stone-700 text-stone-200"
+              className="ml-2 flex-1 min-w-[120px] px-2 py-1 rounded bg-card border border-border text-foreground"
             />
-            <label className="flex items-center gap-1 text-stone-400">
+            <label className="flex items-center gap-1 text-muted-foreground">
               <input
                 type="checkbox"
                 checked={caseSensitive}
@@ -127,22 +127,22 @@ export function SearchPanel({ sagaPath, onClose, onJump }: Props) {
         </div>
 
         <div className="flex-1 overflow-auto p-3">
-          {busy && <div className="text-xs text-stone-500 px-1">searching…</div>}
+          {busy && <div className="text-xs text-muted-foreground px-1">searching…</div>}
           {err && (
             <pre className="text-xs text-rose-400 whitespace-pre-wrap px-1">{err}</pre>
           )}
           {!busy && !err && result && result.hits.length === 0 && (
-            <div className="text-xs text-stone-500 px-1">no matches</div>
+            <div className="text-xs text-muted-foreground px-1">no matches</div>
           )}
           {!query.trim() && !busy && !err && (
-            <div className="text-xs text-stone-500 px-1">
+            <div className="text-xs text-muted-foreground px-1">
               start typing — Echoes scope treats the query as <code>type/id</code>.
             </div>
           )}
           {grouped.length > 0 && (
             <div className="space-y-3">
               {grouped.map((g) => (
-                <div key={g.ref + ":" + g.kind} className="rounded border border-stone-800">
+                <div key={g.ref + ":" + g.kind} className="rounded border border-border">
                   <button
                     type="button"
                     onClick={() => {
@@ -150,10 +150,10 @@ export function SearchPanel({ sagaPath, onClose, onJump }: Props) {
                       jumpTo(first, onJump);
                       onClose();
                     }}
-                    className="w-full text-left px-3 py-2 bg-stone-900/60 hover:bg-stone-900 border-b border-stone-800"
+                    className="w-full text-left px-3 py-2 bg-card/60 hover:bg-card border-b border-border"
                   >
                     <span className="text-xs font-mono text-cyan-300">{g.ref}</span>{" "}
-                    <span className="text-[10px] text-stone-500">
+                    <span className="text-[10px] text-muted-foreground">
                       {g.kind} · {g.hits.length}{" "}
                       {g.hits.length === 1 ? "match" : "matches"}
                     </span>
@@ -167,17 +167,17 @@ export function SearchPanel({ sagaPath, onClose, onJump }: Props) {
                             jumpTo(h, onJump);
                             onClose();
                           }}
-                          className="w-full text-left px-3 py-1.5 hover:bg-stone-900/60 text-xs flex gap-3"
+                          className="w-full text-left px-3 py-1.5 hover:bg-card/60 text-xs flex gap-3"
                         >
-                          <span className="text-stone-500 font-mono w-12 shrink-0">
+                          <span className="text-muted-foreground font-mono w-12 shrink-0">
                             :{h.line}
                           </span>
-                          <span className="text-stone-200 truncate">{h.preview}</span>
+                          <span className="text-foreground truncate">{h.preview}</span>
                         </button>
                       </li>
                     ))}
                     {g.hits.length > 8 && (
-                      <li className="px-3 py-1 text-[11px] text-stone-500">
+                      <li className="px-3 py-1 text-[11px] text-muted-foreground">
                         + {g.hits.length - 8} more
                       </li>
                     )}
@@ -188,7 +188,7 @@ export function SearchPanel({ sagaPath, onClose, onJump }: Props) {
           )}
         </div>
         {result && (
-          <div className="px-4 py-2 border-t border-stone-800 text-[11px] text-stone-500">
+          <div className="px-4 py-2 border-t border-border text-[11px] text-muted-foreground">
             {result.hits.length} hit{result.hits.length === 1 ? "" : "s"} ·{" "}
             scope: {result.scope}
           </div>

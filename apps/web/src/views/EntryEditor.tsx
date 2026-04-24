@@ -89,21 +89,21 @@ export function EntryEditor({ entry, sagaPath, onClose, onSaved }: Props) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
       <div
-        className="w-full max-w-2xl max-h-[90vh] overflow-auto bg-stone-900 border border-stone-700 rounded-lg shadow-2xl"
+        className="w-full max-w-2xl max-h-[90vh] overflow-auto bg-card border border-border rounded-lg shadow-2xl"
         onKeyDown={(e) => {
           if (e.key === "Escape") onClose();
         }}
       >
-        <header className="px-5 py-3 border-b border-stone-800 flex items-center gap-3">
+        <header className="px-5 py-3 border-b border-border flex items-center gap-3">
           <div className="flex-1">
-            <div className="text-xs text-stone-500">
+            <div className="text-xs text-muted-foreground">
               {entry.type}/{entry.id} · {entry.relPath}
             </div>
-            <div className="text-base text-stone-100">Edit frontmatter</div>
+            <div className="text-base text-foreground">Edit frontmatter</div>
           </div>
           <button
             onClick={onClose}
-            className="text-stone-400 hover:text-stone-100 text-sm px-2"
+            className="text-muted-foreground hover:text-foreground text-sm px-2"
           >
             ✕
           </button>
@@ -114,7 +114,7 @@ export function EntryEditor({ entry, sagaPath, onClose, onSaved }: Props) {
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full bg-stone-950 border border-stone-700 rounded px-2 py-1"
+              className="w-full bg-background border border-border rounded px-2 py-1"
             />
           </Field>
 
@@ -122,7 +122,7 @@ export function EntryEditor({ entry, sagaPath, onClose, onSaved }: Props) {
             <select
               value={status}
               onChange={(e) => setStatus(e.target.value)}
-              className="w-full bg-stone-950 border border-stone-700 rounded px-2 py-1"
+              className="w-full bg-background border border-border rounded px-2 py-1"
             >
               <option value="">(unset)</option>
               <option value="draft">draft</option>
@@ -134,7 +134,7 @@ export function EntryEditor({ entry, sagaPath, onClose, onSaved }: Props) {
             <input
               value={tags}
               onChange={(e) => setTags(e.target.value)}
-              className="w-full bg-stone-950 border border-stone-700 rounded px-2 py-1"
+              className="w-full bg-background border border-border rounded px-2 py-1"
             />
           </Field>
 
@@ -142,7 +142,7 @@ export function EntryEditor({ entry, sagaPath, onClose, onSaved }: Props) {
             <input
               value={inherits}
               onChange={(e) => setInherits(e.target.value)}
-              className="w-full bg-stone-950 border border-stone-700 rounded px-2 py-1"
+              className="w-full bg-background border border-border rounded px-2 py-1"
             />
           </Field>
 
@@ -150,7 +150,7 @@ export function EntryEditor({ entry, sagaPath, onClose, onSaved }: Props) {
             <input
               value={aliases}
               onChange={(e) => setAliases(e.target.value)}
-              className="w-full bg-stone-950 border border-stone-700 rounded px-2 py-1"
+              className="w-full bg-background border border-border rounded px-2 py-1"
             />
           </Field>
 
@@ -158,7 +158,7 @@ export function EntryEditor({ entry, sagaPath, onClose, onSaved }: Props) {
             <input
               value={appearsIn}
               onChange={(e) => setAppearsIn(e.target.value)}
-              className="w-full bg-stone-950 border border-stone-700 rounded px-2 py-1"
+              className="w-full bg-background border border-border rounded px-2 py-1"
             />
           </Field>
 
@@ -171,7 +171,7 @@ export function EntryEditor({ entry, sagaPath, onClose, onSaved }: Props) {
               onChange={(e) => setRestYaml(e.target.value)}
               rows={8}
               spellCheck={false}
-              className="w-full bg-stone-950 border border-stone-700 rounded px-2 py-1 font-mono text-xs"
+              className="w-full bg-background border border-border rounded px-2 py-1 font-mono text-xs"
             />
           </Field>
 
@@ -180,17 +180,17 @@ export function EntryEditor({ entry, sagaPath, onClose, onSaved }: Props) {
           )}
         </div>
 
-        <footer className="px-5 py-3 border-t border-stone-800 flex justify-end gap-2">
+        <footer className="px-5 py-3 border-t border-border flex justify-end gap-2">
           <button
             onClick={onClose}
-            className="px-3 py-1 rounded border border-stone-700 text-stone-300 hover:bg-stone-800"
+            className="px-3 py-1 rounded border border-border text-foreground/90 hover:bg-muted"
           >
             Cancel
           </button>
           <button
             onClick={() => void save()}
             disabled={saving}
-            className="px-3 py-1 rounded border border-amber-500 bg-amber-900/40 text-amber-100 hover:bg-amber-800/50 disabled:opacity-50"
+            className="px-3 py-1 rounded border border-primary bg-primary/20 text-primary-foreground hover:bg-primary/30 disabled:opacity-50"
           >
             {saving ? "Saving…" : "Save"}
           </button>
@@ -211,9 +211,9 @@ function Field({
 }) {
   return (
     <label className="block">
-      <div className="text-xs text-stone-400 mb-1">
+      <div className="text-xs text-muted-foreground mb-1">
         {label}
-        {hint && <span className="text-stone-600"> · {hint}</span>}
+        {hint && <span className="text-muted-foreground/70"> · {hint}</span>}
       </div>
       {children}
     </label>
