@@ -3,6 +3,7 @@ import {
   AlertTriangle,
   BookOpen,
   Bookmark,
+  Bot,
   Compass,
   Database,
   FileText,
@@ -34,6 +35,8 @@ import type { RefCatalog } from './editor/ReferenceExtension.js';
 import type { DumpChapter, DumpEntry, DumpPayload } from './lib/lw.js';
 import { lwWrite } from './lib/lw.js';
 import { useSaga } from './state/useSaga.js';
+import type { ChatContextAttachment } from './state/useChat.js';
+import { AssistantPanel } from './views/AssistantPanel.js';
 import { BackupsDialog } from './views/BackupsDialog.js';
 import { ConstellationView } from './views/ConstellationView.js';
 import { EntryEditor } from './views/EntryEditor.js';
@@ -90,6 +93,12 @@ export default function App() {
   const [importing, setImporting] = useState(false);
   const [searching, setSearching] = useState(false);
   const [showingBackups, setShowingBackups] = useState(false);
+  const [assistantOpen, setAssistantOpen] = useState(false);
+  const [assistantSeed, setAssistantSeed] = useState<{
+    agent?: string;
+    prompt?: string;
+    context?: ChatContextAttachment;
+  } | null>(null);
   const [pendingRename, setPendingRename] = useState<{
     type: DumpEntry['type'];
     id: string;
@@ -103,6 +112,10 @@ export default function App() {
       if ((e.ctrlKey || e.metaKey) && (e.key === 'p' || e.key === 'k')) {
         e.preventDefault();
         setSearching(true);
+      }
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'A' || e.key === 'a')) {
+        e.preventDefault();
+        setAssistantOpen((v) => !v);
       }
     };
     window.addEventListener('keydown', onKey);
@@ -212,6 +225,12 @@ export default function App() {
               icon={Bookmark}
               label="Backups"
               onClick={() => setShowingBackups(true)}
+            />
+            <ShelfAction
+              icon={Bot}
+              label={assistantOpen ? 'Hide AI' : 'Assistant'}
+              onClick={() => setAssistantOpen((v) => !v)}
+              title="Ctrl+Shift+A"
             />
           </div>
         </div>
@@ -358,6 +377,18 @@ export default function App() {
             catalog={catalog}
             sagaPath={saga.sagaPath}
             onSaved={() => void saga.reload()}
+            onAskAssistant={(action, sel, relPath) => {
+              setAssistantSeed({
+                agent: action,
+                prompt: assistantPromptFor(action),
+                context: {
+                  selection: sel.text,
+                  path: relPath,
+                  lines: sel.lines,
+                },
+              });
+              setAssistantOpen(true);
+            }}
             key={selection?.key}
           />
         )}
@@ -422,6 +453,19 @@ export default function App() {
         }
       />
 
+      {assistantOpen && (
+        <AssistantPanel
+          sagaRoot={saga.sagaPath}
+          initialAgent={assistantSeed?.agent}
+          initialPrompt={assistantSeed?.prompt}
+          initialContext={assistantSeed?.context}
+          onClose={() => {
+            setAssistantOpen(false);
+            setAssistantSeed(null);
+          }}
+          onApplied={() => void saga.reload()}
+        />
+      )}
       {pickingSaga && (
         <SagaPicker
           current={saga.sagaPath}
@@ -875,11 +919,17 @@ function ChapterView({
   catalog,
   sagaPath,
   onSaved,
+  onAskAssistant,
 }: {
   chapter: { tome: string; chapter: DumpChapter };
   catalog: RefCatalog;
   sagaPath: string;
   onSaved: () => void;
+  onAskAssistant?: (
+    action: string,
+    selection: { text: string; lines: [number, number] },
+    path: string,
+  ) => void;
 }) {
   const [draft, setDraft] = useState(chapter.chapter.body);
   const [saving, setSaving] = useState(false);
@@ -941,7 +991,17 @@ function ChapterView({
         </div>
       </header>
       <div className="flex-1 overflow-hidden">
-        <Editor value={draft} catalog={catalog} onChange={setDraft} />
+        <Editor
+          value={draft}
+          catalog={catalog}
+          onChange={setDraft}
+          onAskAssistant={
+            onAskAssistant
+              ? (action, sel) =>
+                  onAskAssistant(action, sel, chapter.chapter.relPath)
+              : undefined
+          }
+        />
       </div>
     </div>
   );
@@ -1035,6 +1095,20 @@ function EmptyState({
       </div>
     </div>
   );
+}
+
+function assistantPromptFor(action: string): string {
+  switch (action) {
+    case 'scribe':
+      return 'Rewrite the selected passage. Honor existing canon; do not invent new facts.';
+    case 'warden':
+      return 'Does the selected passage contradict anything in the Codex? Check canon and Sigil slang.';
+    case 'polisher':
+      return 'Polish the selected passage for grammar and flow. Do not change meaning or canon.';
+    case 'muse':
+    default:
+      return 'What should I think about regarding this passage? Offer 2–4 distinct options, each with tradeoffs.';
+  }
 }
 
 function Splash({

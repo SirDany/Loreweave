@@ -4,6 +4,13 @@ import { promises as fs, watch as fsWatch, type FSWatcher } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defineConfig, type Plugin } from 'vite';
+import { loadAgents, type AgentDescriptor } from './server/agents.js';
+import {
+  runTool,
+  toolDescriptors,
+  type ToolName,
+  type ToolContext,
+} from './server/tools.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, '../..');
@@ -209,6 +216,150 @@ function lwSidecar(): Plugin {
         });
       });
 
+      // --- Agent catalog ---------------------------------------------------
+      let agentCache: {
+        agents: AgentDescriptor[];
+        preamble: string;
+      } | null = null;
+      const getAgents = async () => {
+        if (agentCache) return agentCache;
+        agentCache = await loadAgents(REPO_ROOT);
+        return agentCache;
+      };
+
+      server.middlewares.use('/lw/agents', async (req, res) => {
+        if (req.method !== 'GET') {
+          res.statusCode = 405;
+          res.end('method not allowed');
+          return;
+        }
+        try {
+          const { agents, preamble } = await getAgents();
+          res.statusCode = 200;
+          res.setHeader('content-type', 'application/json');
+          res.setHeader('cache-control', 'no-store');
+          res.end(
+            JSON.stringify({
+              agents: agents.map((a) => ({
+                id: a.id,
+                name: a.name,
+                description: a.description,
+                tools: a.tools,
+              })),
+              hasPreamble: preamble.length > 0,
+            }),
+          );
+        } catch (e) {
+          res.statusCode = 500;
+          res.end(String(e));
+        }
+      });
+
+      // --- Chat (LLM proxy + tool dispatch) --------------------------------
+      server.middlewares.use('/lw/chat', async (req, res) => {
+        if (req.method !== 'POST') {
+          res.statusCode = 405;
+          res.end('method not allowed');
+          return;
+        }
+        const body = await readBody(req, res);
+        if (body == null) return;
+        let payload: ChatRequest;
+        try {
+          payload = JSON.parse(body || '{}');
+          if (
+            typeof payload.agent !== 'string' ||
+            !Array.isArray(payload.messages) ||
+            typeof payload.sagaRoot !== 'string'
+          ) {
+            throw new Error('agent, messages, sagaRoot required');
+          }
+        } catch (e) {
+          res.statusCode = 400;
+          res.end(String(e));
+          return;
+        }
+
+        res.statusCode = 200;
+        res.setHeader('content-type', 'text/event-stream');
+        res.setHeader('cache-control', 'no-store');
+        res.setHeader('connection', 'keep-alive');
+
+        const send = (event: string, data: unknown) => {
+          try {
+            res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+          } catch {
+            /* client disconnected */
+          }
+        };
+
+        try {
+          const { agents, preamble } = await getAgents();
+          const agent = agents.find((a) => a.id === payload.agent);
+          if (!agent) throw new Error(`unknown agent: ${payload.agent}`);
+
+          const model = await resolveModel();
+
+          const ctx: ToolContext = {
+            repoRoot: REPO_ROOT,
+            cliBin: CLI_BIN,
+            defaultSagaRoot: payload.sagaRoot,
+            safeJoin,
+          };
+
+          // Build AI SDK tool definitions. Each `execute` dispatches to our
+          // runTool() and emits tool_call / tool_result SSE events for the
+          // UI's tool-call trace.
+          const { tool } = await import('ai');
+          const tools: Record<string, unknown> = {};
+          for (const [name, desc] of Object.entries(toolDescriptors)) {
+            tools[name] = tool({
+              description: desc.description,
+              parameters: desc.schema,
+              execute: async (rawArgs: unknown) => {
+                send('tool_call', { name, args: rawArgs });
+                const result = await runTool(name as ToolName, rawArgs, ctx);
+                send('tool_result', { name, result });
+                return result;
+              },
+            });
+          }
+
+          let system = agent.systemPrompt;
+          if (preamble) system = `${preamble}\n\n---\n\n${system}`;
+          system += `\n\n---\n\n## Runtime context\n\nYou are operating inside the Loreweave web app. The writer's current Saga root is \`${payload.sagaRoot}\`. Always pass that as \`sagaRoot\` when calling tools. Mutating tools (\`propose_*\`) never write to disk — they produce a pending-action card the writer must approve.`;
+          if (payload.context?.selection) {
+            system += `\n\nThe writer attached the following selection as context:\n\n\`\`\`\n${payload.context.selection}\n\`\`\``;
+            if (payload.context.path) {
+              system += `\n\nSelection source: \`${payload.context.path}\``;
+            }
+          }
+
+          const { streamText } = await import('ai');
+          const result = streamText({
+            model,
+            system,
+            messages: payload.messages,
+            tools: tools as Parameters<typeof streamText>[0]['tools'],
+            maxSteps: 8,
+          });
+
+          for await (const part of result.fullStream) {
+            if (part.type === 'text-delta') {
+              send('token', part.textDelta);
+            } else if (part.type === 'error') {
+              send('error', String(part.error));
+            }
+            // tool_call / tool_result already emitted by execute().
+          }
+          send('done', {});
+          res.end();
+        } catch (e) {
+          send('error', (e as Error).message ?? String(e));
+          res.end();
+        }
+      });
+
       // --- CLI exec --------------------------------------------------------
       server.middlewares.use('/lw', async (req, res) => {
         if (req.method !== 'POST') {
@@ -230,8 +381,7 @@ function lwSidecar(): Plugin {
           return;
         }
 
-        await acquireSlot();
-        let finished = false;
+        await acquireSlot();        let finished = false;
         const child = spawn('node', [CLI_BIN, ...args], { cwd: REPO_ROOT });
         let stdout = '';
         let stderr = '';
@@ -282,6 +432,49 @@ function lwSidecar(): Plugin {
       });
     },
   };
+}
+
+interface ChatRequest {
+  agent: string;
+  sagaRoot: string;
+  messages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>;
+  context?: {
+    selection?: string;
+    path?: string;
+    lines?: [number, number];
+  };
+}
+
+/**
+ * Pick an LLM provider + model from env vars:
+ *   LW_AI_PROVIDER=anthropic|openai  (optional, auto-detected from API keys)
+ *   LW_AI_MODEL=<model-id>           (optional; sane defaults per provider)
+ *   ANTHROPIC_API_KEY / OPENAI_API_KEY
+ */
+async function resolveModel() {
+  const explicit = process.env.LW_AI_PROVIDER?.toLowerCase();
+  const provider =
+    explicit ??
+    (process.env.ANTHROPIC_API_KEY
+      ? 'anthropic'
+      : process.env.OPENAI_API_KEY
+        ? 'openai'
+        : undefined);
+  if (!provider) {
+    throw new Error(
+      'No LLM provider configured. Set ANTHROPIC_API_KEY or OPENAI_API_KEY ' +
+        '(and optionally LW_AI_PROVIDER / LW_AI_MODEL) in the dev server env.',
+    );
+  }
+  if (provider === 'anthropic') {
+    const { anthropic } = await import('@ai-sdk/anthropic');
+    return anthropic(process.env.LW_AI_MODEL ?? 'claude-3-5-sonnet-latest');
+  }
+  if (provider === 'openai') {
+    const { openai } = await import('@ai-sdk/openai');
+    return openai(process.env.LW_AI_MODEL ?? 'gpt-4o-mini');
+  }
+  throw new Error(`Unknown LW_AI_PROVIDER: ${provider}`);
 }
 
 function safeJoin(root: string, rel: string): string {
