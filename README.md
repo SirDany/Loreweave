@@ -1,8 +1,8 @@
 # Loreweave
 
-A local-first, agentic book-writing workbench. Your canon lives as plain markdown and YAML on disk; VS Code Copilot agents (Muse, Scribe, Warden, Polisher, Archivist) help you ideate, draft, and keep your world consistent; a Tauri + React desktop UI gives you a navigable Codex, Lexicon, Thread (timeline), traces, a constellation graph, git-based versions, and inline editing.
+A local-first, agentic book-writing workbench. Your canon lives as plain markdown and YAML on disk; VS Code Copilot agents (Muse, Scribe, Warden, Polisher, Archivist) help you ideate, draft, and keep your world consistent; a React + Vite web UI (run locally against your own files) gives you a navigable Codex, Lexicon, Thread (timeline), traces, a constellation graph, git-based versions, and inline editing.
 
-> **Status:** early scaffolding. Core library, CLI, agents, and desktop shell are usable end-to-end against the example Saga.
+> **Status:** early scaffolding. Core library, CLI, agents, and web UI are usable end-to-end against the example Saga.
 
 ---
 
@@ -29,7 +29,7 @@ See [docs/conventions.md](docs/conventions.md) for the full spec.
 
 ```
 .github/                 Copilot instructions, agents, prompts
-apps/desktop/            Tauri v2 + React + Vite UI
+apps/web/                React + Vite UI, run locally via `pnpm dev`
 packages/core/           TS library: loader, resolver, validator, timeline, calendar, slang
 packages/cli/            `lw` CLI
 sagas/                   Your writing projects (one folder per Saga)
@@ -69,7 +69,6 @@ sagas/<saga>/
 1. Install prerequisites
    - Node 20.10+ and pnpm
    - Git for repository and Saga workflows
-   - Rust/Cargo only if you want `tauri:dev` or `tauri build`
 2. Install dependencies
 
 ```pwsh
@@ -98,22 +97,29 @@ pnpm lw thread   sagas/example-saga main --linear
 pnpm lw audit    sagas/example-saga --tome book-one
 ```
 
-## Run the desktop UI
+## Run the web UI
 
-Use the plain Vite app for fast UI development:
-
-```pwsh
-pnpm --filter @loreweave/desktop dev
-```
-
-Use the Tauri shell when you want the real native desktop experience:
+Start the local app — it serves the React UI from Vite and exposes a small
+`/lw` middleware that shells out to the CLI against your Sagas on disk:
 
 ```pwsh
-pnpm --filter @loreweave/desktop tauri:dev
+pnpm dev                             # alias of dev:web
+pnpm --filter @loreweave/web dev     # same thing, explicit filter
 ```
 
-- `dev` runs the React UI in Vite without requiring Rust/Cargo
-- `tauri:dev` requires `cargo` and starts the app in the Tauri desktop container
+The dev server binds to `127.0.0.1:5173` by default, so your filesystem is
+never exposed over the network. Open <http://localhost:5173> in any modern
+browser.
+
+To ship a static bundle (no backend, useful for previewing the UI):
+
+```pwsh
+pnpm --filter @loreweave/web build
+pnpm --filter @loreweave/web preview
+```
+
+> The static preview cannot read or write Sagas — filesystem access requires
+> the `dev` sidecar. Run `pnpm dev` for the full editing experience.
 
 ---
 
@@ -172,7 +178,7 @@ lw git merge-abort | merge-continue <saga>
 
 ---
 
-## Desktop UI
+## Web UI
 
 Sections in the **Grimoire** sidebar:
 
@@ -213,7 +219,7 @@ Instructions in `.github/instructions/` auto-apply when you edit files under `co
 
 ## Versioning
 
-Loreweave is local-first; canon is plain text, so any git workflow works. The **Versions** view in the desktop UI and the `lw git ...` subcommands cover the common moves:
+Loreweave is local-first; canon is plain text, so any git workflow works. The **Versions** view in the web UI and the `lw git ...` subcommands cover the common moves:
 
 - Different drafts of the same chapter? Make a branch.
 - Want to try out a name change? `lw rename` it on a feature branch, see how the Echoes shake out, merge or discard.
@@ -221,24 +227,6 @@ Loreweave is local-first; canon is plain text, so any git workflow works. The **
 - Want a point-in-time safety net independent of git? `lw backup` snapshots the Saga as a self-contained zip.
 
 The CLI is a thin wrapper around the system `git` binary, so anything git can do is still available outside Loreweave.
-
----
-
-## Building installers
-
-CI in `.github/workflows/build-desktop.yml` produces Tauri installers on every tag that matches `v*`:
-
-- Windows `.msi`
-- macOS `.dmg`
-- Linux `.AppImage`
-
-Run locally with:
-
-```pwsh
-pnpm --filter @loreweave/desktop tauri:build
-```
-
-Signed / auto-updating builds require additional Tauri signing config not included in this scaffold.
 
 ---
 

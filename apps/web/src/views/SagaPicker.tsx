@@ -10,9 +10,6 @@ interface Props {
 /**
  * Saga switcher. Lists Sagas auto-discovered under ./sagas (via `lw list-sagas`)
  * and accepts a free-form path so writers can keep Sagas anywhere on disk.
- *
- * In Tauri this is wired through the same `lw_invoke` plumbing as everything
- * else, so no extra Rust commands are required.
  */
 export function SagaPicker({ current, onPick, onClose }: Props) {
   const [items, setItems] = useState<DiscoveredSaga[]>([]);

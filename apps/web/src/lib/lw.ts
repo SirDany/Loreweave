@@ -1,7 +1,11 @@
 // TS client around the Loreweave CLI.
 //
-// In plain `vite dev`: POSTs to the `/lw` middleware defined in vite.config.ts.
-// Returns { stdout, stderr, code }.
+// Calls the Vite dev-server middleware defined in vite.config.ts:
+//   POST /lw        — run a CLI command and return { stdout, stderr, code }.
+//   POST /lw/write  — write a file inside a Saga root (204 on success).
+//
+// The middleware only runs on localhost, so all filesystem mutations stay
+// on the writer's own machine.
 
 export interface LwResult {
   stdout: string;
