@@ -18,6 +18,7 @@ import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { markdown } from "@codemirror/lang-markdown";
 import { syntaxHighlighting, defaultHighlightStyle } from "@codemirror/language";
 import { loreweaveExtensions, type RefCatalog } from "./ReferenceExtension.js";
+import { refAtOffset, type RefAtCursor } from "./refAtCursor.js";
 import {
   cycleHeading,
   insertCodeBlock,
@@ -51,6 +52,11 @@ interface Props {
     action: string,
     selection: EditorSelectionEvent,
   ) => void;
+  /**
+   * Fires whenever the cursor enters or leaves an `@type/id` echo. `null`
+   * means the cursor isn't inside any echo.
+   */
+  onRefAtCursor?: (ref: RefAtCursor | null) => void;
 }
 
 interface Anchor {
@@ -87,11 +93,14 @@ const darkTheme = EditorView.theme(
   { dark: true },
 );
 
-export function Editor({ value, catalog, readOnly, onChange, onAskAssistant, hideToolbar }: Props) {
+export function Editor({ value, catalog, readOnly, onChange, onAskAssistant, onRefAtCursor, hideToolbar }: Props) {
   const host = useRef<HTMLDivElement>(null);
   const view = useRef<EditorView | null>(null);
   const lwCompartment = useRef(new Compartment());
   const [anchor, setAnchor] = useState<Anchor | null>(null);
+  const lastRefKey = useRef<string | null>(null);
+  const refCallback = useRef(onRefAtCursor);
+  refCallback.current = onRefAtCursor;
 
   // Initial mount
   useEffect(() => {
@@ -119,6 +128,7 @@ export function Editor({ value, catalog, readOnly, onChange, onAskAssistant, hid
           if (u.docChanged && onChange) onChange(u.state.doc.toString());
           if (u.selectionSet || u.docChanged) {
             updateAnchor(u.view);
+            updateRef(u.view);
           }
         }),
       ],
@@ -150,6 +160,17 @@ export function Editor({ value, catalog, readOnly, onChange, onAskAssistant, hid
         text,
         lines: [startLine, endLine],
       });
+    };
+
+    const updateRef = (v: EditorView) => {
+      const cb = refCallback.current;
+      if (!cb) return;
+      const pos = v.state.selection.main.head;
+      const ref = refAtOffset(v.state.doc.toString(), pos);
+      const key = ref ? `${ref.type}/${ref.id}@${ref.from}` : null;
+      if (key === lastRefKey.current) return;
+      lastRefKey.current = key;
+      cb(ref);
     };
 
     return () => {

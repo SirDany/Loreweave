@@ -13,6 +13,7 @@ import {
   StorageNotFoundError,
   type StorageAdapter,
 } from '@loreweave/core';
+import { providerFromEnv, searchIndex } from './embeddings.js';
 
 export interface ToolContext {
   repoRoot: string;
@@ -47,6 +48,7 @@ export type ToolName =
   | 'lw_audit'
   | 'lw_list_entries'
   | 'read_file'
+  | 'semantic_search'
   | 'propose_edit'
   | 'propose_patch'
   | 'propose_new_entry'
@@ -99,6 +101,11 @@ export const toolSchemas = {
       .string()
       .min(1)
       .describe('Path relative to the Saga root (e.g. "codex/characters/aaron.md").'),
+  }),
+  semantic_search: z.object({
+    sagaRoot: sagaRootSchema,
+    query: z.string().min(1),
+    k: z.number().int().min(1).max(25).optional(),
   }),
   propose_edit: z.object({
     sagaRoot: sagaRootSchema,
@@ -186,6 +193,11 @@ export const toolDescriptors: Record<ToolName, ToolDescriptor> = {
     description:
       'Read any file inside a Saga root. Use this for the raw markdown+frontmatter when weave/dump are not enough.',
     schema: toolSchemas.read_file,
+  },
+  semantic_search: {
+    description:
+      'Semantic search across the Saga using a pre-built embeddings index. Returns the top-k most relevant entries + chapters. Only available when the writer has opted into embeddings (LOREWEAVE_EMBEDDINGS env).',
+    schema: toolSchemas.semantic_search,
   },
   propose_edit: {
     description:
@@ -494,6 +506,27 @@ export async function runTool(
             rawHash: hashContent(content),
           },
         };
+      }
+      case 'semantic_search': {
+        const cfg = providerFromEnv();
+        if (!cfg) {
+          return {
+            ok: false,
+            error:
+              'semantic_search is disabled: the writer hasn\'t configured an embeddings provider. Set LOREWEAVE_EMBEDDINGS=ollama (and build the index via /lw/embed/build) to enable.',
+          };
+        }
+        try {
+          const hits = await searchIndex(
+            sagaRoot,
+            args.query as string,
+            cfg,
+            (args.k as number | undefined) ?? 8,
+          );
+          return { ok: true, data: hits };
+        } catch (e) {
+          return { ok: false, error: (e as Error).message };
+        }
       }
       case 'propose_edit': {
         const rel = args.relPath as string;

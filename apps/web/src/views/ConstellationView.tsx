@@ -49,6 +49,7 @@ const REF_RE = /@(character|location|concept|lore|waypoint|term|sigil)\/([a-z0-9
 export function ConstellationView({ data, onJump }: Props) {
   const [hover, setHover] = useState<string | null>(null);
   const [filter, setFilter] = useState<Set<EntryType>>(new Set(TYPE_ORDER));
+  const [mode, setMode] = useState<"all" | "inheritance">("all");
 
   const { nodes, edges, byId } = useMemo(() => {
     const visible = data.entries.filter((e) => filter.has(e.type));
@@ -97,6 +98,22 @@ export function ConstellationView({ data, onJump }: Props) {
     };
     for (const e of visible) {
       const src = `${e.type}/${e.id}`;
+      if (mode === "inheritance") {
+        // Only draw inheritance edges, and include the transitive chain so
+        // a character -> sigil -> parent-sigil shows up as a ladder.
+        const chain =
+          e.inheritsChain && e.inheritsChain.length > 0
+            ? e.inheritsChain
+                .map((x) => x.replace(/^sigil:/, "sigil/"))
+                .filter((x) => x.includes("/"))
+            : (e.inherits ?? []).map((s) => `sigil/${s}`);
+        let prev = src;
+        for (const target of chain) {
+          addEdge(prev, target);
+          prev = target;
+        }
+        continue;
+      }
       const re = new RegExp(REF_RE.source, "g");
       let m: RegExpExecArray | null;
       while ((m = re.exec(e.body))) addEdge(src, `${m[1]}/${m[2]}`);
@@ -115,7 +132,7 @@ export function ConstellationView({ data, onJump }: Props) {
       }
     }
     return { nodes, edges, byId };
-  }, [data, filter]);
+  }, [data, filter, mode]);
 
   const nodeMap = new Map(nodes.map((n) => [n.id, n]));
 
@@ -143,6 +160,32 @@ export function ConstellationView({ data, onJump }: Props) {
       <header className="px-6 py-3 border-b border-border flex items-center gap-3">
         <div className="text-lg flex-1">Constellation</div>
         <div className="flex gap-1 text-xs">
+          <button
+            onClick={() => setMode("all")}
+            className={
+              "px-2 py-0.5 rounded border " +
+              (mode === "all"
+                ? "border-border bg-muted"
+                : "border-border text-muted-foreground/70")
+            }
+            title="All @echoes between entries"
+          >
+            echoes
+          </button>
+          <button
+            onClick={() => setMode("inheritance")}
+            className={
+              "px-2 py-0.5 rounded border " +
+              (mode === "inheritance"
+                ? "border-border bg-muted"
+                : "border-border text-muted-foreground/70")
+            }
+            title="Sigil inheritance graph only"
+          >
+            inheritance
+          </button>
+        </div>
+        <div className="flex gap-1 text-xs">
           {TYPE_ORDER.map((t) => (
             <button
               key={t}
@@ -164,7 +207,7 @@ export function ConstellationView({ data, onJump }: Props) {
           ))}
         </div>
         <div className="text-xs text-muted-foreground">
-          {nodes.length} entries · {edges.length} echoes
+          {nodes.length} entries · {edges.length} {mode === "inheritance" ? "inherits" : "echoes"}
         </div>
       </header>
       <div className="flex-1 overflow-auto bg-background">

@@ -3,6 +3,7 @@ import { auditCmd } from './commands/audit.js';
 import { backupListCmd } from './commands/backup-list.js';
 import { backupCmd } from './commands/backup.js';
 import { calendarCmd } from './commands/calendar.js';
+import { compileCmd } from './commands/compile.js';
 import { dumpCmd } from './commands/dump.js';
 import { entryDiffCmd } from './commands/entry-diff.js';
 import { exportCmd } from './commands/export.js';
@@ -118,6 +119,15 @@ export async function run(argv: string[]): Promise<void> {
     )
     .option('--json', 'with --plan, emit JSON')
     .action(exportCmd);
+
+  program
+    .command('compile')
+    .description('Concatenate per-scene markdown into each chapter.md.')
+    .argument('<saga>', 'path to the Saga directory')
+    .option('--tome <slug>', 'only compile one tome')
+    .option('--chapter <slug>', 'only compile one chapter')
+    .option('--check', 'exit non-zero if any chapter.md is out of date')
+    .action(compileCmd);
 
   program
     .command('backup')

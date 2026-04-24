@@ -31,6 +31,12 @@ import {
   invalidateDigest,
   renderDigestForPrompt,
 } from './digest-cache.js';
+import {
+  buildIndex,
+  loadIndex,
+  providerFromEnv,
+  searchIndex,
+} from './embeddings.js';
 import { commitFile } from './git.js';
 import { resolveModel } from './model.js';
 import { safeJoin } from './paths.js';
@@ -370,6 +376,116 @@ export function registerSidecar(
       res.setHeader('content-type', 'application/json');
       res.setHeader('cache-control', 'no-store');
       res.end(JSON.stringify(digest));
+    } catch (e) {
+      res.statusCode = 500;
+      res.end(String(e));
+    }
+  });
+
+  // --- /lw/embed/status ----------------------------------------------------
+  host.use('/lw/embed/status', async (req, res) => {
+    if (req.method !== 'GET') {
+      res.statusCode = 405;
+      res.end('method not allowed');
+      return;
+    }
+    const url = new URL(req.url ?? '', 'http://localhost');
+    const rootParam = url.searchParams.get('sagaRoot');
+    if (!rootParam) {
+      res.statusCode = 400;
+      res.end('sagaRoot query param required');
+      return;
+    }
+    try {
+      const abs = path.resolve(safeRoot(rootParam));
+      const cfg = providerFromEnv();
+      const idx = await loadIndex(abs);
+      res.statusCode = 200;
+      res.setHeader('content-type', 'application/json');
+      res.setHeader('cache-control', 'no-store');
+      res.end(
+        JSON.stringify({
+          enabled: !!cfg,
+          provider: cfg?.provider ?? null,
+          model: cfg?.model ?? null,
+          index: idx
+            ? {
+                provider: idx.provider,
+                model: idx.model,
+                builtAt: idx.builtAt,
+                entries: idx.entries.length,
+              }
+            : null,
+        }),
+      );
+    } catch (e) {
+      res.statusCode = 500;
+      res.end(String(e));
+    }
+  });
+
+  // --- /lw/embed/build -----------------------------------------------------
+  host.use('/lw/embed/build', async (req, res) => {
+    if (req.method !== 'POST') {
+      res.statusCode = 405;
+      res.end('method not allowed');
+      return;
+    }
+    const body = await readBody(req, res);
+    if (body == null) return;
+    try {
+      const { sagaRoot } = JSON.parse(body || '{}');
+      if (typeof sagaRoot !== 'string') throw new Error('sagaRoot required');
+      const cfg = providerFromEnv();
+      if (!cfg) {
+        throw new Error(
+          'embeddings provider not configured (set LOREWEAVE_EMBEDDINGS)',
+        );
+      }
+      const abs = path.resolve(safeRoot(sagaRoot));
+      const idx = await buildIndex(abs, cfg);
+      res.statusCode = 200;
+      res.setHeader('content-type', 'application/json');
+      res.setHeader('cache-control', 'no-store');
+      res.end(
+        JSON.stringify({
+          ok: true,
+          provider: idx.provider,
+          model: idx.model,
+          entries: idx.entries.length,
+        }),
+      );
+    } catch (e) {
+      res.statusCode = 400;
+      res.end(String(e));
+    }
+  });
+
+  // --- /lw/embed/search ----------------------------------------------------
+  host.use('/lw/embed/search', async (req, res) => {
+    if (req.method !== 'GET') {
+      res.statusCode = 405;
+      res.end('method not allowed');
+      return;
+    }
+    const url = new URL(req.url ?? '', 'http://localhost');
+    const rootParam = url.searchParams.get('sagaRoot');
+    const q = url.searchParams.get('q');
+    const kParam = url.searchParams.get('k');
+    if (!rootParam || !q) {
+      res.statusCode = 400;
+      res.end('sagaRoot + q query params required');
+      return;
+    }
+    try {
+      const cfg = providerFromEnv();
+      if (!cfg) throw new Error('embeddings provider not configured');
+      const abs = path.resolve(safeRoot(rootParam));
+      const hits = await searchIndex(abs, q, cfg, kParam ? parseInt(kParam, 10) : 8);
+      res.statusCode = 200;
+      res.setHeader('content-type', 'application/json');
+      res.setHeader('cache-control', 'no-store');
+      res.end(JSON.stringify({ hits }));
     } catch (e) {
       res.statusCode = 500;
       res.end(String(e));

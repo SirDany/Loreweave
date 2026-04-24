@@ -51,4 +51,16 @@ describe("lw export tome-pdf / tome-docx", () => {
     const stat = await fs.stat(out);
     expect(stat.size).toBeGreaterThan(1000);
   });
+
+  it("produces an epub file via pandoc when available", async () => {
+    if (!hasPandoc()) {
+      console.warn("pandoc not on PATH — skipping epub export test");
+      return;
+    }
+    const saga = await buildSaga("pandoc-saga-epub");
+    const out = path.join(tmpRoot, "book-one.epub");
+    await exportCmd(saga, { format: "tome-epub", tome: "book-one", out });
+    const stat = await fs.stat(out);
+    expect(stat.size).toBeGreaterThan(1000);
+  });
 });

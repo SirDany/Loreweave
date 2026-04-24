@@ -35,7 +35,10 @@ import { Editor } from './editor/LazyEditor.js';
 import type { RefCatalog } from './editor/ReferenceExtension.js';
 import type { DumpChapter, DumpEntry, DumpPayload } from './lib/lw.js';
 import { lwWrite } from './lib/lw.js';
+import type { CanonDigestPayload } from './lib/lw.js';
 import { buildCatalog } from './lib/catalog.js';
+import type { RefAtCursor } from './editor/refAtCursor.js';
+import { CodexPane } from './views/CodexPane.js';
 import { useSaga } from './state/useSaga.js';
 import type { ChatContextAttachment } from './state/useChat.js';
 import { AssistantPanel } from './views/AssistantPanel.js';
@@ -402,6 +405,10 @@ export default function App() {
             chapter={currentChapter}
             catalog={catalog}
             sagaPath={saga.sagaPath}
+            digest={saga.digest}
+            onJumpToEntry={(type, id) =>
+              handleJump({ kind: 'entry', key: `${type}/${id}` })
+            }
             onSaved={() => void saga.reload()}
             onAskAssistant={(action, sel, relPath) => {
               const likelyRefs = Array.from(
@@ -470,6 +477,7 @@ export default function App() {
             data={data}
             sagaPath={saga.sagaPath}
             tomeLens={saga.tomeLens}
+            onReloaded={() => void saga.reload()}
           />
         )}
         {!currentEntry && !currentChapter && section === 'traces' && (
@@ -1020,7 +1028,9 @@ function ChapterView({
   chapter,
   catalog,
   sagaPath,
+  digest,
   onSaved,
+  onJumpToEntry,
   onAskAssistant,
   onAsk,
   onAudit,
@@ -1028,7 +1038,9 @@ function ChapterView({
   chapter: { tome: string; chapter: DumpChapter };
   catalog: RefCatalog;
   sagaPath: string;
+  digest: CanonDigestPayload | null;
   onSaved: () => void;
+  onJumpToEntry?: (type: string, id: string) => void;
   onAskAssistant?: (
     action: string,
     selection: { text: string; lines: [number, number] },
@@ -1040,6 +1052,25 @@ function ChapterView({
   const [draft, setDraft] = useState(chapter.chapter.body);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
+  const [cursorRef, setCursorRef] = useState<RefAtCursor | null>(null);
+  const [paneOpen, setPaneOpen] = useState<boolean>(() => {
+    try {
+      return window.localStorage.getItem('loreweave.codexPane') !== '0';
+    } catch {
+      return true;
+    }
+  });
+  const togglePane = () => {
+    setPaneOpen((v) => {
+      const next = !v;
+      try {
+        window.localStorage.setItem('loreweave.codexPane', next ? '1' : '0');
+      } catch {
+        /* best effort */
+      }
+      return next;
+    });
+  };
   const dirty = draft !== chapter.chapter.body;
 
   const save = async () => {
@@ -1111,6 +1142,16 @@ function ChapterView({
             </Button>
           )}
           <Button
+            variant="ghost"
+            size="sm"
+            className="gap-1.5"
+            onClick={togglePane}
+            title={paneOpen ? 'Hide Codex pane' : 'Show Codex pane'}
+          >
+            <BookOpen className="h-3.5 w-3.5" />
+            {paneOpen ? 'Hide codex' : 'Show codex'}
+          </Button>
+          <Button
             variant={dirty ? 'default' : 'outline'}
             size="sm"
             onClick={save}
@@ -1120,18 +1161,30 @@ function ChapterView({
           </Button>
         </div>
       </header>
-      <div className="flex-1 overflow-hidden">
-        <Editor
-          value={draft}
-          catalog={catalog}
-          onChange={setDraft}
-          onAskAssistant={
-            onAskAssistant
-              ? (action, sel) =>
-                  onAskAssistant(action, sel, chapter.chapter.relPath)
-              : undefined
-          }
-        />
+      <div className="flex flex-1 overflow-hidden">
+        <div className="flex flex-1 flex-col overflow-hidden">
+          <Editor
+            value={draft}
+            catalog={catalog}
+            onChange={setDraft}
+            onRefAtCursor={setCursorRef}
+            onAskAssistant={
+              onAskAssistant
+                ? (action, sel) =>
+                    onAskAssistant(action, sel, chapter.chapter.relPath)
+                : undefined
+            }
+          />
+        </div>
+        {paneOpen && (
+          <aside className="w-80 shrink-0 border-l border-border bg-card/30">
+            <CodexPane
+              ref={cursorRef}
+              digest={digest}
+              onJump={onJumpToEntry}
+            />
+          </aside>
+        )}
       </div>
     </div>
   );
