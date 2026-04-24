@@ -28,6 +28,16 @@ export interface RefCatalogEntry {
   name: string;
   /** Short summary string for hover preview. */
   summary?: string;
+  /** Known aliases (a.k.a. names). */
+  aliases?: string[];
+  /** Sigil / free tags applied to the entry. */
+  tags?: string[];
+  /** Draft vs canon status (if set). */
+  status?: 'draft' | 'canon' | null;
+  /** Parent Sigils this entry inherits from (from the weave cache). */
+  inheritsChain?: string[];
+  /** A bounded selection of resolved properties for the hover card. */
+  properties?: Array<{ key: string; value: unknown; from: string }>;
 }
 
 export interface RefCatalog {
@@ -94,6 +104,24 @@ function sigilCompletions(catalog: RefCatalog) {
 
 const REF_RE = /@([a-zA-Z]+)\/([a-zA-Z0-9\-_]+)/g;
 
+function formatPropValue(value: unknown): string {
+  if (value == null) return "—";
+  if (Array.isArray(value)) {
+    if (value.length === 0) return "—";
+    return value.map((v) => formatPropValue(v)).join(", ");
+  }
+  if (typeof value === "object") {
+    try {
+      const s = JSON.stringify(value);
+      return s.length > 60 ? s.slice(0, 60) + "…" : s;
+    } catch {
+      return "[object]";
+    }
+  }
+  const s = String(value);
+  return s.length > 80 ? s.slice(0, 80) + "…" : s;
+}
+
 function brokenRefPlugin(catalog: RefCatalog) {
   const valid = new Set(catalog.entries.map((e) => `${e.type}/${e.id}`));
   const broken = Decoration.mark({ class: "lw-broken-ref" });
@@ -152,21 +180,84 @@ export function loreweaveExtensions(catalog: RefCatalog) {
               dom.textContent = `unknown reference: ${key}`;
               dom.style.color = "#fecaca";
             } else {
+              const header = document.createElement("div");
+              header.style.display = "flex";
+              header.style.alignItems = "center";
+              header.style.gap = "0.4rem";
               const h = document.createElement("div");
               h.style.fontWeight = "600";
-              h.textContent = `${entry.name}`;
+              h.textContent = entry.name;
+              header.appendChild(h);
+              if (entry.status) {
+                const badge = document.createElement("span");
+                badge.textContent = entry.status;
+                badge.style.fontSize = "0.65rem";
+                badge.style.textTransform = "uppercase";
+                badge.style.padding = "0.05rem 0.35rem";
+                badge.style.borderRadius = "0.2rem";
+                badge.style.border = "1px solid #57534e";
+                badge.style.color =
+                  entry.status === "draft" ? "#fde68a" : "#bbf7d0";
+                header.appendChild(badge);
+              }
+              dom.appendChild(header);
+
               const s = document.createElement("div");
               s.style.fontSize = "0.75rem";
               s.style.color = "#a8a29e";
               s.textContent = `${entry.type}/${entry.id}`;
-              dom.append(h, s);
+              dom.appendChild(s);
+
+              if (entry.aliases && entry.aliases.length > 0) {
+                const a = document.createElement("div");
+                a.style.fontSize = "0.7rem";
+                a.style.color = "#a8a29e";
+                a.style.marginTop = "0.15rem";
+                a.textContent = `a.k.a. ${entry.aliases.join(", ")}`;
+                dom.appendChild(a);
+              }
+
               if (entry.summary) {
                 const p = document.createElement("div");
                 p.style.fontSize = "0.8rem";
-                p.style.marginTop = "0.25rem";
-                p.style.maxWidth = "24rem";
+                p.style.marginTop = "0.3rem";
+                p.style.maxWidth = "26rem";
                 p.textContent = entry.summary;
                 dom.appendChild(p);
+              }
+
+              if (entry.properties && entry.properties.length > 0) {
+                const tbl = document.createElement("div");
+                tbl.style.marginTop = "0.4rem";
+                tbl.style.display = "grid";
+                tbl.style.gridTemplateColumns = "auto 1fr";
+                tbl.style.columnGap = "0.5rem";
+                tbl.style.rowGap = "0.1rem";
+                tbl.style.fontSize = "0.72rem";
+                for (const p of entry.properties) {
+                  const k = document.createElement("div");
+                  k.textContent = p.key;
+                  k.style.color = "#a8a29e";
+                  const v = document.createElement("div");
+                  v.textContent = formatPropValue(p.value);
+                  v.style.color = "#e7e5e4";
+                  if (p.from.startsWith("sigil:")) {
+                    v.title = `inherited from ${p.from}`;
+                    v.style.fontStyle = "italic";
+                  }
+                  tbl.appendChild(k);
+                  tbl.appendChild(v);
+                }
+                dom.appendChild(tbl);
+              }
+
+              if (entry.tags && entry.tags.length > 0) {
+                const t = document.createElement("div");
+                t.style.fontSize = "0.65rem";
+                t.style.color = "#a8a29e";
+                t.style.marginTop = "0.3rem";
+                t.textContent = entry.tags.map((x) => `#${x}`).join(" ");
+                dom.appendChild(t);
               }
             }
             return { dom };

@@ -35,6 +35,7 @@ import { Editor } from './editor/LazyEditor.js';
 import type { RefCatalog } from './editor/ReferenceExtension.js';
 import type { DumpChapter, DumpEntry, DumpPayload } from './lib/lw.js';
 import { lwWrite } from './lib/lw.js';
+import { buildCatalog } from './lib/catalog.js';
 import { useSaga } from './state/useSaga.js';
 import type { ChatContextAttachment } from './state/useChat.js';
 import { AssistantPanel } from './views/AssistantPanel.js';
@@ -149,7 +150,7 @@ export default function App() {
   if (!saga.data) return <Splash message="No Saga data." />;
 
   const data = saga.data;
-  const catalog = buildCatalog(data);
+  const catalog = buildCatalog(data, saga.digest);
   const visibleEntries = applyLens(data.entries, saga.tomeLens);
 
   const currentEntry =
@@ -1380,34 +1381,6 @@ function getUsagesCount(entry: DumpEntry, data: DumpPayload): number {
     }
   }
   return count;
-}
-
-function buildCatalog(data: DumpPayload): RefCatalog {
-  const sigils = data.entries
-    .filter((e) => e.type === 'sigil')
-    .map((e) => e.id);
-  return {
-    entries: data.entries.map((e) => ({
-      type: e.type,
-      id: e.id,
-      name: e.name,
-      summary: entrySummary(e),
-    })),
-    sigils,
-  };
-}
-
-function entrySummary(e: DumpEntry): string | undefined {
-  const fm = e.frontmatter as Record<string, unknown>;
-  if (e.type === 'term' && typeof fm.definition === 'string') {
-    return fm.definition as string;
-  }
-  const first = e.body
-    .split('\n')
-    .map((l) => l.trim())
-    .find((l) => l.length > 0 && !l.startsWith('#'));
-  if (first && first.length > 200) return first.slice(0, 200) + '…';
-  return first;
 }
 
 function applyLens(entries: DumpEntry[], tome: string | null): DumpEntry[] {

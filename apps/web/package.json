@@ -18,12 +18,10 @@
     "@codemirror/language": "6.10.3",
     "@codemirror/state": "6.4.1",
     "@codemirror/view": "6.34.1",
-    "@ai-sdk/anthropic": "^0.0.56",
-    "@ai-sdk/openai": "^0.0.72",
     "@loreweave/core": "workspace:*",
+    "@loreweave/sidecar": "workspace:*",
     "@radix-ui/react-slot": "^1.1.0",
     "@radix-ui/react-tabs": "^1.1.13",
-    "ai": "^3.4.33",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
     "codemirror": "6.0.1",
@@ -33,9 +31,6 @@
     "tailwind-merge": "^2.5.2",
     "yaml": "2.5.1",
     "zod": "^3.25.28"
-  },
-  "optionalDependencies": {
-    "ollama-ai-provider": "^0.15.2"
   },
   "devDependencies": {
     "@types/react": "18.3.5",

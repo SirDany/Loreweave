@@ -14,12 +14,6 @@ importers:
 
   apps/web:
     dependencies:
-      '@ai-sdk/anthropic':
-        specifier: ^0.0.56
-        version: 0.0.56(zod@3.25.76)
-      '@ai-sdk/openai':
-        specifier: ^0.0.72
-        version: 0.0.72(zod@3.25.76)
       '@codemirror/autocomplete':
         specifier: 6.18.0
         version: 6.18.0(@codemirror/language@6.10.3)(@codemirror/state@6.4.1)(@codemirror/view@6.34.1)(@lezer/common@1.5.2)
@@ -41,15 +35,15 @@ importers:
       '@loreweave/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@loreweave/sidecar':
+        specifier: workspace:*
+        version: link:../../packages/sidecar
       '@radix-ui/react-slot':
         specifier: ^1.1.0
         version: 1.2.3(@types/react@18.3.5)(react@18.3.1)
       '@radix-ui/react-tabs':
         specifier: ^1.1.13
         version: 1.1.13(@types/react-dom@18.3.0)(@types/react@18.3.5)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
-      ai:
-        specifier: ^3.4.33
-        version: 3.4.33(react@18.3.1)(sswr@2.2.0(svelte@5.55.5))(svelte@5.55.5)(vue@3.5.33(typescript@5.6.2))(zod@3.25.76)
       class-variance-authority:
         specifier: ^0.7.0
         version: 0.7.1
@@ -77,10 +71,6 @@ importers:
       zod:
         specifier: ^3.25.28
         version: 3.25.76
-    optionalDependencies:
-      ollama-ai-provider:
-        specifier: ^0.15.2
-        version: 0.15.2(zod@3.25.76)
     devDependencies:
       '@types/react':
         specifier: 18.3.5
@@ -164,6 +154,41 @@ importers:
       zod:
         specifier: 3.23.8
         version: 3.23.8
+    devDependencies:
+      '@types/node':
+        specifier: 20.16.5
+        version: 20.16.5
+      typescript:
+        specifier: 5.6.2
+        version: 5.6.2
+      vitest:
+        specifier: 2.1.1
+        version: 2.1.1(@types/node@20.16.5)
+
+  packages/sidecar:
+    dependencies:
+      '@ai-sdk/anthropic':
+        specifier: ^0.0.56
+        version: 0.0.56(zod@3.25.76)
+      '@ai-sdk/openai':
+        specifier: ^0.0.72
+        version: 0.0.72(zod@3.25.76)
+      '@loreweave/core':
+        specifier: workspace:*
+        version: link:../core
+      ai:
+        specifier: ^3.4.33
+        version: 3.4.33(react@18.3.1)(sswr@2.2.0(svelte@5.55.5))(svelte@5.55.5)(vue@3.5.33(typescript@5.6.2))(zod@3.25.76)
+      yaml:
+        specifier: 2.5.1
+        version: 2.5.1
+      zod:
+        specifier: ^3.25.28
+        version: 3.25.76
+    optionalDependencies:
+      ollama-ai-provider:
+        specifier: ^0.15.2
+        version: 0.15.2(zod@3.25.76)
     devDependencies:
       '@types/node':
         specifier: 20.16.5

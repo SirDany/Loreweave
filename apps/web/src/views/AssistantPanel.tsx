@@ -46,6 +46,7 @@ interface Props {
 
 const POLICY_KEY = (sagaRoot: string) => `lw.chat.approvalPolicy.${sagaRoot}`;
 const LEGACY_POLICY_KEY = 'lw.chat.approvalPolicy';
+const AUTOCOMMIT_KEY = (sagaRoot: string) => `lw.chat.autoCommit.${sagaRoot}`;
 
 function loadPolicy(sagaRoot: string): ApprovalPolicy {
   try {
@@ -61,6 +62,17 @@ function loadPolicy(sagaRoot: string): ApprovalPolicy {
   return 'writes-approval';
 }
 
+function loadAutoCommit(sagaRoot: string): boolean {
+  try {
+    const v = localStorage.getItem(AUTOCOMMIT_KEY(sagaRoot));
+    // Default: on. A Saga that isn't a git repo just no-ops silently.
+    if (v === '0' || v === 'false') return false;
+    return true;
+  } catch {
+    return true;
+  }
+}
+
 export function AssistantPanel({
   sagaRoot,
   onClose,
@@ -72,9 +84,13 @@ export function AssistantPanel({
   const [policy, setPolicy] = useState<ApprovalPolicy>(() =>
     loadPolicy(sagaRoot),
   );
+  const [autoCommit, setAutoCommit] = useState<boolean>(() =>
+    loadAutoCommit(sagaRoot),
+  );
   useEffect(() => {
     // Switching Sagas re-loads that Saga's stored policy.
     setPolicy(loadPolicy(sagaRoot));
+    setAutoCommit(loadAutoCommit(sagaRoot));
   }, [sagaRoot]);
   useEffect(() => {
     try {
@@ -83,8 +99,15 @@ export function AssistantPanel({
       /* ignore */
     }
   }, [sagaRoot, policy]);
+  useEffect(() => {
+    try {
+      localStorage.setItem(AUTOCOMMIT_KEY(sagaRoot), autoCommit ? '1' : '0');
+    } catch {
+      /* ignore */
+    }
+  }, [sagaRoot, autoCommit]);
 
-  const chat = useChat({ sagaRoot, approvalPolicy: policy });
+  const chat = useChat({ sagaRoot, approvalPolicy: policy, autoCommit });
   const [draft, setDraft] = useState(initialPrompt ?? '');
   const [attachment, setAttachment] = useState<ChatContextAttachment | undefined>(
     initialContext,
@@ -243,6 +266,8 @@ export function AssistantPanel({
         <SettingsPanel
           policy={policy}
           onPolicyChange={setPolicy}
+          autoCommit={autoCommit}
+          onAutoCommitChange={setAutoCommit}
           onClose={() => setShowingSettings(false)}
         />
       )}
@@ -387,22 +412,27 @@ export function AssistantPanel({
 function SettingsPanel({
   policy,
   onPolicyChange,
+  autoCommit,
+  onAutoCommitChange,
   onClose,
 }: {
   policy: ApprovalPolicy;
   onPolicyChange: (p: ApprovalPolicy) => void;
+  autoCommit: boolean;
+  onAutoCommitChange: (v: boolean) => void;
   onClose: () => void;
 }) {
   return (
-    <div className="border-b border-border bg-muted/20 px-4 py-3 space-y-2">
+    <div className="border-b border-border bg-muted/20 px-4 py-3 space-y-3">
       <div className="flex items-center gap-2">
         <Settings className="h-3.5 w-3.5 text-primary/80" />
-        <span className="label-rune flex-1">Approval policy</span>
+        <span className="label-rune flex-1">Assistant settings</span>
         <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
           <X className="h-3.5 w-3.5" />
         </button>
       </div>
       <div className="space-y-1 text-xs">
+        <div className="label-rune text-[10px] text-muted-foreground">Approval policy</div>
         <PolicyOption
           id="auto-reads"
           label="Auto-allow reads, approve writes"
@@ -424,6 +454,24 @@ function SettingsPanel({
           current={policy}
           onPick={onPolicyChange}
         />
+      </div>
+      <div className="space-y-1 text-xs pt-1 border-t border-border/50">
+        <div className="label-rune text-[10px] text-muted-foreground">Git</div>
+        <label className="flex items-start gap-2 cursor-pointer rounded-md border border-border bg-background px-2 py-1.5 hover:bg-muted">
+          <input
+            type="checkbox"
+            className="mt-0.5 accent-primary"
+            checked={autoCommit}
+            onChange={(e) => onAutoCommitChange(e.target.checked)}
+          />
+          <div className="flex-1">
+            <div className="text-xs font-medium">Auto-commit approved writes</div>
+            <div className="mt-0.5 text-[11px] text-muted-foreground">
+              When on, each Apply creates a single git commit in the Saga repo.
+              Silently skipped if the Saga isn't a git repo.
+            </div>
+          </div>
+        </label>
       </div>
     </div>
   );
@@ -625,6 +673,11 @@ function PendingActionCard({
         )}
         {stale && <Badge variant="warning">stale</Badge>}
         {applied && <Badge variant="success">applied</Badge>}
+        {applied && action.commitShortSha && (
+          <Badge variant="secondary" title="Git commit created by auto-commit">
+            ⎇ {action.commitShortSha}
+          </Badge>
+        )}
       </div>
       <div className="font-mono text-[11px] text-foreground/80">
         {action.relPath}
@@ -637,6 +690,11 @@ function PendingActionCard({
       {action.error && (
         <div className="rounded border border-destructive/50 bg-destructive/10 px-2 py-1 text-[11px] text-destructive">
           {action.error}
+        </div>
+      )}
+      {applied && action.commitError && (
+        <div className="rounded border border-amber-600/40 bg-amber-500/10 px-2 py-1 text-[11px] text-amber-200">
+          File saved, but auto-commit failed: {action.commitError}
         </div>
       )}
       <div className="max-h-60 overflow-auto rounded border border-border bg-background font-mono text-[10px] leading-relaxed">

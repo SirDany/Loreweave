@@ -46,6 +46,10 @@ export interface PendingAction {
   patch?: boolean;
   status: 'pending' | 'applied' | 'discarded' | 'stale';
   error?: string;
+  /** Short SHA of the commit created by the sidecar when auto-commit is on. */
+  commitShortSha?: string;
+  /** Set when auto-commit was requested but the git step failed. */
+  commitError?: string;
 }
 
 export interface AgentMeta {
@@ -71,6 +75,11 @@ export interface UsageSummary {
 interface UseChatOptions {
   sagaRoot: string;
   approvalPolicy?: ApprovalPolicy;
+  /**
+   * When true, the sidecar creates a git commit for every approved apply.
+   * No-ops silently if the Saga isn't in a git repo.
+   */
+  autoCommit?: boolean;
 }
 
 interface PersistedThread {
@@ -106,12 +115,33 @@ function saveThreads(
 }
 
 /**
+ * Build a commit message for an approved agent apply. Format:
+ *
+ *   Assistant (<agent>): <verb> <relPath>
+ *
+ *   <rationale, if any>
+ *
+ * Using a stable prefix lets writers filter assistant commits in their log.
+ */
+function buildCommitMessage(agentId: string, action: PendingAction): string {
+  const verb =
+    action.kind === 'new'
+      ? 'create'
+      : action.patch
+        ? 'patch'
+        : 'edit';
+  const subject = `Assistant (${agentId || 'unknown'}): ${verb} ${action.relPath}`;
+  const rationale = action.rationale?.trim();
+  return rationale ? `${subject}\n\n${rationale}` : subject;
+}
+
+/**
  * Streams a chat conversation with a Loreweave agent against the Vite dev
  * sidecar's `/lw/chat` SSE endpoint. Maintains per-agent threads persisted
  * to `localStorage` so switching agents preserves each personality's
  * context, and offers retry + handoff handling.
  */
-export function useChat({ sagaRoot, approvalPolicy: _policy = 'writes-approval' }: UseChatOptions) {
+export function useChat({ sagaRoot, approvalPolicy: _policy = 'writes-approval', autoCommit = false }: UseChatOptions) {
   void _policy;
   const [agents, setAgents] = useState<AgentMeta[]>([]);
   const [agentsError, setAgentsError] = useState<string | null>(null);
@@ -469,6 +499,9 @@ export function useChat({ sagaRoot, approvalPolicy: _policy = 'writes-approval' 
         ),
       }));
       try {
+        const commitMessage = autoCommit
+          ? buildCommitMessage(agentId, action)
+          : null;
         const resp = await fetch('/lw/apply', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
@@ -477,6 +510,7 @@ export function useChat({ sagaRoot, approvalPolicy: _policy = 'writes-approval' 
             relPath: action.relPath,
             content: action.next,
             originalHash: action.originalHash,
+            ...(commitMessage ? { commit: { message: commitMessage } } : {}),
           }),
         });
         if (resp.status === 409) {
@@ -498,14 +532,25 @@ export function useChat({ sagaRoot, approvalPolicy: _policy = 'writes-approval' 
         if (!resp.ok) {
           throw new Error(`/lw/apply ${resp.status}`);
         }
-        // Capture the new hash so Revert can validate it hasn't drifted.
+        // Capture the new hash so Revert can validate it hasn't drifted, and
+        // the short commit SHA (if the sidecar auto-committed) for display.
         try {
-          const body = (await resp.json()) as { newHash?: string };
-          if (body?.newHash) {
+          const body = (await resp.json()) as {
+            newHash?: string;
+            commit?: { sha?: string; shortSha?: string; error?: string } | null;
+          };
+          if (body?.newHash || body?.commit) {
             updateThread((t) => ({
               ...t,
               pending: t.pending.map((p) =>
-                p.id === id ? { ...p, appliedHash: body.newHash } : p,
+                p.id === id
+                  ? {
+                      ...p,
+                      appliedHash: body.newHash ?? p.appliedHash,
+                      commitShortSha: body.commit?.shortSha,
+                      commitError: body.commit?.error,
+                    }
+                  : p,
               ),
             }));
           }
@@ -523,7 +568,7 @@ export function useChat({ sagaRoot, approvalPolicy: _policy = 'writes-approval' 
         }));
       }
     },
-    [agentId, updateThread],
+    [agentId, autoCommit, updateThread],
   );
 
   const discardPending = useCallback(
@@ -548,6 +593,9 @@ export function useChat({ sagaRoot, approvalPolicy: _policy = 'writes-approval' 
         return;
       }
       try {
+        const commitMessage = autoCommit
+          ? `Assistant (${agentId}): revert ${action.relPath}`
+          : null;
         const resp = await fetch('/lw/apply', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
@@ -559,6 +607,7 @@ export function useChat({ sagaRoot, approvalPolicy: _policy = 'writes-approval' 
             // overwrite it with the original — otherwise we'd clobber the
             // writer's manual edits.
             originalHash: action.appliedHash,
+            ...(commitMessage ? { commit: { message: commitMessage } } : {}),
           }),
         });
         if (resp.status === 409) {
@@ -593,7 +642,7 @@ export function useChat({ sagaRoot, approvalPolicy: _policy = 'writes-approval' 
         }));
       }
     },
-    [agentId, updateThread],
+    [agentId, autoCommit, updateThread],
   );
 
   /** Keep a ref of the threads map for async callbacks. */

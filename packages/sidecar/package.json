@@ -1,0 +1,37 @@
+{
+  "name": "@loreweave/sidecar",
+  "version": "0.1.0",
+  "description": "Loreweave HTTP sidecar: write, apply, events, agents, chat, CLI proxy. Embeddable in Vite (dev) or a standalone Node HTTP server.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@ai-sdk/anthropic": "^0.0.56",
+    "@ai-sdk/openai": "^0.0.72",
+    "@loreweave/core": "workspace:*",
+    "ai": "^3.4.33",
+    "yaml": "2.5.1",
+    "zod": "^3.25.28"
+  },
+  "optionalDependencies": {
+    "ollama-ai-provider": "^0.15.2"
+  },
+  "devDependencies": {
+    "@types/node": "20.16.5",
+    "typescript": "5.6.2",
+    "vitest": "2.1.1"
+  }
+}

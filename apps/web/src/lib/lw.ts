@@ -190,9 +190,7 @@ export function dump(saga: string, tome?: string): Promise<DumpPayload> {
   const args = ['dump', saga];
   if (tome) args.push('--tome', tome);
   return lwJson<DumpPayload>(args);
-}
-
-export function resolveEntry(
+}export function resolveEntry(
   saga: string,
   type: EntryType,
   id: string,
@@ -207,6 +205,68 @@ export function validate(
   const args = ['validate', saga, '--json'];
   if (tome) args.push('--tome', tome);
   return lwJson<{ diagnostics: Diagnostic[] }>(args);
+}
+
+// ---------- canon digest (cached phone book + weaves) ----------
+
+export interface DigestPhoneBookEntry {
+  ref: string;
+  type: EntryType;
+  id: string;
+  name: string;
+  aliases?: string[];
+  tags?: string[];
+  relPath: string;
+  summary: string;
+  status?: 'draft' | 'canon' | null;
+  appearsIn?: string[];
+}
+
+export interface DigestWeaveEntry {
+  ref: string;
+  inheritsChain: string[];
+  properties: Record<string, { value: unknown; from: string }>;
+}
+
+export interface DigestThreadWaypoint {
+  id: string;
+  label?: string;
+  at?: string;
+  event: string;
+  eventName?: string;
+}
+
+export interface DigestThread {
+  id: string;
+  calendar?: string;
+  branchesFrom?: { thread: string; at_waypoint: string };
+  waypoints: DigestThreadWaypoint[];
+  issues: Array<{ kind: string; message: string }>;
+}
+
+export interface CanonDigestPayload {
+  schema: number;
+  sagaId: string;
+  revision: string;
+  builtAt: string;
+  counts: { entries: number; threads: number; tomes: number };
+  phoneBook: DigestPhoneBookEntry[];
+  weaves: DigestWeaveEntry[];
+  threads: DigestThread[];
+  tomes: Array<{ id: string; title: string; chapters: number }>;
+}
+
+export async function fetchDigest(
+  sagaRoot: string,
+  opts: { force?: boolean } = {},
+): Promise<CanonDigestPayload> {
+  const q = new URLSearchParams({ sagaRoot });
+  if (opts.force) q.set('force', '1');
+  const res = await fetch(`/lw/digest?${q.toString()}`);
+  if (!res.ok) {
+    throw new Error(`/lw/digest ${res.status}: ${await res.text()}`);
+  }
+  return (await res.json()) as CanonDigestPayload;
 }
 
 export function threadOf(

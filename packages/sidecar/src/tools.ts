@@ -9,6 +9,10 @@ import { createHash } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { z } from 'zod';
+import {
+  StorageNotFoundError,
+  type StorageAdapter,
+} from '@loreweave/core';
 
 export interface ToolContext {
   repoRoot: string;
@@ -16,6 +20,13 @@ export interface ToolContext {
   /** Default Saga root the conversation is scoped to, if any. */
   defaultSagaRoot?: string;
   safeJoin: (root: string, rel: string) => string;
+  /**
+   * Optional storage factory. When present, `propose_*` and `read_file`
+   * resolve file contents via the adapter instead of `node:fs`. The
+   * desktop sidecar always supplies one; leaving it optional keeps
+   * test harnesses (which pass a fake `safeJoin`) working unchanged.
+   */
+  storageFor?: (sagaRoot: string) => StorageAdapter;
 }
 
 export interface ToolResult {
@@ -253,6 +264,31 @@ function resolveSagaRoot(ctx: ToolContext, sagaRoot: string): string {
   return path.isAbsolute(sagaRoot) ? sagaRoot : path.join(ctx.repoRoot, sagaRoot);
 }
 
+/**
+ * Read a file under a Saga root via the supplied storage adapter when the
+ * sidecar provides one, otherwise fall through to `node:fs`. Always throws
+ * {@link StorageNotFoundError} (or a matching `ENOENT`) when the file is
+ * missing, so callers can branch on it uniformly via {@link isMissing}.
+ */
+async function readSagaFile(
+  ctx: ToolContext,
+  sagaRootRel: string,
+  sagaRootAbs: string,
+  relPath: string,
+): Promise<string> {
+  if (ctx.storageFor) {
+    return ctx.storageFor(sagaRootRel).readFile(relPath);
+  }
+  const abs = ctx.safeJoin(sagaRootAbs, relPath);
+  return fs.readFile(abs, 'utf8');
+}
+
+function isMissing(e: unknown): boolean {
+  if (e instanceof StorageNotFoundError) return true;
+  const code = (e as NodeJS.ErrnoException | undefined)?.code;
+  return code === 'ENOENT';
+}
+
 function unifiedDiff(oldText: string, newText: string, file: string): string {
   const a = oldText.split('\n');
   const b = newText.split('\n');
@@ -448,24 +484,24 @@ export async function runTool(
         return { ok: true, data: rows };
       }
       case 'read_file': {
-        const abs = ctx.safeJoin(sagaRoot, args.relPath as string);
-        const content = await fs.readFile(abs, 'utf8');
+        const rel = args.relPath as string;
+        const content = await readSagaFile(ctx, sagaRootRel, sagaRoot, rel);
         return {
           ok: true,
           data: {
-            relPath: args.relPath,
-            content: sanitizeForModel(content, args.relPath as string),
+            relPath: rel,
+            content: sanitizeForModel(content, rel),
             rawHash: hashContent(content),
           },
         };
       }
       case 'propose_edit': {
         const rel = args.relPath as string;
-        const abs = ctx.safeJoin(sagaRoot, rel);
         let original = '';
         try {
-          original = await fs.readFile(abs, 'utf8');
-        } catch {
+          original = await readSagaFile(ctx, sagaRootRel, sagaRoot, rel);
+        } catch (e) {
+          if (!isMissing(e)) throw e;
           original = '';
         }
         const next = args.newContent as string;
@@ -485,12 +521,14 @@ export async function runTool(
       }
       case 'propose_patch': {
         const rel = args.relPath as string;
-        const abs = ctx.safeJoin(sagaRoot, rel);
-        let original = '';
+        let original: string;
         try {
-          original = await fs.readFile(abs, 'utf8');
-        } catch {
-          return { ok: false, error: `file not found: ${rel}` };
+          original = await readSagaFile(ctx, sagaRootRel, sagaRoot, rel);
+        } catch (e) {
+          if (isMissing(e)) {
+            return { ok: false, error: `file not found: ${rel}` };
+          }
+          throw e;
         }
         const oldStr = args.oldStr as string;
         const newStr = args.newStr as string;
@@ -527,13 +565,13 @@ export async function runTool(
       }
       case 'propose_new_entry': {
         const rel = args.relPath as string;
-        const abs = ctx.safeJoin(sagaRoot, rel);
         let exists = false;
         let original = '';
         try {
-          original = await fs.readFile(abs, 'utf8');
+          original = await readSagaFile(ctx, sagaRootRel, sagaRoot, rel);
           exists = true;
-        } catch {
+        } catch (e) {
+          if (!isMissing(e)) throw e;
           exists = false;
         }
         return {

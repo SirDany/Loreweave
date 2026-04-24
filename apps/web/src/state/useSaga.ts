@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
-import { dump, type DumpPayload } from "../lib/lw.js";
+import {
+  dump,
+  fetchDigest,
+  type CanonDigestPayload,
+  type DumpPayload,
+} from "../lib/lw.js";
 
 const DEFAULT_SAGA = "sagas/example-saga";
 const STORAGE_KEY = "loreweave.sagaPath";
@@ -7,6 +12,11 @@ const STORAGE_KEY = "loreweave.sagaPath";
 export interface SagaState {
   sagaPath: string;
   data: DumpPayload | null;
+  /**
+   * Canon digest (phone book + resolved weaves + thread summaries). Lags
+   * `data` by one request; null until the first successful fetch.
+   */
+  digest: CanonDigestPayload | null;
   loading: boolean;
   error: string | null;
   tomeLens: string | null;
@@ -30,6 +40,7 @@ export function useSaga(initialPath: string = DEFAULT_SAGA): SagaState {
     readInitialPath(initialPath),
   );
   const [data, setData] = useState<DumpPayload | null>(null);
+  const [digest, setDigest] = useState<CanonDigestPayload | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tomeLens, setTomeLens] = useState<string | null>(null);
@@ -42,6 +53,7 @@ export function useSaga(initialPath: string = DEFAULT_SAGA): SagaState {
       // best effort
     }
     setTomeLens(null);
+    setDigest(null);
   }, []);
 
   const reload = useCallback(async () => {
@@ -50,6 +62,13 @@ export function useSaga(initialPath: string = DEFAULT_SAGA): SagaState {
     try {
       const payload = await dump(sagaPath);
       setData(payload);
+      // Digest is a pure optimization — never block the reload on it.
+      fetchDigest(sagaPath).then(
+        (d) => setDigest(d),
+        () => {
+          /* endpoint unavailable (e.g. Tauri build w/o sidecar); ignore. */
+        },
+      );
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -106,6 +125,7 @@ export function useSaga(initialPath: string = DEFAULT_SAGA): SagaState {
   return {
     sagaPath,
     data,
+    digest,
     loading,
     error,
     tomeLens,
