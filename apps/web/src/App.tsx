@@ -14,6 +14,7 @@ import {
   Network,
   RefreshCw,
   Search,
+  Settings,
   Shield,
   Sparkles,
   Tags,
@@ -43,6 +44,7 @@ import { useSaga } from './state/useSaga.js';
 import type { ChatContextAttachment } from './state/useChat.js';
 import { AssistantPanel } from './views/AssistantPanel.js';
 import { BackupsDialog } from './views/BackupsDialog.js';
+import { SettingsDialog } from './views/SettingsDialog.js';
 import { ConstellationView } from './views/ConstellationView.js';
 import { EntryEditor } from './views/EntryEditor.js';
 import { ExportDialog } from './views/ExportDialog.js';
@@ -107,6 +109,7 @@ export default function App() {
   const [importing, setImporting] = useState(false);
   const [searching, setSearching] = useState(false);
   const [showingBackups, setShowingBackups] = useState(false);
+  const [showingSettings, setShowingSettings] = useState(false);
   const [assistantOpen, setAssistantOpen] = useState(false);
   const [assistantSeed, setAssistantSeed] = useState<{
     agent?: string;
@@ -243,6 +246,12 @@ export default function App() {
               icon={Bookmark}
               label="Backups"
               onClick={() => setShowingBackups(true)}
+            />
+            <ShelfAction
+              icon={Settings}
+              label="Settings"
+              onClick={() => setShowingSettings(true)}
+              title="AI providers & keys"
             />
             <ShelfAction
               icon={Bot}
@@ -605,6 +614,10 @@ export default function App() {
             setShowingBackups(false);
           }}
         />
+      )}
+
+      {showingSettings && (
+        <SettingsDialog onClose={() => setShowingSettings(false)} />
       )}
       </div>
     </div>

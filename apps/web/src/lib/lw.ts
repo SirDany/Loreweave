@@ -269,6 +269,60 @@ export async function fetchDigest(
   return (await res.json()) as CanonDigestPayload;
 }
 
+// ---------- config (AI providers + keys) ----------
+
+export interface MaskedLoreweaveConfig {
+  chat: {
+    provider?: 'anthropic' | 'openai' | 'ollama';
+    model?: string;
+    anthropicApiKey: boolean;
+    openaiApiKey: boolean;
+    ollamaHost?: string;
+  };
+  embeddings: {
+    provider?: 'ollama' | 'openai-compatible';
+    model?: string;
+    endpoint?: string;
+    apiKey: boolean;
+  };
+  envOverrides: string[];
+  path: string;
+}
+
+export type ConfigPatch = {
+  chat?: Partial<{
+    provider: 'anthropic' | 'openai' | 'ollama' | null;
+    model: string | null;
+    anthropicApiKey: string | null;
+    openaiApiKey: string | null;
+    ollamaHost: string | null;
+  }>;
+  embeddings?: Partial<{
+    provider: 'ollama' | 'openai-compatible' | null;
+    model: string | null;
+    endpoint: string | null;
+    apiKey: string | null;
+  }>;
+};
+
+export async function fetchConfig(): Promise<MaskedLoreweaveConfig> {
+  const res = await fetch('/lw/config');
+  if (!res.ok) throw new Error(`/lw/config ${res.status}: ${await res.text()}`);
+  return (await res.json()) as MaskedLoreweaveConfig;
+}
+
+export async function saveConfigPatch(
+  patch: ConfigPatch,
+): Promise<MaskedLoreweaveConfig> {
+  const res = await fetch('/lw/config', {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(patch),
+  });
+  if (!res.ok) throw new Error(`/lw/config ${res.status}: ${await res.text()}`);
+  return (await res.json()) as MaskedLoreweaveConfig;
+}
+
 export function threadOf(
   saga: string,
   threadId: string,

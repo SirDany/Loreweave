@@ -1,5 +1,13 @@
 /**
- * Pick an LLM provider + model from env vars:
+ * Pick an LLM provider + model.
+ *
+ * Settings come from two sources, in order of precedence:
+ *   1. Environment variables (for CI / power users)
+ *   2. The user config file at `~/.loreweave/config.json`
+ *      (managed from the web UI's Settings dialog; applied to
+ *      `process.env` at sidecar startup by `applyConfigToEnv()`).
+ *
+ * Recognised env vars:
  *   LW_AI_PROVIDER=anthropic|openai|ollama  (optional, auto-detected)
  *   LW_AI_MODEL=<model-id>                  (optional; sane defaults per provider)
  *   ANTHROPIC_API_KEY / OPENAI_API_KEY      (API-key providers)

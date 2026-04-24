@@ -32,6 +32,12 @@ import {
   renderDigestForPrompt,
 } from './digest-cache.js';
 import {
+  applyConfigToEnv,
+  loadConfig,
+  maskConfig,
+  patchConfig,
+} from './config.js';
+import {
   buildIndex,
   loadIndex,
   providerFromEnv,
@@ -121,6 +127,11 @@ export function registerSidecar(
   opts: SidecarOptions,
 ): SidecarHandle {
   const { repoRoot, cliBin } = opts;
+
+  // Merge user-level config (~/.loreweave/config.json) into process.env so
+  // model.ts / embeddings.ts pick it up transparently. Env vars already set
+  // by the caller win, per applyConfigToEnv's "env > config > defaults" rule.
+  void applyConfigToEnv();
 
   // --- concurrency gate for CLI sub-processes -------------------------------
   let inflight = 0;
@@ -488,6 +499,40 @@ export function registerSidecar(
       res.end(JSON.stringify({ hits }));
     } catch (e) {
       res.statusCode = 500;
+      res.end(String(e));
+    }
+  });
+
+  // --- /lw/config (AI providers + keys) ------------------------------------
+  host.use('/lw/config', async (req, res) => {
+    try {
+      if (req.method === 'GET') {
+        const cfg = await loadConfig();
+        res.statusCode = 200;
+        res.setHeader('content-type', 'application/json');
+        res.setHeader('cache-control', 'no-store');
+        res.end(JSON.stringify(maskConfig(cfg)));
+        return;
+      }
+      if (req.method === 'PUT' || req.method === 'PATCH') {
+        const body = await readBody(req, res);
+        if (body == null) return;
+        const patch = JSON.parse(body || '{}') as Parameters<
+          typeof patchConfig
+        >[0];
+        const updated = await patchConfig(patch ?? {});
+        // Re-apply to process.env immediately so the next chat turn sees it.
+        await applyConfigToEnv();
+        res.statusCode = 200;
+        res.setHeader('content-type', 'application/json');
+        res.setHeader('cache-control', 'no-store');
+        res.end(JSON.stringify(maskConfig(updated)));
+        return;
+      }
+      res.statusCode = 405;
+      res.end('method not allowed');
+    } catch (e) {
+      res.statusCode = 400;
       res.end(String(e));
     }
   });
