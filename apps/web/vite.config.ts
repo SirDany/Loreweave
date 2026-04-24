@@ -1,5 +1,6 @@
 import react from '@vitejs/plugin-react';
 import { spawn } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { promises as fs, watch as fsWatch, type FSWatcher } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -170,6 +171,81 @@ function lwSidecar(): Plugin {
         }
       });
 
+      // --- apply (hash-aware writer for assistant proposals) ---------------
+      server.middlewares.use('/lw/apply', async (req, res) => {
+        if (req.method !== 'POST') {
+          res.statusCode = 405;
+          res.end('method not allowed');
+          return;
+        }
+        const body = await readBody(req, res);
+        if (body == null) return;
+        try {
+          const {
+            sagaRoot,
+            relPath,
+            content,
+            originalHash,
+          } = JSON.parse(body || '{}');
+          if (
+            typeof sagaRoot !== 'string' ||
+            typeof relPath !== 'string' ||
+            typeof content !== 'string'
+          ) {
+            throw new Error('sagaRoot, relPath, content required');
+          }
+          const rootAbs = safeRoot(sagaRoot);
+          const safe = safeJoin(rootAbs, relPath);
+          // Hash-based stale-detection: if the proposal was generated against
+          // an original whose contents we know, re-read disk and bail if the
+          // writer (or another tool) has since modified the file.
+          if (typeof originalHash === 'string' && originalHash.length > 0) {
+            let current = '';
+            try {
+              current = await fs.readFile(safe, 'utf8');
+            } catch {
+              current = '';
+            }
+            const currentHash = createHash('sha256')
+              .update(current, 'utf8')
+              .digest('hex')
+              .slice(0, 16);
+            if (currentHash !== originalHash) {
+              res.statusCode = 409;
+              res.setHeader('content-type', 'application/json');
+              res.setHeader('cache-control', 'no-store');
+              res.end(
+                JSON.stringify({
+                  error: 'stale',
+                  message:
+                    'File changed on disk since the proposal was generated. Refresh and ask the agent to re-propose.',
+                  currentHash,
+                  expectedHash: originalHash,
+                }),
+              );
+              return;
+            }
+          }
+          await fs.mkdir(path.dirname(safe), { recursive: true });
+          await fs.writeFile(safe, content, 'utf8');
+          res.statusCode = 200;
+          res.setHeader('content-type', 'application/json');
+          res.setHeader('cache-control', 'no-store');
+          res.end(
+            JSON.stringify({
+              ok: true,
+              newHash: createHash('sha256')
+                .update(content, 'utf8')
+                .digest('hex')
+                .slice(0, 16),
+            }),
+          );
+        } catch (e) {
+          res.statusCode = 400;
+          res.end(String(e));
+        }
+      });
+
       // --- SSE watcher -----------------------------------------------------
       server.middlewares.use('/lw/events', (req, res) => {
         if (req.method !== 'GET') {
@@ -256,6 +332,12 @@ function lwSidecar(): Plugin {
       });
 
       // --- Chat (LLM proxy + tool dispatch) --------------------------------
+      // Simple sliding-window rate limit: refuse if too many chat starts in
+      // the last minute. Tool loops already cap via streamText maxSteps.
+      const CHAT_WINDOW_MS = 60_000;
+      const CHAT_MAX_PER_WINDOW = 20;
+      const chatStartTimes: number[] = [];
+
       server.middlewares.use('/lw/chat', async (req, res) => {
         if (req.method !== 'POST') {
           res.statusCode = 405;
@@ -280,6 +362,21 @@ function lwSidecar(): Plugin {
           return;
         }
 
+        // Rate-limit bookkeeping.
+        const now = Date.now();
+        while (chatStartTimes.length && now - chatStartTimes[0]! > CHAT_WINDOW_MS) {
+          chatStartTimes.shift();
+        }
+        if (chatStartTimes.length >= CHAT_MAX_PER_WINDOW) {
+          res.statusCode = 429;
+          res.setHeader('cache-control', 'no-store');
+          res.end(
+            `Rate limit: max ${CHAT_MAX_PER_WINDOW} chat turns per minute. Wait a moment and retry.`,
+          );
+          return;
+        }
+        chatStartTimes.push(now);
+
         res.statusCode = 200;
         res.setHeader('content-type', 'text/event-stream');
         res.setHeader('cache-control', 'no-store');
@@ -292,6 +389,16 @@ function lwSidecar(): Plugin {
             /* client disconnected */
           }
         };
+
+        // Abort propagates to tool executions + the LLM stream when the
+        // client disconnects (writer hits Stop).
+        const abort = new AbortController();
+        req.on('close', () => abort.abort());
+
+        // Aggregate transcript for the session log.
+        const logEvents: Array<Record<string, unknown>> = [];
+        const pushLog = (evt: Record<string, unknown>) =>
+          logEvents.push({ ts: Date.now(), ...evt });
 
         try {
           const { agents, preamble } = await getAgents();
@@ -307,9 +414,6 @@ function lwSidecar(): Plugin {
             safeJoin,
           };
 
-          // Build AI SDK tool definitions. Each `execute` dispatches to our
-          // runTool() and emits tool_call / tool_result SSE events for the
-          // UI's tool-call trace.
           const { tool } = await import('ai');
           const tools: Record<string, unknown> = {};
           for (const [name, desc] of Object.entries(toolDescriptors)) {
@@ -318,8 +422,21 @@ function lwSidecar(): Plugin {
               parameters: desc.schema,
               execute: async (rawArgs: unknown) => {
                 send('tool_call', { name, args: rawArgs });
-                const result = await runTool(name as ToolName, rawArgs, ctx);
+                pushLog({ type: 'tool_call', name, args: rawArgs });
+                const result = await runTool(
+                  name as ToolName,
+                  rawArgs,
+                  ctx,
+                  { signal: abort.signal },
+                );
                 send('tool_result', { name, result });
+                pushLog({
+                  type: 'tool_result',
+                  name,
+                  ok: result.ok,
+                  // Only log small snippets so the jsonl stays tailable.
+                  error: result.error?.slice(0, 400),
+                });
                 return result;
               },
             });
@@ -327,12 +444,20 @@ function lwSidecar(): Plugin {
 
           let system = agent.systemPrompt;
           if (preamble) system = `${preamble}\n\n---\n\n${system}`;
-          system += `\n\n---\n\n## Runtime context\n\nYou are operating inside the Loreweave web app. The writer's current Saga root is \`${payload.sagaRoot}\`. Always pass that as \`sagaRoot\` when calling tools. Mutating tools (\`propose_*\`) never write to disk — they produce a pending-action card the writer must approve.`;
+          system += `\n\n---\n\n## Runtime context\n\nYou are operating inside the Loreweave web app. The writer's current Saga root is \`${payload.sagaRoot}\`. Always pass that as \`sagaRoot\` when calling tools. Mutating tools (\`propose_*\`) never write to disk — they produce a pending-action card the writer must approve. Prefer \`propose_patch\` over \`propose_edit\` for localized changes.`;
           if (payload.context?.selection) {
-            system += `\n\nThe writer attached the following selection as context:\n\n\`\`\`\n${payload.context.selection}\n\`\`\``;
+            system += `\n\nThe writer attached the following selection as context:\n\n\`\`\`\n${payload.context.selection.replace(/```/g, '``\u200b`')}\n\`\`\``;
             if (payload.context.path) {
               system += `\n\nSelection source: \`${payload.context.path}\``;
             }
+          }
+          if (
+            payload.context?.likelyRefs &&
+            payload.context.likelyRefs.length > 0
+          ) {
+            system += `\n\n### Likely-relevant canon refs\n\nThe writer's current chapter mentions: ${payload.context.likelyRefs
+              .map((r) => `\`${r}\``)
+              .join(', ')}. Consider calling \`lw_weave\` on any you need before drafting.`;
           }
 
           const { streamText } = await import('ai');
@@ -342,21 +467,57 @@ function lwSidecar(): Plugin {
             messages: payload.messages,
             tools: tools as Parameters<typeof streamText>[0]['tools'],
             maxSteps: 8,
+            abortSignal: abort.signal,
           });
 
+          pushLog({ type: 'user', agent: payload.agent, messages: payload.messages.length });
+
+          let assistantText = '';
           for await (const part of result.fullStream) {
             if (part.type === 'text-delta') {
               send('token', part.textDelta);
+              assistantText += part.textDelta;
             } else if (part.type === 'error') {
               send('error', String(part.error));
+              pushLog({ type: 'error', message: String(part.error) });
             }
-            // tool_call / tool_result already emitted by execute().
+          }
+          // Usage is sometimes attached to the final stream event. We send
+          // it to the client for the budget HUD when available.
+          try {
+            const usage = await result.usage;
+            if (usage) send('usage', usage);
+            pushLog({ type: 'assistant', text: assistantText.slice(0, 2000), usage });
+          } catch {
+            pushLog({ type: 'assistant', text: assistantText.slice(0, 2000) });
           }
           send('done', {});
           res.end();
         } catch (e) {
-          send('error', (e as Error).message ?? String(e));
+          const msg = (e as Error).message ?? String(e);
+          send('error', msg);
+          pushLog({ type: 'error', message: msg });
           res.end();
+        } finally {
+          // Best-effort session log — never fail the request on IO errors.
+          try {
+            const logDir = path.join(
+              safeRoot(payload.sagaRoot),
+              '.loreweave',
+            );
+            await fs.mkdir(logDir, { recursive: true });
+            const logFile = path.join(logDir, 'assistant-log.jsonl');
+            const line =
+              JSON.stringify({
+                ts: Date.now(),
+                agent: payload.agent,
+                sagaRoot: payload.sagaRoot,
+                events: logEvents,
+              }) + '\n';
+            await fs.appendFile(logFile, line, 'utf8');
+          } catch {
+            /* ignore log failures */
+          }
         }
       });
 
@@ -442,14 +603,17 @@ interface ChatRequest {
     selection?: string;
     path?: string;
     lines?: [number, number];
+    /** `type/id` refs the client knows are relevant (from the current chapter/entry). */
+    likelyRefs?: string[];
   };
 }
 
 /**
  * Pick an LLM provider + model from env vars:
- *   LW_AI_PROVIDER=anthropic|openai  (optional, auto-detected from API keys)
- *   LW_AI_MODEL=<model-id>           (optional; sane defaults per provider)
- *   ANTHROPIC_API_KEY / OPENAI_API_KEY
+ *   LW_AI_PROVIDER=anthropic|openai|ollama  (optional, auto-detected)
+ *   LW_AI_MODEL=<model-id>                  (optional; sane defaults per provider)
+ *   ANTHROPIC_API_KEY / OPENAI_API_KEY      (API-key providers)
+ *   OLLAMA_HOST=http://localhost:11434      (local)
  */
 async function resolveModel() {
   const explicit = process.env.LW_AI_PROVIDER?.toLowerCase();
@@ -459,11 +623,13 @@ async function resolveModel() {
       ? 'anthropic'
       : process.env.OPENAI_API_KEY
         ? 'openai'
-        : undefined);
+        : process.env.OLLAMA_HOST
+          ? 'ollama'
+          : undefined);
   if (!provider) {
     throw new Error(
-      'No LLM provider configured. Set ANTHROPIC_API_KEY or OPENAI_API_KEY ' +
-        '(and optionally LW_AI_PROVIDER / LW_AI_MODEL) in the dev server env.',
+      'No LLM provider configured. Set ANTHROPIC_API_KEY, OPENAI_API_KEY, ' +
+        'or OLLAMA_HOST (and optionally LW_AI_PROVIDER / LW_AI_MODEL) in the dev server env.',
     );
   }
   if (provider === 'anthropic') {
@@ -473,6 +639,31 @@ async function resolveModel() {
   if (provider === 'openai') {
     const { openai } = await import('@ai-sdk/openai');
     return openai(process.env.LW_AI_MODEL ?? 'gpt-4o-mini');
+  }
+  if (provider === 'ollama') {
+    // `ollama-ai-provider` is peer-compatible with the Vercel AI SDK.
+    // It's an optional runtime dep; import lazily so writers without
+    // Ollama don't need the package installed.
+    try {
+      const mod = (await import(
+        /* @vite-ignore */ 'ollama-ai-provider'
+      )) as unknown as {
+        createOllama: (opts: { baseURL: string }) => (model: string) => unknown;
+      };
+      const baseURL =
+        (process.env.OLLAMA_HOST ?? 'http://127.0.0.1:11434').replace(
+          /\/$/,
+          '',
+        ) + '/api';
+      const ollama = mod.createOllama({ baseURL });
+      return ollama(process.env.LW_AI_MODEL ?? 'llama3.1');
+    } catch (e) {
+      throw new Error(
+        'Ollama requested but `ollama-ai-provider` is not installed. ' +
+          'Run `pnpm --filter @loreweave/web add ollama-ai-provider` and retry. ' +
+          `(inner: ${(e as Error).message})`,
+      );
+    }
   }
   throw new Error(`Unknown LW_AI_PROVIDER: ${provider}`);
 }

@@ -1,10 +1,33 @@
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
+import {
+  Bold,
+  Code,
+  Code2,
+  Heading,
+  Italic,
+  Link as LinkIcon,
+  List,
+  ListOrdered,
+  Minus,
+  Quote,
+  Strikethrough,
+} from "lucide-react";
 import { EditorState, Compartment } from "@codemirror/state";
 import { EditorView, keymap, lineNumbers } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { markdown } from "@codemirror/lang-markdown";
 import { syntaxHighlighting, defaultHighlightStyle } from "@codemirror/language";
 import { loreweaveExtensions, type RefCatalog } from "./ReferenceExtension.js";
+import {
+  cycleHeading,
+  insertCodeBlock,
+  insertHorizontalRule,
+  insertLink,
+  markdownFormattingKeymap,
+  toggleInlineWrap,
+  toggleLinePrefix,
+  toggleOrderedList,
+} from "./markdownCommands.js";
 
 export interface EditorSelectionEvent {
   /** Currently selected text (main selection range). */
@@ -18,6 +41,8 @@ interface Props {
   catalog: RefCatalog;
   readOnly?: boolean;
   onChange?: (v: string) => void;
+  /** Hide the markdown formatting toolbar above the editor. */
+  hideToolbar?: boolean;
   /**
    * Called when the writer picks an agent action from the selection toolbar.
    * `action` is one of the agent ids (muse / scribe / warden / polisher).
@@ -62,7 +87,7 @@ const darkTheme = EditorView.theme(
   { dark: true },
 );
 
-export function Editor({ value, catalog, readOnly, onChange, onAskAssistant }: Props) {
+export function Editor({ value, catalog, readOnly, onChange, onAskAssistant, hideToolbar }: Props) {
   const host = useRef<HTMLDivElement>(null);
   const view = useRef<EditorView | null>(null);
   const lwCompartment = useRef(new Compartment());
@@ -77,7 +102,13 @@ export function Editor({ value, catalog, readOnly, onChange, onAskAssistant }: P
       extensions: [
         lineNumbers(),
         history(),
-        keymap.of([...defaultKeymap, ...historyKeymap]),
+        keymap.of([
+          // Markdown formatting shortcuts take precedence so Ctrl+B / Ctrl+I
+          // don't fall through to the default keymap's selection commands.
+          ...markdownFormattingKeymap(),
+          ...defaultKeymap,
+          ...historyKeymap,
+        ]),
         markdown(),
         syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
         darkTheme,
@@ -149,30 +180,152 @@ export function Editor({ value, catalog, readOnly, onChange, onAskAssistant }: P
   }, [value]);
 
   return (
-    <div ref={host} className="relative h-full overflow-auto">
-      {anchor && onAskAssistant && (
-        <div
-          className="absolute z-20 flex items-center gap-1 rounded-md border border-border bg-card px-1.5 py-1 shadow-lg"
-          style={{ top: Math.max(4, anchor.top), left: anchor.left }}
-          onMouseDown={(e) => e.preventDefault()}
-        >
-          <span className="px-1 text-[10px] uppercase tracking-wider text-muted-foreground">
-            Ask
-          </span>
-          {TOOLBAR_ACTIONS.map((a) => (
-            <button
-              key={a.id}
-              title={a.title}
-              className="rounded px-2 py-0.5 text-xs text-foreground/90 hover:bg-accent hover:text-accent-foreground"
-              onClick={() =>
-                onAskAssistant(a.id, { text: anchor.text, lines: anchor.lines })
-              }
-            >
-              {a.label}
-            </button>
-          ))}
-        </div>
+    <div className="flex h-full flex-col overflow-hidden">
+      {!readOnly && !hideToolbar && (
+        <MarkdownToolbar viewRef={view} />
       )}
+      <div ref={host} className="relative flex-1 overflow-auto">
+        {anchor && onAskAssistant && (
+          <div
+            className="absolute z-20 flex items-center gap-1 rounded-md border border-border bg-card px-1.5 py-1 shadow-lg"
+            style={{ top: Math.max(4, anchor.top), left: anchor.left }}
+            onMouseDown={(e) => e.preventDefault()}
+          >
+            <span className="px-1 text-[10px] uppercase tracking-wider text-muted-foreground">
+              Ask
+            </span>
+            {TOOLBAR_ACTIONS.map((a) => (
+              <button
+                key={a.id}
+                title={a.title}
+                className="rounded px-2 py-0.5 text-xs text-foreground/90 hover:bg-accent hover:text-accent-foreground"
+                onClick={() =>
+                  onAskAssistant(a.id, { text: anchor.text, lines: anchor.lines })
+                }
+              >
+                {a.label}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---------- markdown formatting toolbar -----------------------------------
+
+interface ToolbarButton {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  title: string;
+  run: (v: EditorView) => void;
+}
+
+const TOOLBAR_BUTTONS: ToolbarButton[] = [
+  {
+    icon: Heading,
+    label: 'H',
+    title: 'Heading (cycle H1/H2/H3 — Ctrl+Shift+H)',
+    run: (v) => cycleHeading(v),
+  },
+  {
+    icon: Bold,
+    label: 'B',
+    title: 'Bold (Ctrl+B)',
+    run: (v) => toggleInlineWrap(v, '**'),
+  },
+  {
+    icon: Italic,
+    label: 'I',
+    title: 'Italic (Ctrl+I)',
+    run: (v) => toggleInlineWrap(v, '_'),
+  },
+  {
+    icon: Strikethrough,
+    label: 'S',
+    title: 'Strikethrough (Ctrl+Shift+X)',
+    run: (v) => toggleInlineWrap(v, '~~'),
+  },
+  {
+    icon: Code,
+    label: 'Code',
+    title: 'Inline code (Ctrl+E)',
+    run: (v) => toggleInlineWrap(v, '`'),
+  },
+  {
+    icon: LinkIcon,
+    label: 'Link',
+    title: 'Link (Ctrl+L)',
+    run: (v) => insertLink(v),
+  },
+  {
+    icon: List,
+    label: 'UL',
+    title: 'Bullet list (Ctrl+Shift+8)',
+    run: (v) => toggleLinePrefix(v, '- ', [/^\*\s/, /^\d+\.\s/]),
+  },
+  {
+    icon: ListOrdered,
+    label: 'OL',
+    title: 'Numbered list (Ctrl+Shift+7)',
+    run: (v) => toggleOrderedList(v),
+  },
+  {
+    icon: Quote,
+    label: 'Quote',
+    title: 'Blockquote (Ctrl+Shift+.)',
+    run: (v) => toggleLinePrefix(v, '> '),
+  },
+  {
+    icon: Code2,
+    label: 'Block',
+    title: 'Code block',
+    run: (v) => insertCodeBlock(v),
+  },
+  {
+    icon: Minus,
+    label: 'HR',
+    title: 'Horizontal rule',
+    run: (v) => insertHorizontalRule(v),
+  },
+];
+
+function MarkdownToolbar({ viewRef }: { viewRef: React.MutableRefObject<EditorView | null> }) {
+  return (
+    <div
+      className="flex shrink-0 flex-wrap items-center gap-0.5 border-b border-border bg-card/60 px-2 py-1"
+      onMouseDown={(e) => e.preventDefault()}
+    >
+      {TOOLBAR_BUTTONS.map((b, i) => {
+        // Insert a subtle divider after the heading-cycle button and after
+        // the inline-formatting cluster so the toolbar reads as three groups:
+        // structure • inline • blocks.
+        const Icon = b.icon;
+        const divider = i === 1 || i === 5 || i === 8;
+        return (
+          <Fragment key={b.label + i}>
+            {divider && (
+              <span
+                aria-hidden
+                className="mx-1 inline-block h-4 w-px bg-border"
+              />
+            )}
+            <button
+              type="button"
+              title={b.title}
+              onClick={() => {
+                const v = viewRef.current;
+                if (v) b.run(v);
+              }}
+              className="inline-flex h-7 items-center gap-1 rounded px-2 text-[11px] font-medium text-foreground/85 hover:bg-accent hover:text-accent-foreground"
+            >
+              <Icon className="h-3.5 w-3.5" />
+              <span className="hidden md:inline">{b.label}</span>
+            </button>
+          </Fragment>
+        );
+      })}
     </div>
   );
 }

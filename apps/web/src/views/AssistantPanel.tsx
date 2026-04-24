@@ -1,11 +1,15 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ArrowRight,
   Bot,
   Check,
   ChevronDown,
   ChevronRight,
+  Gauge,
   Loader2,
+  RotateCcw,
   Send,
+  Settings,
   Sparkles,
   StopCircle,
   Trash2,
@@ -18,6 +22,7 @@ import { Separator } from '../components/ui/separator.js';
 import { cn } from '../lib/utils.js';
 import {
   useChat,
+  type ApprovalPolicy,
   type ChatContextAttachment,
   type ChatMessage,
   type ChatToolCall,
@@ -37,6 +42,20 @@ interface Props {
   onApplied?: () => void;
 }
 
+const POLICY_KEY = 'lw.chat.approvalPolicy';
+
+function loadPolicy(): ApprovalPolicy {
+  try {
+    const v = localStorage.getItem(POLICY_KEY) as ApprovalPolicy | null;
+    if (v === 'auto-reads' || v === 'writes-approval' || v === 'approve-all') {
+      return v;
+    }
+  } catch {
+    /* ignore */
+  }
+  return 'writes-approval';
+}
+
 export function AssistantPanel({
   sagaRoot,
   onClose,
@@ -45,11 +64,21 @@ export function AssistantPanel({
   initialPrompt,
   onApplied,
 }: Props) {
-  const chat = useChat({ sagaRoot });
+  const [policy, setPolicy] = useState<ApprovalPolicy>(loadPolicy);
+  useEffect(() => {
+    try {
+      localStorage.setItem(POLICY_KEY, policy);
+    } catch {
+      /* ignore */
+    }
+  }, [policy]);
+
+  const chat = useChat({ sagaRoot, approvalPolicy: policy });
   const [draft, setDraft] = useState(initialPrompt ?? '');
   const [attachment, setAttachment] = useState<ChatContextAttachment | undefined>(
     initialContext,
   );
+  const [showingSettings, setShowingSettings] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -75,9 +104,13 @@ export function AssistantPanel({
   };
 
   const selectedAgent = chat.agents.find((a) => a.id === chat.agentId);
+  const pendingVisible = chat.pending.filter(
+    (p) => p.status === 'pending' || p.status === 'stale',
+  );
+  const tokenTotal = chat.usageTotal.totalTokens ?? 0;
 
   return (
-    <aside className="w-[380px] shrink-0 flex flex-col border-l border-border bg-card/60 h-full overflow-hidden">
+    <aside className="w-[420px] shrink-0 flex flex-col border-l border-border bg-card/60 h-full overflow-hidden">
       <header className="px-4 py-3 border-b border-border flex items-center gap-2">
         <Bot className="h-4 w-4 text-primary" />
         <span className="label-rune flex-1">Assistant</span>
@@ -85,8 +118,17 @@ export function AssistantPanel({
           variant="ghost"
           size="sm"
           className="h-7 px-2 text-muted-foreground hover:text-foreground"
+          onClick={() => setShowingSettings((v) => !v)}
+          title="Settings"
+        >
+          <Settings className="h-3.5 w-3.5" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 px-2 text-muted-foreground hover:text-foreground"
           onClick={chat.reset}
-          title="Start a new chat"
+          title="Start a new chat with this agent"
         >
           <Trash2 className="h-3.5 w-3.5" />
         </Button>
@@ -111,7 +153,18 @@ export function AssistantPanel({
           <div className="text-xs text-muted-foreground">Loading agents…</div>
         ) : (
           <>
-            <label className="label-rune block">Agent</label>
+            <div className="flex items-center gap-2">
+              <label className="label-rune flex-1">Agent</label>
+              {tokenTotal > 0 && (
+                <span
+                  title={`Prompt ${chat.usageTotal.promptTokens ?? 0} / completion ${chat.usageTotal.completionTokens ?? 0}`}
+                  className="inline-flex items-center gap-1 rounded border border-border bg-muted/40 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
+                >
+                  <Gauge className="h-3 w-3" />
+                  {formatTokens(tokenTotal)}
+                </span>
+              )}
+            </div>
             <select
               className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
               value={chat.agentId}
@@ -132,6 +185,14 @@ export function AssistantPanel({
         )}
       </div>
 
+      {showingSettings && (
+        <SettingsPanel
+          policy={policy}
+          onPolicyChange={setPolicy}
+          onClose={() => setShowingSettings(false)}
+        />
+      )}
+
       {/* Messages */}
       <div
         ref={scrollRef}
@@ -144,26 +205,35 @@ export function AssistantPanel({
             search the Lexicon, and propose edits you approve.
           </div>
         )}
-        {chat.messages.map((m) => (
-          <MessageBubble key={m.id} message={m} />
-        ))}
-
-        {chat.pending.filter((p) => p.status === 'pending').length > 0 && (
-          <Separator />
-        )}
-        {chat.pending
-          .filter((p) => p.status === 'pending')
-          .map((action) => (
-            <PendingActionCard
-              key={action.id}
-              action={action}
-              onApply={async () => {
-                await chat.applyPending(action.id);
-                onApplied?.();
-              }}
-              onDiscard={() => chat.discardPending(action.id)}
+        {chat.messages.map((m, idx) => {
+          const isLastAssistant =
+            m.role === 'assistant' && idx === chat.messages.length - 1;
+          return (
+            <MessageBubble
+              key={m.id}
+              message={m}
+              onHandoff={(to) => chat.setAgentId(to)}
+              onRetry={
+                isLastAssistant && chat.canRetry && !chat.streaming
+                  ? () => void chat.retry()
+                  : undefined
+              }
             />
-          ))}
+          );
+        })}
+
+        {pendingVisible.length > 0 && <Separator />}
+        {pendingVisible.map((action) => (
+          <PendingActionCard
+            key={action.id}
+            action={action}
+            onApply={async () => {
+              await chat.applyPending(action.id);
+              onApplied?.();
+            }}
+            onDiscard={() => chat.discardPending(action.id)}
+          />
+        ))}
 
         {chat.streamError && (
           <div className="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-xs text-destructive">
@@ -214,12 +284,7 @@ export function AssistantPanel({
         />
         <div className="flex items-center gap-2">
           {chat.streaming ? (
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5"
-              onClick={chat.cancel}
-            >
+            <Button variant="outline" size="sm" className="gap-1.5" onClick={chat.cancel}>
               <StopCircle className="h-3.5 w-3.5" />
               Stop
             </Button>
@@ -234,6 +299,18 @@ export function AssistantPanel({
               Send
             </Button>
           )}
+          {chat.canRetry && !chat.streaming && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-1.5 text-muted-foreground hover:text-foreground"
+              onClick={() => void chat.retry()}
+              title="Regenerate the last reply"
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+              Retry
+            </Button>
+          )}
           {chat.streaming && (
             <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <Loader2 className="h-3 w-3 animate-spin" />
@@ -246,28 +323,148 @@ export function AssistantPanel({
   );
 }
 
-function MessageBubble({ message }: { message: ChatMessage }) {
+function SettingsPanel({
+  policy,
+  onPolicyChange,
+  onClose,
+}: {
+  policy: ApprovalPolicy;
+  onPolicyChange: (p: ApprovalPolicy) => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className="border-b border-border bg-muted/20 px-4 py-3 space-y-2">
+      <div className="flex items-center gap-2">
+        <Settings className="h-3.5 w-3.5 text-primary/80" />
+        <span className="label-rune flex-1">Approval policy</span>
+        <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
+          <X className="h-3.5 w-3.5" />
+        </button>
+      </div>
+      <div className="space-y-1 text-xs">
+        <PolicyOption
+          id="auto-reads"
+          label="Auto-allow reads, approve writes"
+          hint="Default. Read tools run freely; propose_* always asks."
+          current={policy}
+          onPick={onPolicyChange}
+        />
+        <PolicyOption
+          id="writes-approval"
+          label="Approve writes (stricter confirm)"
+          hint="Same as default today; kept for future per-tool confirmation."
+          current={policy}
+          onPick={onPolicyChange}
+        />
+        <PolicyOption
+          id="approve-all"
+          label="Approve every tool call"
+          hint="Future: prompt before running any tool. Not yet enforced."
+          current={policy}
+          onPick={onPolicyChange}
+        />
+      </div>
+    </div>
+  );
+}
+
+function PolicyOption({
+  id,
+  label,
+  hint,
+  current,
+  onPick,
+}: {
+  id: ApprovalPolicy;
+  label: string;
+  hint: string;
+  current: ApprovalPolicy;
+  onPick: (p: ApprovalPolicy) => void;
+}) {
+  const active = id === current;
+  return (
+    <button
+      onClick={() => onPick(id)}
+      className={cn(
+        'w-full rounded-md border px-2 py-1.5 text-left transition-colors',
+        active
+          ? 'border-primary/60 bg-primary/10 text-foreground'
+          : 'border-border bg-background hover:bg-muted',
+      )}
+    >
+      <div className="flex items-center gap-2">
+        <span
+          className={cn(
+            'inline-block h-2 w-2 rounded-full',
+            active ? 'bg-primary' : 'bg-muted-foreground/50',
+          )}
+        />
+        <span className="text-xs font-medium">{label}</span>
+      </div>
+      <div className="mt-0.5 pl-4 text-[11px] text-muted-foreground">{hint}</div>
+    </button>
+  );
+}
+
+function MessageBubble({
+  message,
+  onHandoff,
+  onRetry,
+}: {
+  message: ChatMessage;
+  onHandoff: (agentId: string) => void;
+  onRetry?: () => void;
+}) {
   const isUser = message.role === 'user';
   return (
     <div
       className={cn(
-        'rounded-md px-3 py-2 text-sm whitespace-pre-wrap break-words',
+        'rounded-md px-3 py-2 text-sm',
         isUser
           ? 'bg-accent/50 border border-accent text-foreground ml-6'
           : 'bg-background border border-border text-foreground mr-6',
       )}
     >
-      <div className="label-rune mb-1">
-        {isUser ? 'You' : 'Assistant'}
+      <div className="flex items-center gap-2 mb-1">
+        <span className="label-rune flex-1">
+          {isUser ? 'You' : 'Assistant'}
+        </span>
+        {onRetry && (
+          <button
+            onClick={onRetry}
+            title="Regenerate"
+            className="text-muted-foreground hover:text-foreground"
+          >
+            <RotateCcw className="h-3 w-3" />
+          </button>
+        )}
       </div>
-      {message.content ||
-        (message.role === 'assistant' && (
-          <span className="text-muted-foreground italic">…</span>
-        ))}
+      {isUser ? (
+        <div className="whitespace-pre-wrap break-words">{message.content}</div>
+      ) : message.content ? (
+        <MarkdownContent text={message.content} />
+      ) : (
+        <span className="text-muted-foreground italic">…</span>
+      )}
       {message.toolCalls && message.toolCalls.length > 0 && (
         <div className="mt-2 space-y-1">
           {message.toolCalls.map((tc, i) => (
             <ToolCallChip key={i} call={tc} />
+          ))}
+        </div>
+      )}
+      {message.handoffs && message.handoffs.length > 0 && (
+        <div className="mt-2 space-y-1">
+          {message.handoffs.map((h, i) => (
+            <button
+              key={i}
+              onClick={() => onHandoff(h.to)}
+              className="flex w-full items-center gap-2 rounded-md border border-primary/50 bg-primary/10 px-2 py-1.5 text-left text-xs hover:bg-primary/20"
+            >
+              <ArrowRight className="h-3.5 w-3.5 text-primary" />
+              <span className="font-medium">Continue with {h.to}</span>
+              <span className="truncate text-muted-foreground">{h.instructions}</span>
+            </button>
           ))}
         </div>
       )}
@@ -338,16 +535,29 @@ function PendingActionCard({
   onApply: () => void | Promise<void>;
   onDiscard: () => void;
 }) {
+  const stale = action.status === 'stale';
   return (
-    <div className="rounded-md border-2 border-primary/60 bg-primary/5 p-3 space-y-2">
+    <div
+      className={cn(
+        'rounded-md border-2 p-3 space-y-2',
+        stale
+          ? 'border-amber-500/60 bg-amber-500/5'
+          : 'border-primary/60 bg-primary/5',
+      )}
+    >
       <div className="flex items-center gap-2">
         <Wrench className="h-3.5 w-3.5 text-primary" />
         <span className="label-rune flex-1">
-          {action.kind === 'new' ? 'Proposed new entry' : 'Proposed edit'}
+          {action.kind === 'new'
+            ? 'Proposed new entry'
+            : action.patch
+              ? 'Proposed patch'
+              : 'Proposed edit'}
         </span>
         {action.kind === 'new' && action.exists && (
           <Badge variant="warning">overwrites</Badge>
         )}
+        {stale && <Badge variant="warning">stale</Badge>}
       </div>
       <div className="font-mono text-[11px] text-foreground/80">
         {action.relPath}
@@ -355,6 +565,11 @@ function PendingActionCard({
       {action.rationale && (
         <div className="text-xs text-muted-foreground italic">
           {action.rationale}
+        </div>
+      )}
+      {action.error && (
+        <div className="rounded border border-destructive/50 bg-destructive/10 px-2 py-1 text-[11px] text-destructive">
+          {action.error}
         </div>
       )}
       <div className="max-h-60 overflow-auto rounded border border-border bg-background font-mono text-[10px] leading-relaxed">
@@ -380,20 +595,231 @@ function PendingActionCard({
         )}
       </div>
       <div className="flex gap-2">
-        <Button size="sm" className="gap-1.5" onClick={() => void onApply()}>
+        <Button
+          size="sm"
+          className="gap-1.5"
+          onClick={() => void onApply()}
+          disabled={stale}
+        >
           <Check className="h-3.5 w-3.5" />
           Apply
         </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          className="gap-1.5"
-          onClick={onDiscard}
-        >
+        <Button variant="outline" size="sm" className="gap-1.5" onClick={onDiscard}>
           <X className="h-3.5 w-3.5" />
           Discard
         </Button>
       </div>
     </div>
   );
+}
+
+// ---------- tiny safe markdown renderer -----------------------------------
+
+/**
+ * Renders the most common markdown constructs found in assistant replies:
+ * headings, bullets, ordered lists, fenced code, inline code, bold/italic,
+ * links, and `@type/id` echoes. Everything else falls through as plain
+ * text. Deliberately zero-dep — we avoid pulling `marked` or `remark`
+ * just for chat bubbles.
+ */
+function MarkdownContent({ text }: { text: string }) {
+  const blocks = useMemo(() => splitBlocks(text), [text]);
+  return (
+    <div className="space-y-2 leading-relaxed">
+      {blocks.map((b, i) => renderBlock(b, i))}
+    </div>
+  );
+}
+
+type Block =
+  | { kind: 'h'; level: number; text: string }
+  | { kind: 'code'; lang?: string; text: string }
+  | { kind: 'ul'; items: string[] }
+  | { kind: 'ol'; items: string[] }
+  | { kind: 'quote'; text: string }
+  | { kind: 'p'; text: string };
+
+function splitBlocks(src: string): Block[] {
+  const lines = src.replace(/\r\n/g, '\n').split('\n');
+  const out: Block[] = [];
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i]!;
+    if (/^```/.test(line)) {
+      const lang = line.slice(3).trim() || undefined;
+      const buf: string[] = [];
+      i++;
+      while (i < lines.length && !/^```/.test(lines[i]!)) {
+        buf.push(lines[i]!);
+        i++;
+      }
+      if (i < lines.length) i++; // consume closing fence
+      out.push({ kind: 'code', lang, text: buf.join('\n') });
+      continue;
+    }
+    const h = line.match(/^(#{1,6})\s+(.*)$/);
+    if (h) {
+      out.push({ kind: 'h', level: h[1]!.length, text: h[2]! });
+      i++;
+      continue;
+    }
+    if (/^[-*]\s+/.test(line)) {
+      const items: string[] = [];
+      while (i < lines.length && /^[-*]\s+/.test(lines[i]!)) {
+        items.push(lines[i]!.replace(/^[-*]\s+/, ''));
+        i++;
+      }
+      out.push({ kind: 'ul', items });
+      continue;
+    }
+    if (/^\d+\.\s+/.test(line)) {
+      const items: string[] = [];
+      while (i < lines.length && /^\d+\.\s+/.test(lines[i]!)) {
+        items.push(lines[i]!.replace(/^\d+\.\s+/, ''));
+        i++;
+      }
+      out.push({ kind: 'ol', items });
+      continue;
+    }
+    if (/^>\s?/.test(line)) {
+      const buf: string[] = [];
+      while (i < lines.length && /^>\s?/.test(lines[i]!)) {
+        buf.push(lines[i]!.replace(/^>\s?/, ''));
+        i++;
+      }
+      out.push({ kind: 'quote', text: buf.join('\n') });
+      continue;
+    }
+    if (line.trim() === '') {
+      i++;
+      continue;
+    }
+    // Gather a paragraph.
+    const buf: string[] = [];
+    while (i < lines.length && lines[i]!.trim() !== '' && !/^(#{1,6}\s|```|[-*]\s|\d+\.\s|>)/.test(lines[i]!)) {
+      buf.push(lines[i]!);
+      i++;
+    }
+    out.push({ kind: 'p', text: buf.join(' ') });
+  }
+  return out;
+}
+
+function renderBlock(b: Block, key: number): JSX.Element {
+  switch (b.kind) {
+    case 'h':
+      return (
+        <div
+          key={key}
+          className={cn(
+            'font-serif font-semibold',
+            b.level === 1 ? 'text-lg' : b.level === 2 ? 'text-base' : 'text-sm',
+          )}
+        >
+          {renderInline(b.text)}
+        </div>
+      );
+    case 'code':
+      return (
+        <pre
+          key={key}
+          className="max-h-60 overflow-auto rounded-md border border-border bg-background px-2 py-1 font-mono text-[11px] leading-snug"
+        >
+          {b.text}
+        </pre>
+      );
+    case 'ul':
+      return (
+        <ul key={key} className="list-disc space-y-0.5 pl-5 text-sm">
+          {b.items.map((it, i) => (
+            <li key={i}>{renderInline(it)}</li>
+          ))}
+        </ul>
+      );
+    case 'ol':
+      return (
+        <ol key={key} className="list-decimal space-y-0.5 pl-5 text-sm">
+          {b.items.map((it, i) => (
+            <li key={i}>{renderInline(it)}</li>
+          ))}
+        </ol>
+      );
+    case 'quote':
+      return (
+        <blockquote
+          key={key}
+          className="border-l-2 border-primary/60 pl-3 text-sm italic text-foreground/85"
+        >
+          {renderInline(b.text)}
+        </blockquote>
+      );
+    case 'p':
+      return (
+        <p key={key} className="text-sm">
+          {renderInline(b.text)}
+        </p>
+      );
+  }
+}
+
+function renderInline(text: string): (JSX.Element | string)[] {
+  const tokens: (JSX.Element | string)[] = [];
+  // Combined regex: inline code | bold | italic | link | @type/id echo
+  const re = /`([^`]+)`|\*\*([^*]+)\*\*|\b_([^_]+)_\b|\[([^\]]+)\]\(([^)]+)\)|@([a-z]+)\/([a-zA-Z0-9._-]+)/g;
+  let last = 0;
+  let m: RegExpExecArray | null;
+  let i = 0;
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > last) tokens.push(text.slice(last, m.index));
+    if (m[1] != null) {
+      tokens.push(
+        <code key={i++} className="rounded bg-muted/60 px-1 font-mono text-[11px]">
+          {m[1]}
+        </code>,
+      );
+    } else if (m[2] != null) {
+      tokens.push(
+        <strong key={i++} className="font-semibold">
+          {m[2]}
+        </strong>,
+      );
+    } else if (m[3] != null) {
+      tokens.push(
+        <em key={i++} className="italic">
+          {m[3]}
+        </em>,
+      );
+    } else if (m[4] != null && m[5] != null) {
+      const href = m[5];
+      tokens.push(
+        <a
+          key={i++}
+          href={href}
+          target="_blank"
+          rel="noreferrer"
+          className="text-primary underline-offset-2 hover:underline"
+        >
+          {m[4]}
+        </a>,
+      );
+    } else if (m[6] != null && m[7] != null) {
+      tokens.push(
+        <span
+          key={i++}
+          className="rounded bg-primary/15 px-1 font-mono text-[11px] text-primary"
+        >
+          @{m[6]}/{m[7]}
+        </span>,
+      );
+    }
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) tokens.push(text.slice(last));
+  return tokens;
+}
+
+function formatTokens(n: number): string {
+  if (n < 1000) return `${n} tok`;
+  if (n < 10_000) return `${(n / 1000).toFixed(1)}k tok`;
+  return `${Math.round(n / 1000)}k tok`;
 }

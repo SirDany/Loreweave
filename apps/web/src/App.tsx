@@ -352,6 +352,17 @@ export default function App() {
             catalog={catalog}
             sagaPath={saga.sagaPath}
             onSaved={() => void saga.reload()}
+            onAsk={() => {
+              setAssistantSeed({
+                agent: 'muse',
+                prompt: `Tell me about \`@${currentEntry.type}/${currentEntry.id}\`. Read the Codex and list what's established vs. open questions.`,
+                context: {
+                  path: currentEntry.relPath,
+                  likelyRefs: [`${currentEntry.type}/${currentEntry.id}`],
+                },
+              });
+              setAssistantOpen(true);
+            }}
             key={selection?.key}
           />
         )}
@@ -378,6 +389,11 @@ export default function App() {
             sagaPath={saga.sagaPath}
             onSaved={() => void saga.reload()}
             onAskAssistant={(action, sel, relPath) => {
+              const likelyRefs = Array.from(
+                new Set(
+                  currentChapter.chapter.refs.map((r) => `${r.type}/${r.id}`),
+                ),
+              );
               setAssistantSeed({
                 agent: action,
                 prompt: assistantPromptFor(action),
@@ -385,6 +401,24 @@ export default function App() {
                   selection: sel.text,
                   path: relPath,
                   lines: sel.lines,
+                  likelyRefs,
+                },
+              });
+              setAssistantOpen(true);
+            }}
+            onAsk={() => {
+              const likelyRefs = Array.from(
+                new Set(
+                  currentChapter.chapter.refs.map((r) => `${r.type}/${r.id}`),
+                ),
+              );
+              setAssistantSeed({
+                agent: 'muse',
+                prompt:
+                  'Discuss this chapter with me — structure, pacing, what works, what doesn\'t.',
+                context: {
+                  path: currentChapter.chapter.relPath,
+                  likelyRefs,
                 },
               });
               setAssistantOpen(true);
@@ -808,11 +842,13 @@ function EntryView({
   catalog,
   sagaPath,
   onSaved,
+  onAsk,
 }: {
   entry: DumpEntry;
   catalog: RefCatalog;
   sagaPath: string;
   onSaved: () => void;
+  onAsk?: () => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [renaming, setRenaming] = useState(false);
@@ -865,6 +901,18 @@ function EntryView({
             </span>
           )}
           {dirty && <span className="text-amber-400">• unsaved</span>}
+          {onAsk && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-1.5"
+              onClick={onAsk}
+              title="Ask the assistant about this entry"
+            >
+              <Bot className="h-3.5 w-3.5" />
+              Ask
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="sm"
@@ -920,6 +968,7 @@ function ChapterView({
   sagaPath,
   onSaved,
   onAskAssistant,
+  onAsk,
 }: {
   chapter: { tome: string; chapter: DumpChapter };
   catalog: RefCatalog;
@@ -930,6 +979,7 @@ function ChapterView({
     selection: { text: string; lines: [number, number] },
     path: string,
   ) => void;
+  onAsk?: () => void;
 }) {
   const [draft, setDraft] = useState(chapter.chapter.body);
   const [saving, setSaving] = useState(false);
@@ -980,6 +1030,18 @@ function ChapterView({
             </span>
           )}
           {dirty && <span className="text-amber-400">• unsaved</span>}
+          {onAsk && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-1.5"
+              onClick={onAsk}
+              title="Ask the assistant about this chapter"
+            >
+              <Bot className="h-3.5 w-3.5" />
+              Ask
+            </Button>
+          )}
           <Button
             variant={dirty ? 'default' : 'outline'}
             size="sm"
