@@ -1,10 +1,18 @@
 import { useEffect, useState } from 'react';
 import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from '../components/ui/tabs.js';
+import {
   fetchConfig,
   saveConfigPatch,
   type ConfigPatch,
   type MaskedLoreweaveConfig,
 } from '../lib/lw.js';
+import { cn } from '../lib/utils.js';
+import { useSkin } from '../theme/SkinProvider.js';
 
 interface Props {
   onClose: () => void;
@@ -108,7 +116,7 @@ export function SettingsDialog({ onClose }: Props) {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-border px-5 py-3">
-          <h2 className="text-lg font-semibold">AI settings</h2>
+          <h2 className="text-lg font-semibold">Settings</h2>
           <button
             className="text-sm text-muted-foreground hover:text-foreground"
             onClick={onClose}
@@ -117,17 +125,26 @@ export function SettingsDialog({ onClose }: Props) {
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-6">
-          {err && (
-            <div className="rounded border border-red-500/50 bg-red-500/10 px-3 py-2 text-sm text-red-200">
-              {err}
-            </div>
-          )}
-          {info && (
-            <div className="rounded border border-emerald-500/50 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200">
-              {info}
-            </div>
-          )}
+        <Tabs defaultValue="ai" className="flex-1 flex flex-col overflow-hidden">
+          <TabsList className="mx-5 mt-3 w-fit">
+            <TabsTrigger value="ai">AI</TabsTrigger>
+            <TabsTrigger value="appearance">Appearance</TabsTrigger>
+          </TabsList>
+
+          <TabsContent
+            value="ai"
+            className="flex-1 overflow-y-auto px-5 py-4 space-y-6 mt-3"
+          >
+            {err && (
+              <div className="rounded border border-red-500/50 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+                {err}
+              </div>
+            )}
+            {info && (
+              <div className="rounded border border-emerald-500/50 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200">
+                {info}
+              </div>
+            )}
 
           {cfg && cfg.envOverrides.length > 0 && (
             <div className="rounded border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
@@ -269,7 +286,19 @@ export function SettingsDialog({ onClose }: Props) {
               <code>0600</code>. Keys are never committed to your Saga repo.
             </p>
           )}
-        </div>
+          </TabsContent>
+
+          <TabsContent
+            value="appearance"
+            className="flex-1 overflow-y-auto px-5 py-4 space-y-4 mt-3"
+          >
+            <SkinPicker />
+            <p className="text-[11px] text-muted-foreground">
+              Skins are CSS variable maps written to <code>:root</code>. Your
+              choice is remembered locally in this browser.
+            </p>
+          </TabsContent>
+        </Tabs>
 
         <div className="flex items-center justify-end gap-2 border-t border-border px-5 py-3">
           <button
@@ -328,5 +357,58 @@ function KeyField({
         onChange={(e) => setValue(e.target.value)}
       />
     </label>
+  );
+}
+
+
+function SkinPicker() {
+  const { skin, available, setSkinId } = useSkin();
+  return (
+    <div>
+      <h3 className="text-sm font-semibold mb-2">Skin</h3>
+      <p className="text-xs text-muted-foreground mb-3">
+        Restyle the entire app. Skins write CSS variables to <code>:root</code>; nothing else changes.
+      </p>
+      <div className="grid grid-cols-1 gap-2">
+        {available.map((s) => {
+          const active = s.id === skin.id;
+          return (
+            <button
+              key={s.id}
+              onClick={() => setSkinId(s.id)}
+              className={cn(
+                'flex items-center gap-3 rounded-md border px-3 py-2 text-left transition-colors',
+                active
+                  ? 'border-primary bg-primary/10'
+                  : 'border-border hover:bg-muted',
+              )}
+            >
+              <SkinSwatch tokens={s.tokens} />
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium">{s.name}</div>
+                <div className="text-[11px] text-muted-foreground truncate">
+                  {s.description}
+                </div>
+              </div>
+              {active && (
+                <span className="rounded bg-primary/20 px-1.5 py-0.5 text-[10px] text-primary">
+                  active
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function SkinSwatch({ tokens }: { tokens: { background: string; primary: string; accent: string; foreground: string } }) {
+  return (
+    <div className="flex h-8 w-12 shrink-0 overflow-hidden rounded border border-border">
+      <div className="flex-1" style={{ background: `hsl(${tokens.background})` }} />
+      <div className="flex-1" style={{ background: `hsl(${tokens.primary})` }} />
+      <div className="flex-1" style={{ background: `hsl(${tokens.accent})` }} />
+    </div>
   );
 }

@@ -154,6 +154,13 @@ export interface Saga {
   threads: Thread[];
   calendars: CalendarSpec[];
   traces: Trace[];
+  /**
+   * Resolved Kind catalog (built-ins + saga-defined). Populated by
+   * `loadSaga`. Tests/fixtures may construct a Saga without this field;
+   * consumers that need the catalog should treat absence as
+   * builtin-only.
+   */
+  kinds?: import('./kind-loader.js').KindCatalog;
 }
 
 export type TraceKind = 'idea' | 'todo' | 'remark' | 'question' | 'done';
@@ -177,9 +184,9 @@ export interface Trace {
   relPath: string;
 }
 
-/** Key for the entry graph. */
-export type EntryKey = `${EntryType}/${string}`;
+/** Key for the entry graph. Type is a Kind id (built-in or saga-defined). */
+export type EntryKey = `${string}/${string}`;
 
-export function entryKey(type: EntryType, id: string): EntryKey {
+export function entryKey(type: string, id: string): EntryKey {
   return `${type}/${id}` as EntryKey;
 }

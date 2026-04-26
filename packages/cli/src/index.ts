@@ -10,6 +10,8 @@ import { exportCmd } from './commands/export.js';
 import { gitCmd } from './commands/git.js';
 import { importCmd } from './commands/import.js';
 import { ingestCmd } from './commands/ingest.js';
+import { kindsCmd } from './commands/kinds.js';
+import { lensesCmd } from './commands/lenses.js';
 import { listSagasCmd } from './commands/list-sagas.js';
 import { migrateCmd } from './commands/migrate.js';
 import { refsCmd } from './commands/refs.js';
@@ -294,6 +296,20 @@ export async function run(argv: string[]): Promise<void> {
     .argument('[root]', 'directory containing Sagas', 'sagas')
     .option('--json', 'emit JSON')
     .action(listSagasCmd);
+
+  program
+    .command('kinds')
+    .description('List the resolved Kind catalog (built-ins + saga overrides).')
+    .argument('<saga>', 'path to the Saga directory')
+    .option('--json', 'emit JSON')
+    .action(kindsCmd);
+
+  program
+    .command('lenses')
+    .description('List saga-defined Lenses under <saga>/.loreweave/lenses/.')
+    .argument('<saga>', 'path to the Saga directory')
+    .option('--json', 'emit JSON')
+    .action(lensesCmd);
 
   await program.parseAsync(argv, { from: 'user' });
 }

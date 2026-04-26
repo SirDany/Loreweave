@@ -1,11 +1,17 @@
 import { useMemo, useState } from "react";
 import YAML from "yaml";
+import { EchoPicker } from "../components/forms/EchoPicker.js";
+import { KindForm } from "../components/forms/KindForm.js";
 import { lwWrite } from "../lib/lw.js";
-import type { DumpEntry } from "../lib/lw.js";
+import type { DumpEntry, KindInfo } from "../lib/lw.js";
 
 interface Props {
   entry: DumpEntry;
   sagaPath: string;
+  /** All entries in the saga — used to populate Echo picker pools. */
+  allEntries: DumpEntry[];
+  /** Resolved Kind catalog for picker filtering and labels. */
+  kinds: KindInfo[];
   onClose: () => void;
   onSaved: () => void;
 }
@@ -15,19 +21,42 @@ interface Props {
  * Common fields are exposed as form inputs; everything else is editable
  * as raw YAML so nothing is silently dropped.
  */
-export function EntryEditor({ entry, sagaPath, onClose, onSaved }: Props) {
+export function EntryEditor({ entry, sagaPath, allEntries, kinds, onClose, onSaved }: Props) {
   const { common, rest } = useMemo(() => splitFrontmatter(entry.frontmatter), [entry]);
+  const kind = useMemo(
+    () => kinds.find((k) => k.id === entry.type),
+    [kinds, entry.type],
+  );
+  const hasKindForm = !!(kind && kind.properties && Object.keys(kind.properties).length > 0);
+
+  const initialKindProps = useMemo<Record<string, unknown>>(() => {
+    const p = rest.properties;
+    return p && typeof p === "object" && !Array.isArray(p)
+      ? { ...(p as Record<string, unknown>) }
+      : {};
+  }, [rest]);
+  const restWithoutProps = useMemo(() => {
+    if (!hasKindForm) return rest;
+    const { properties: _omit, ...other } = rest;
+    void _omit;
+    return other;
+  }, [rest, hasKindForm]);
 
   const [name, setName] = useState(String(common.name ?? entry.name ?? ""));
   const [status, setStatus] = useState<string>(
     common.status == null ? "" : String(common.status),
   );
-  const [tags, setTags] = useState<string>(listToText(common.tags));
-  const [inherits, setInherits] = useState<string>(listToText(common.inherits));
+  const [tags, setTags] = useState<string[]>(listToKeys(common.tags, "sigil"));
+  const [inherits, setInherits] = useState<string[]>(
+    listToKeys(common.inherits, "sigil"),
+  );
   const [aliases, setAliases] = useState<string>(listToText(common.aliases));
   const [appearsIn, setAppearsIn] = useState<string>(listToText(common.appears_in));
+  const [kindProps, setKindProps] = useState<Record<string, unknown>>(initialKindProps);
   const [restYaml, setRestYaml] = useState<string>(
-    Object.keys(rest).length ? YAML.stringify(rest).trimEnd() : "",
+    Object.keys(restWithoutProps).length
+      ? YAML.stringify(restWithoutProps).trimEnd()
+      : "",
   );
 
   const [saving, setSaving] = useState(false);
@@ -43,9 +72,9 @@ export function EntryEditor({ entry, sagaPath, onClose, onSaved }: Props) {
       next.type = entry.type;
       if (name.trim()) next.name = name.trim();
 
-      const tagList = textToList(tags);
+      const tagList = keysToIds(tags);
       if (tagList.length) next.tags = tagList;
-      const inhList = textToList(inherits);
+      const inhList = keysToIds(inherits);
       if (inhList.length) next.inherits = inhList;
       const aliasList = textToList(aliases);
       if (aliasList.length) next.aliases = aliasList;
@@ -54,7 +83,12 @@ export function EntryEditor({ entry, sagaPath, onClose, onSaved }: Props) {
 
       if (status.trim()) next.status = status.trim();
 
-      // Merge remaining YAML (properties, overrides, kind, speaks, ...).
+      // Kind-form properties (synth from the Kind's schema).
+      if (hasKindForm && Object.keys(kindProps).length > 0) {
+        next.properties = kindProps;
+      }
+
+      // Merge remaining YAML (overrides, kind, speaks, ...).
       if (restYaml.trim()) {
         let parsed: unknown;
         try {
@@ -130,19 +164,23 @@ export function EntryEditor({ entry, sagaPath, onClose, onSaved }: Props) {
             </select>
           </Field>
 
-          <Field label="tags" hint="comma or newline separated">
-            <input
+          <Field label="tags" hint="sigils — pick from the catalog">
+            <EchoPicker
+              kinds={["sigil"]}
+              entries={allEntries}
               value={tags}
-              onChange={(e) => setTags(e.target.value)}
-              className="w-full bg-background border border-border rounded px-2 py-1"
+              onChange={setTags}
+              placeholder="Search sigils…"
             />
           </Field>
 
-          <Field label="inherits" hint="sigil ids, comma or newline separated">
-            <input
+          <Field label="inherits" hint="sigils whose properties merge in">
+            <EchoPicker
+              kinds={["sigil"]}
+              entries={allEntries}
               value={inherits}
-              onChange={(e) => setInherits(e.target.value)}
-              className="w-full bg-background border border-border rounded px-2 py-1"
+              onChange={setInherits}
+              placeholder="Search sigils…"
             />
           </Field>
 
@@ -162,9 +200,20 @@ export function EntryEditor({ entry, sagaPath, onClose, onSaved }: Props) {
             />
           </Field>
 
+          {hasKindForm && kind ? (
+            <KindForm
+              kind={kind}
+              values={kindProps}
+              onChange={setKindProps}
+              entries={allEntries}
+            />
+          ) : null}
+
           <Field
             label="advanced (YAML)"
-            hint="properties, overrides, kind, speaks, spoken_here, etc."
+            hint={hasKindForm
+              ? "overrides, kind, speaks, spoken_here, etc."
+              : "properties, overrides, kind, speaks, spoken_here, etc."}
           >
             <textarea
               value={restYaml}
@@ -252,4 +301,25 @@ function textToList(s: string): string[] {
     .split(/[\n,]/)
     .map((x) => x.trim())
     .filter((x) => x.length > 0);
+}
+
+/**
+ * Convert a sigil id list to EchoPicker keys (`sigil/<id>`). Accepts
+ * already-prefixed values too in case a saga stores echoes literally.
+ */
+function listToKeys(v: unknown, defaultType: string): string[] {
+  if (!v) return [];
+  const list = Array.isArray(v) ? v : [v];
+  return list
+    .map((x) => String(x).trim())
+    .filter((x) => x.length > 0)
+    .map((x) => (x.includes("/") ? x : `${defaultType}/${x}`));
+}
+
+/** Strip the kind prefix off EchoPicker keys for storage as bare ids. */
+function keysToIds(keys: string[]): string[] {
+  return keys.map((k) => {
+    const slash = k.indexOf("/");
+    return slash < 0 ? k : k.slice(slash + 1);
+  });
 }

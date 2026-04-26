@@ -161,9 +161,12 @@ function checkProseRefs(
   for (const e of saga.entries)
     sources.push({ body: e.body, relPath: e.relPath });
 
+  const byEcho = saga.kinds?.byEcho;
   for (const src of sources) {
     for (const ref of extractReferences(src.body)) {
-      if (!index.has(entryKey(ref.type, ref.id))) {
+      // Resolve alias prefixes to canonical kind id when a catalog is present.
+      const canonical = byEcho?.get(ref.type) ?? ref.type;
+      if (!index.has(entryKey(canonical, ref.id))) {
         out.push(
           diag(
             'error',

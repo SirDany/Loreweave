@@ -8,6 +8,22 @@ export * from "./timeline.js";
 export * from "./slang.js";
 export * from "./validator.js";
 export { loadSaga, LoadError } from "./loader.js";
+export {
+  KindFrontmatterSchema,
+  KindFieldSchema,
+  KindFieldTypeSchema,
+  KindDisplaySchema,
+  KindCycleError,
+  type KindFrontmatter,
+  type KindField,
+  type ResolvedKind,
+} from "./kinds.js";
+export {
+  loadKindCatalog,
+  buildKindCatalog,
+  type KindCatalog,
+} from "./kind-loader.js";
+export { BUILTIN_KIND_DEFS, BUILTIN_KIND_IDS } from "./builtin-kinds.js";
 export * from "./storage.js";
 export { FsAdapter } from "./storage-fs.js";
 export { MemoryAdapter } from "./storage-memory.js";

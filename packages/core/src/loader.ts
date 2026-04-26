@@ -3,9 +3,12 @@ import matter from 'gray-matter';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import YAML from 'yaml';
+import { BUILTIN_KIND_IDS } from './builtin-kinds.js';
+import { loadKindCatalog, type KindCatalog } from './kind-loader.js';
 import {
   CalendarFileSchema,
   ChapterMetaSchema,
+  CustomKindEntryFrontmatterSchema,
   EntryFrontmatterSchema,
   SagaManifestSchema,
   ThreadFileSchema,
@@ -62,16 +65,27 @@ function toRel(root: string, p: string): string {
 async function parseEntry(file: string, root: string): Promise<Entry> {
   const raw = await readText(file);
   const parsed = matter(raw);
-  const result = EntryFrontmatterSchema.safeParse(parsed.data);
-  if (!result.success) {
-    throw new LoadError(
-      `invalid frontmatter: ${result.error.issues
-        .map((i) => `${i.path.join('.')}: ${i.message}`)
-        .join('; ')}`,
-      file
-    );
+  // Try the strict discriminated union first (built-in kinds). Fall
+  // back to the permissive custom-kind schema for entries belonging
+  // to a saga-defined Kind.
+  const strict = EntryFrontmatterSchema.safeParse(parsed.data);
+  let fm: Entry['frontmatter'];
+  if (strict.success) {
+    fm = strict.data;
+  } else {
+    const loose = CustomKindEntryFrontmatterSchema.safeParse(parsed.data);
+    if (!loose.success) {
+      // Surface the strict error since the typical cause is a typo in a
+      // built-in type rather than an intentional custom kind.
+      throw new LoadError(
+        `invalid frontmatter: ${strict.error.issues
+          .map((i) => `${i.path.join('.')}: ${i.message}`)
+          .join('; ')}`,
+        file,
+      );
+    }
+    fm = loose.data as unknown as Entry['frontmatter'];
   }
-  const fm = result.data;
   const expectedId = path.basename(file, path.extname(file));
   if (fm.id !== expectedId) {
     throw new LoadError(
@@ -261,6 +275,9 @@ export async function loadSaga(root: string): Promise<Saga> {
     manifestPath,
     SagaManifestSchema
   );
+  // Resolve the Kind catalog first — built-ins seeded, saga `kinds/*.md`
+  // overrides applied, extends chains resolved.
+  const kinds = await loadKindCatalog(absRoot);
   // Canonical layout: codex/ lexicon/ sigils/ threads/ tomes/ traces/.
   // Legacy folders (wiki/ glossary/ tags/ timelines/) are no longer loaded —
   // run `lw migrate` on a legacy saga to rename them first.
@@ -274,13 +291,28 @@ export async function loadSaga(root: string): Promise<Saga> {
       loadCalendars(absRoot),
       loadTraces(absRoot),
     ]);
+  // Saga-defined Kinds (non-builtin) bring their own storage folders.
+  // Walk each unique folder once.
+  const customEntries: Entry[] = [];
+  const seenStorage = new Set<string>(['codex', 'lexicon', 'sigils']);
+  for (const k of kinds.byId.values()) {
+    if (BUILTIN_KIND_IDS.has(k.id)) continue;
+    const storage = k.storage;
+    if (seenStorage.has(storage)) continue;
+    seenStorage.add(storage);
+    const dir = path.join(absRoot, storage);
+    customEntries.push(...(await loadEntriesIn(dir, absRoot)));
+  }
   return {
     manifest,
     root: absRoot,
-    entries: [...codex, ...lexicon, ...sigils],
+    entries: [...codex, ...lexicon, ...sigils, ...customEntries],
     tomes,
     threads,
     calendars,
     traces,
+    kinds,
   };
 }
+
+export type { KindCatalog };

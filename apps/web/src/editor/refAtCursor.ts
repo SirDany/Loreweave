@@ -4,11 +4,16 @@
  * the CodeMirror editor so it can be unit-tested without jsdom.
  */
 
-const REF_RE = /@([a-zA-Z]+)\/([a-zA-Z0-9\-_]+)/g;
+// Mirror of `REF_REGEX` in @loreweave/core. Match groups: 1=type, 2=id,
+// 3=optional `{display}` override.
+const REF_RE =
+  /@([a-z][a-z0-9-]*)\/([a-z0-9][a-z0-9-]*)(?:\{([^}\n]*)\})?/g;
 
 export interface RefAtCursor {
   type: string;
   id: string;
+  /** Optional display-text override extracted from `{...}`. */
+  display?: string;
   /** 0-based character offset of the `@` inside the document. */
   from: number;
   /** Exclusive end offset (from + raw.length). */
@@ -27,7 +32,14 @@ export function refAtOffset(doc: string, pos: number): RefAtCursor | null {
     const from = m.index ?? 0;
     const to = from + m[0].length;
     if (pos >= from && pos <= to) {
-      return { type: m[1]!, id: m[2]!, from, to, raw: m[0] };
+      return {
+        type: m[1]!,
+        id: m[2]!,
+        display: m[3],
+        from,
+        to,
+        raw: m[0],
+      };
     }
   }
   return null;

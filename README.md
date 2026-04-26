@@ -345,6 +345,32 @@ local-first threat model and is out of scope for this repo.
 
 ---
 
+## Extending Loreweave
+
+Loreweave is built around two extension seams:
+
+- **Kinds** — the entry-type catalog. Built-in Kinds (`character`,
+  `location`, `concept`, `lore`, `waypoint`, `term`, `sigil`) ship
+  baked in; Sagas add or override them by dropping
+  `<saga>/kinds/<id>.md`. See **[docs/kinds.md](docs/kinds.md)**.
+- **Lenses & the Loom** — the view layer. Every Grimoire section
+  (Codex, Lexicon, Sigils, Threads, Traces, Constellation, Story,
+  Versions) is a virtual Lens manifest dispatched through the Loom.
+  Contributed renderers live under `apps/web/src/loom/contrib/`. See
+  **[docs/loom.md](docs/loom.md)**.
+
+The reference contribution is the **kanban** renderer
+(`apps/web/src/loom/contrib/KanbanLens.tsx`) — a property-bucketed
+column view you can wire to any Kind. Set `editable: true` on the
+manifest and cards become draggable; column moves persist to the
+entry's frontmatter.
+
+Saga-defined Lenses live at `<saga>/.loreweave/lenses/<id>.yaml` and
+are loaded automatically. From the UI, **Actions → Compose lens…**
+scaffolds one interactively.
+
+---
+
 ## Contributing
 
 Contributions are welcome — especially bug reports against the example
@@ -364,10 +390,6 @@ When changing code, preserve these:
 2. The CLI stays the authoritative ground truth for validation / weave / audit.
 3. Local-first: no network call is required for core workflows.
 4. `StorageAdapter` is the only filesystem seam in the sidecar.
-
-Loreweave is intentionally desktop-only: multi-tenancy, hosted SaaS, public
-HTTP APIs, BYO-key proxies, and live co-editing are all explicitly out of
-scope. Those paths were considered and deliberately closed.
 
 ---
 

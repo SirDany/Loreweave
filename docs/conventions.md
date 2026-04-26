@@ -125,6 +125,23 @@ Rules:
 - Echoes are machine-checked; the validator errors on broken refs.
 - Echoes are preserved verbatim during edits — don't flatten them to plain text.
 
+### Display-text overrides
+
+Append `{display text}` to an Echo to override the rendered label
+without changing the link target. Useful when the prose calls a
+character by an alias, a title, or a pronoun:
+
+```
+The @character/aaron{king} stood watch.
+@character/aaron{he} drew his sword.
+A messenger reached @location/vellmar{the gates}.
+```
+
+The reference still resolves to `character/aaron`, so audits, renames,
+usage counts, and broken-ref checks keep working. The override is
+honored by the chapter preview, the assistant pane, and Pandoc/HTML
+exports. An empty `{}` is treated as "use the default name".
+
 ## 6. `appears_in` — Tome scope metadata
 
 An optional `appears_in: [<tome-slug>, ...]` on any entry (or Waypoint) expresses that the entry is only narrated in those Tomes. Omit = present across the whole Saga.

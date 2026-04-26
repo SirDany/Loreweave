@@ -237,11 +237,20 @@ async function exportSagaZip(sagaPath: string, outFile: string): Promise<void> {
  * Replace `@type/id` references with the entity's display name when
  * resolvable; otherwise leave the raw ref in place. Used by tome-md and
  * tome-html exports so published prose doesn't leak Codex ids.
+ *
+ * Recognizes the optional `{display text}` override syntax: when
+ * present, the override wins over the resolved entity name.
  */
 export function stripRefs(text: string, idx: Map<string, string>): string {
   return text.replace(
-    /@([a-zA-Z]+)\/([a-zA-Z0-9\-_]+)/g,
-    (raw, type, id) => idx.get(`${type}/${id}`) ?? raw
+    /@([a-z][a-z0-9-]*)\/([a-z0-9][a-z0-9-]*)(?:\{([^}\n]*)\})?/g,
+    (raw, type: string, id: string, display: string | undefined) => {
+      if (display !== undefined && display.length > 0) return display;
+      // Strip the `{...}` suffix from the fallback so a missing entity
+      // still renders as the bare echo rather than echo+braces.
+      const bare = `@${type}/${id}`;
+      return idx.get(`${type}/${id}`) ?? bare;
+    },
   );
 }
 
@@ -488,9 +497,12 @@ async function exportCodex(
         parts.push(`*${g.type}/${e.frontmatter.id}*\n\n`);
         // Replace @echoes with markdown links to in-document anchors.
         const linked = e.body.replace(
-          /@([a-zA-Z]+)\/([a-zA-Z0-9\-_]+)/g,
-          (raw, type, id) => {
-            const display = idx.get(`${type}/${id}`) ?? raw;
+          /@([a-zA-Z]+)\/([a-zA-Z0-9\-_]+)(?:\{([^}\n]*)\})?/g,
+          (raw, type, id, override) => {
+            const display =
+              override !== undefined && override.length > 0
+                ? override
+                : idx.get(`${type}/${id}`) ?? raw;
             return `[${display}](#${anchorOf(type, id)})`;
           }
         );
@@ -529,9 +541,12 @@ async function exportCodex(
         // Tokenize @echoes, escape the body, then re-inject anchor tags.
         const tokens: Array<{ type: string; id: string; display: string }> = [];
         const tokenized = e.body.replace(
-          /@([a-zA-Z]+)\/([a-zA-Z0-9\-_]+)/g,
-          (raw, type, id) => {
-            const display = idx.get(`${type}/${id}`) ?? raw;
+          /@([a-zA-Z]+)\/([a-zA-Z0-9\-_]+)(?:\{([^}\n]*)\})?/g,
+          (raw, type, id, override) => {
+            const display =
+              override !== undefined && override.length > 0
+                ? override
+                : idx.get(`${type}/${id}`) ?? raw;
             tokens.push({ type, id, display });
             return `\u0000LWREF${tokens.length - 1}\u0000`;
           }

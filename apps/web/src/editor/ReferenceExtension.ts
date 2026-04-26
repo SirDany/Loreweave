@@ -102,7 +102,10 @@ function sigilCompletions(catalog: RefCatalog) {
   };
 }
 
-const REF_RE = /@([a-zA-Z]+)\/([a-zA-Z0-9\-_]+)/g;
+// Mirror of `REF_REGEX` in @loreweave/core. Match groups: 1=type, 2=id,
+// 3=optional `{display}` override.
+const REF_RE =
+  /@([a-z][a-z0-9-]*)\/([a-z0-9][a-z0-9-]*)(?:\{([^}\n]*)\})?/g;
 
 function formatPropValue(value: unknown): string {
   if (value == null) return "—";
@@ -168,6 +171,7 @@ export function loreweaveExtensions(catalog: RefCatalog) {
       const end = start + m[0].length;
       if (rel >= start && rel <= end) {
         const key = `${m[1]}/${m[2]}`;
+        const display = m[3];
         const entry = lookup.get(key);
         return {
           pos: line.from + start,
@@ -207,6 +211,16 @@ export function loreweaveExtensions(catalog: RefCatalog) {
               s.style.color = "#a8a29e";
               s.textContent = `${entry.type}/${entry.id}`;
               dom.appendChild(s);
+
+              if (display !== undefined) {
+                const d = document.createElement("div");
+                d.style.fontSize = "0.7rem";
+                d.style.color = "#a8a29e";
+                d.style.marginTop = "0.15rem";
+                d.style.fontStyle = "italic";
+                d.textContent = `displays as: ${display || "(empty)"}`;
+                dom.appendChild(d);
+              }
 
               if (entry.aliases && entry.aliases.length > 0) {
                 const a = document.createElement("div");

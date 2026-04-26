@@ -2,9 +2,14 @@ import { useCallback, useEffect, useState } from "react";
 import {
   dump,
   fetchDigest,
+  kinds as fetchKinds,
+  lenses as fetchLenses,
   type CanonDigestPayload,
   type DumpPayload,
+  type KindInfo,
+  type LensManifestPayload,
 } from "../lib/lw.js";
+import { registerLensManifest } from "../loom/registry.js";
 
 const DEFAULT_SAGA = "sagas/example-saga";
 const STORAGE_KEY = "loreweave.sagaPath";
@@ -17,6 +22,11 @@ export interface SagaState {
    * `data` by one request; null until the first successful fetch.
    */
   digest: CanonDigestPayload | null;
+  /**
+   * Resolved Kind catalog (built-ins + saga overrides). Empty array
+   * before the first successful fetch.
+   */
+  kinds: KindInfo[];
   loading: boolean;
   error: string | null;
   tomeLens: string | null;
@@ -41,6 +51,7 @@ export function useSaga(initialPath: string = DEFAULT_SAGA): SagaState {
   );
   const [data, setData] = useState<DumpPayload | null>(null);
   const [digest, setDigest] = useState<CanonDigestPayload | null>(null);
+  const [kinds, setKinds] = useState<KindInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tomeLens, setTomeLens] = useState<string | null>(null);
@@ -54,6 +65,7 @@ export function useSaga(initialPath: string = DEFAULT_SAGA): SagaState {
     }
     setTomeLens(null);
     setDigest(null);
+    setKinds([]);
   }, []);
 
   const reload = useCallback(async () => {
@@ -62,11 +74,30 @@ export function useSaga(initialPath: string = DEFAULT_SAGA): SagaState {
     try {
       const payload = await dump(sagaPath);
       setData(payload);
-      // Digest is a pure optimization — never block the reload on it.
+      // Digest + kinds are optimizations — never block the reload on them.
       fetchDigest(sagaPath).then(
         (d) => setDigest(d),
         () => {
           /* endpoint unavailable (e.g. Tauri build w/o sidecar); ignore. */
+        },
+      );
+      fetchKinds(sagaPath).then(
+        (k) => setKinds(k),
+        () => {
+          /* CLI unavailable; ignore. */
+        },
+      );
+      fetchLenses(sagaPath).then(
+        (list: LensManifestPayload[]) => {
+          for (const m of list) {
+            registerLensManifest({
+              ...m,
+              builtin: false,
+            });
+          }
+        },
+        () => {
+          /* CLI unavailable; ignore. */
         },
       );
     } catch (e) {
@@ -126,6 +157,7 @@ export function useSaga(initialPath: string = DEFAULT_SAGA): SagaState {
     sagaPath,
     data,
     digest,
+    kinds,
     loading,
     error,
     tomeLens,

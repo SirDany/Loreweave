@@ -190,7 +190,76 @@ export function dump(saga: string, tome?: string): Promise<DumpPayload> {
   const args = ['dump', saga];
   if (tome) args.push('--tome', tome);
   return lwJson<DumpPayload>(args);
-}export function resolveEntry(
+}
+
+export type KindFieldType =
+  | 'string'
+  | 'text'
+  | 'number'
+  | 'boolean'
+  | 'date'
+  | 'enum'
+  | 'ref'
+  | 'list';
+
+export interface KindFieldDef {
+  type: KindFieldType;
+  required?: boolean;
+  default?: unknown;
+  description?: string;
+  options?: string[];
+  kind?: string;
+  of?: KindFieldDef;
+}
+
+export interface KindDisplayInfo {
+  icon?: string;
+  color?: string;
+  listFields?: string[];
+  sortBy?: string;
+}
+
+export interface KindInfo {
+  id: string;
+  name: string;
+  echoPrefix: string;
+  aliases: string[];
+  storage: string;
+  builtin: boolean;
+  source: string | null;
+  description: string;
+  properties?: Record<string, KindFieldDef>;
+  display?: KindDisplayInfo;
+}
+
+export function kinds(saga: string): Promise<KindInfo[]> {
+  return lwJson<KindInfo[]>(['kinds', saga, '--json']);
+}
+
+export interface LensManifestPayload {
+  id: string;
+  name: string;
+  icon?: string;
+  renderer: string;
+  description?: string;
+  kinds?: string[];
+  filter?: {
+    inherits?: string[];
+    tags?: string[];
+    status?: 'draft' | 'canon';
+  };
+  groupBy?: string;
+  sortBy?: string;
+  fields?: string[];
+  source: string;
+  editable?: boolean;
+}
+
+export function lenses(saga: string): Promise<LensManifestPayload[]> {
+  return lwJson<LensManifestPayload[]>(['lenses', saga, '--json']);
+}
+
+export function resolveEntry(
   saga: string,
   type: EntryType,
   id: string,

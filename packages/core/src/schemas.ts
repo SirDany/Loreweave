@@ -75,6 +75,16 @@ export const EntryFrontmatterSchema = z.discriminatedUnion('type', [
   SigilFrontmatterSchema,
 ]);
 
+/**
+ * Permissive entry frontmatter for entries authored under a saga-defined
+ * Kind. The `type` field is any kebab-case id (the Kind id); all other
+ * BaseFrontmatter fields remain optional. Phase 2 will synthesize a
+ * stricter schema from the Kind's `properties` map.
+ */
+export const CustomKindEntryFrontmatterSchema = BaseFrontmatter.extend({
+  type: z.string().regex(/^[a-z][a-z0-9-]*$/, 'type must be kebab-case'),
+});
+
 export const WaypointSchema = z.object({
   id: Id,
   event: z.string().min(1),

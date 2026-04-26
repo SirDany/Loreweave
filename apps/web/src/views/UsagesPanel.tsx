@@ -14,7 +14,8 @@ interface Hit {
   snippet: string;
 }
 
-const REF_RE = /@([a-zA-Z]+)\/([a-zA-Z0-9\-_]+)/g;
+const REF_RE =
+  /@([a-z][a-z0-9-]*)\/([a-z0-9][a-z0-9-]*)(?:\{([^}\n]*)\})?/g;
 
 function scanFor(
   type: string,

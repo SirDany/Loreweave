@@ -29,4 +29,17 @@ describe("refAtOffset", () => {
     expect(r.type).toBe("location");
     expect(r.id).toBe("vellmar");
   });
+
+  it("captures a {display} override and includes the suffix in the range", () => {
+    const overrideDoc = "The @character/aaron{king} stood.";
+    const pos = overrideDoc.indexOf("aaron");
+    const r = refAtOffset(overrideDoc, pos)!;
+    expect(r.type).toBe("character");
+    expect(r.id).toBe("aaron");
+    expect(r.display).toBe("king");
+    expect(r.raw).toBe("@character/aaron{king}");
+    // Cursor anywhere inside the override should still resolve.
+    const insideBraces = overrideDoc.indexOf("king") + 1;
+    expect(refAtOffset(overrideDoc, insideBraces)?.id).toBe("aaron");
+  });
 });

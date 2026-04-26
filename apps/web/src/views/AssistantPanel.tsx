@@ -951,7 +951,9 @@ function renderBlock(b: Block, key: number): JSX.Element {
 function renderInline(text: string): (JSX.Element | string)[] {
   const tokens: (JSX.Element | string)[] = [];
   // Combined regex: inline code | bold | italic | link | @type/id echo
-  const re = /`([^`]+)`|\*\*([^*]+)\*\*|\b_([^_]+)_\b|\[([^\]]+)\]\(([^)]+)\)|@([a-z]+)\/([a-zA-Z0-9._-]+)/g;
+  // (with optional `{display}` override).
+  const re =
+    /`([^`]+)`|\*\*([^*]+)\*\*|\b_([^_]+)_\b|\[([^\]]+)\]\(([^)]+)\)|@([a-z][a-z0-9-]*)\/([a-z0-9][a-z0-9-]*)(?:\{([^}\n]*)\})?/g;
   let last = 0;
   let m: RegExpExecArray | null;
   let i = 0;
@@ -989,12 +991,16 @@ function renderInline(text: string): (JSX.Element | string)[] {
         </a>,
       );
     } else if (m[6] != null && m[7] != null) {
+      const display = m[8];
+      const label =
+        display && display.length > 0 ? display : `@${m[6]}/${m[7]}`;
       tokens.push(
         <span
           key={i++}
+          title={`@${m[6]}/${m[7]}`}
           className="rounded bg-primary/15 px-1 font-mono text-[11px] text-primary"
         >
-          @{m[6]}/{m[7]}
+          {label}
         </span>,
       );
     }
