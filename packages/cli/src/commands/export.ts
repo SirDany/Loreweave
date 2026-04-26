@@ -1,10 +1,16 @@
 import { loadSaga } from '@loreweave/core';
 import archiver from 'archiver';
+import { marked } from 'marked';
 import { spawn, spawnSync } from 'node:child_process';
 import { createWriteStream, promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import pc from 'picocolors';
+
+// Synchronous CommonMark + GFM rendering. We tokenize @echoes to opaque
+// placeholders before parsing so marked never sees them, then re-inject
+// `<a>` anchors after rendering.
+marked.setOptions({ gfm: true, breaks: false, async: false });
 
 export type ExportFormat =
   | 'saga'
@@ -292,21 +298,17 @@ async function exportTome(
     return;
   }
 
-  // tome-html
+  // tome-html: render chapter body as Markdown so **bold**, *italic*,
+  // lists, blockquotes, code, and nested headings all survive publishing.
   const escape = (s: string) =>
     s.replace(
       /[&<>]/g,
       (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]!)
     );
-  const paragraphs = (text: string) =>
-    text
-      .split(/\n{2,}/)
-      .map((p) => `<p>${escape(p).replace(/\n/g, '<br/>')}</p>`)
-      .join('\n');
   const body = chapters
     .map(
       (c) =>
-        `<section><h2>${escape(c.meta.title ?? c.slug)}</h2>\n${paragraphs(
+        `<section><h2>${escape(c.meta.title ?? c.slug)}</h2>\n${marked.parse(
           stripRefsLocal(c.body).trim()
         )}</section>`
     )
@@ -520,11 +522,6 @@ async function exportCodex(
       /[&<>]/g,
       (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]!)
     );
-  const paragraphs = (text: string) =>
-    text
-      .split(/\n{2,}/)
-      .map((p) => `<p>${p}</p>`)
-      .join('\n');
 
   const sections: string[] = [];
   for (const g of groups) {
@@ -538,7 +535,9 @@ async function exportCodex(
     const entryHtml = items
       .map((e) => {
         const name = e.frontmatter.name ?? e.frontmatter.id;
-        // Tokenize @echoes, escape the body, then re-inject anchor tags.
+        // Tokenize @echoes to opaque placeholders, render body as markdown,
+        // then swap placeholders for anchor links. Markdown renderers will
+        // escape user text for us.
         const tokens: Array<{ type: string; id: string; display: string }> = [];
         const tokenized = e.body.replace(
           /@([a-zA-Z]+)\/([a-zA-Z0-9\-_]+)(?:\{([^}\n]*)\})?/g,
@@ -548,11 +547,11 @@ async function exportCodex(
                 ? override
                 : idx.get(`${type}/${id}`) ?? raw;
             tokens.push({ type, id, display });
-            return `\u0000LWREF${tokens.length - 1}\u0000`;
+            return `LWREF${tokens.length - 1}LWEND`;
           }
         );
-        const escaped = escape(tokenized).replace(
-          /\u0000LWREF(\d+)\u0000/g,
+        const rendered = (marked.parse(tokenized) as string).replace(
+          /LWREF(\d+)LWEND/g,
           (_, n) => {
             const t = tokens[Number(n)]!;
             return `<a href="#${anchorOf(t.type, t.id)}">${escape(
@@ -563,7 +562,7 @@ async function exportCodex(
         return `<article id="${anchorOf(g.type, e.frontmatter.id)}">
   <h3>${escape(name)}</h3>
   <div class="ref">${g.type}/${escape(e.frontmatter.id)}</div>
-  ${paragraphs(escaped)}
+  ${rendered}
 </article>`;
       })
       .join('\n');

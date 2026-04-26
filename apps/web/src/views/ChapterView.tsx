@@ -9,6 +9,7 @@ import type { CanonDigestPayload, DumpChapter } from '../lib/lw.js';
 import { lwWrite } from '../lib/lw.js';
 import { cn } from '../lib/utils.js';
 import { CodexPane } from './CodexPane.js';
+import { ConfirmDeleteDialog } from './ConfirmDeleteDialog.js';
 
 interface ChapterViewProps {
   chapter: { tome: string; chapter: DumpChapter };
@@ -16,6 +17,7 @@ interface ChapterViewProps {
   sagaPath: string;
   digest: CanonDigestPayload | null;
   onSaved: () => void;
+  onDeleted?: () => void;
   onJumpToEntry?: (type: string, id: string) => void;
   onAskAssistant?: (
     action: string,
@@ -36,6 +38,7 @@ export function ChapterView({
   sagaPath,
   digest,
   onSaved,
+  onDeleted,
   onJumpToEntry,
   onAskAssistant,
   onAsk,
@@ -43,6 +46,7 @@ export function ChapterView({
 }: ChapterViewProps) {
   const [draft, setDraft] = useState(chapter.chapter.body);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [cursorRef, setCursorRef] = useState<RefAtCursor | null>(null);
   const [paneOpen, setPaneOpen] = useState<boolean>(() => {
@@ -144,6 +148,14 @@ export function ChapterView({
             {paneOpen ? 'Hide codex' : 'Show codex'}
           </Button>
           <Button
+            variant="ghost"
+            size="sm"
+            className="text-rose-400 hover:text-rose-300"
+            onClick={() => setDeleting(true)}
+          >
+            Delete
+          </Button>
+          <Button
             variant={dirty ? 'default' : 'outline'}
             size="sm"
             onClick={save}
@@ -178,6 +190,19 @@ export function ChapterView({
           </aside>
         )}
       </div>
+      {deleting && (
+        <ConfirmDeleteDialog
+          sagaPath={sagaPath}
+          relPath={chapter.chapter.relPath.replace(/\/chapter\.md$/, '')}
+          label={`chapter "${chapter.chapter.title}"`}
+          recursive
+          onClose={() => setDeleting(false)}
+          onDeleted={() => {
+            onDeleted?.();
+            onSaved();
+          }}
+        />
+      )}
     </div>
   );
 }

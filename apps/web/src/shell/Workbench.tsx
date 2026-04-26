@@ -35,6 +35,7 @@ interface WorkbenchProps {
   selectionKey: string | undefined;
   onJump: Jumper;
   onSaved: () => void;
+  onDeleted?: () => void;
   openAssistant: (seed: AssistantSeed) => void;
 }
 
@@ -56,6 +57,7 @@ export function Workbench({
   selectionKey,
   onJump,
   onSaved,
+  onDeleted,
   openAssistant,
 }: WorkbenchProps) {
   const [storyTab, setStoryTab] = useState<'edit' | 'preview'>('edit');
@@ -70,6 +72,7 @@ export function Workbench({
           allEntries={data.entries}
           kinds={kinds}
           onSaved={onSaved}
+          onDeleted={onDeleted}
           onAsk={() =>
             openAssistant({
               agent: 'muse',
@@ -109,6 +112,7 @@ export function Workbench({
             onJump({ kind: 'entry', key: `${type}/${id}` })
           }
           onSaved={onSaved}
+          onDeleted={onDeleted}
           onAskAssistant={(action, sel, relPath) => {
             const likelyRefs = Array.from(
               new Set(

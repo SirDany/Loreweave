@@ -27,6 +27,7 @@ interface ShelfProps {
   onBackups: () => void;
   onSettings: () => void;
   onComposeLens: () => void;
+  onRules: () => void;
   onToggleAssistant: () => void;
   assistantOpen: boolean;
 }
@@ -49,6 +50,7 @@ export function Shelf({
   onBackups,
   onSettings,
   onComposeLens,
+  onRules,
   onToggleAssistant,
   assistantOpen,
 }: ShelfProps) {
@@ -87,6 +89,7 @@ export function Shelf({
             onBackups={onBackups}
             onSettings={onSettings}
             onComposeLens={onComposeLens}
+            onRules={onRules}
             onToggleAssistant={onToggleAssistant}
             assistantOpen={assistantOpen}
           />

@@ -13,6 +13,10 @@ interface GrimoireProps {
   selection: Selection | null;
   onSelect: (s: Selection) => void;
   onRename: (entry: DumpEntry) => void;
+  onNewCodex?: (type: string) => void;
+  onNewTerm?: () => void;
+  onNewSigil?: () => void;
+  onNewChapter?: () => void;
 }
 
 /**
@@ -27,10 +31,14 @@ export function Grimoire({
   selection,
   onSelect,
   onRename,
+  onNewCodex,
+  onNewTerm,
+  onNewSigil,
+  onNewChapter,
 }: GrimoireProps) {
   const sections = getSections();
   return (
-    <nav className="w-72 shrink-0 flex flex-col border-r border-border bg-background/40 overflow-hidden">
+    <nav className="w-80 shrink-0 flex flex-col border-r border-border bg-background/40 overflow-hidden">
       <div className="px-4 pt-5 pb-3">
         <span className="label-rune">Grimoire</span>
         <ul className="mt-2 space-y-0.5">
@@ -79,6 +87,10 @@ export function Grimoire({
           selection={selection}
           onSelect={onSelect}
           onRename={onRename}
+          onNewCodex={onNewCodex}
+          onNewTerm={onNewTerm}
+          onNewSigil={onNewSigil}
+          onNewChapter={onNewChapter}
         />
       </div>
     </nav>

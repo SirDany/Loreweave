@@ -135,6 +135,33 @@ export class MemoryAdapter implements StorageAdapter {
     }
   }
 
+  async deletePath(
+    rel: string,
+    opts?: { recursive?: boolean },
+  ): Promise<void> {
+    const norm = normalize(rel);
+    if (this.files.has(norm)) {
+      this.files.delete(norm);
+      this.notify(norm);
+      return;
+    }
+    if (!this.dirs.has(norm)) return;
+    const prefix = norm + '/';
+    const childFiles = [...this.files.keys()].filter((k) =>
+      k.startsWith(prefix),
+    );
+    const childDirs = [...this.dirs].filter(
+      (d) => d !== norm && d.startsWith(prefix),
+    );
+    if (!opts?.recursive && (childFiles.length > 0 || childDirs.length > 0)) {
+      throw new Error(`directory not empty: ${rel}`);
+    }
+    for (const f of childFiles) this.files.delete(f);
+    for (const d of childDirs) this.dirs.delete(d);
+    this.dirs.delete(norm);
+    this.notify(norm);
+  }
+
   async appendFile(rel: string, content: string): Promise<void> {
     const norm = normalize(rel);
     const prior = this.files.get(norm)?.content ?? '';

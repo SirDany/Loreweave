@@ -42,6 +42,57 @@ export async function lwWrite(
   }
 }
 
+/**
+ * Create a new file under the Saga. Resolves the new relative path on
+ * success; rejects with a "exists" error tag if the path is already taken
+ * and `overwrite` is not set.
+ */
+export async function lwCreate(
+  sagaRoot: string,
+  relPath: string,
+  content = '',
+  overwrite = false,
+): Promise<{ relPath: string }> {
+  const res = await fetch('/lw/create', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ sagaRoot, relPath, content, overwrite }),
+  });
+  if (res.status === 409) {
+    const err = new Error(`${relPath} already exists`);
+    (err as Error & { code?: string }).code = 'exists';
+    throw err;
+  }
+  if (!res.ok) {
+    throw new Error(`/lw/create ${res.status}: ${await res.text()}`);
+  }
+  return (await res.json()) as { relPath: string };
+}
+
+/**
+ * Delete a file or directory under the Saga. Recursive deletes are
+ * gated on the caller passing `recursive: true` so we never wipe a folder
+ * by accident.
+ */
+export async function lwDelete(
+  sagaRoot: string,
+  relPath: string,
+  opts?: { recursive?: boolean },
+): Promise<void> {
+  const res = await fetch('/lw/delete', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      sagaRoot,
+      relPath,
+      recursive: opts?.recursive === true,
+    }),
+  });
+  if (!res.ok) {
+    throw new Error(`/lw/delete ${res.status}: ${await res.text()}`);
+  }
+}
+
 async function lwJson<T>(args: string[]): Promise<T> {
   const r = await lw(args);
   if (r.code !== 0 && !r.stdout) {

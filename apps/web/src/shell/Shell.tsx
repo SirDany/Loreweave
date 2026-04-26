@@ -41,6 +41,7 @@ export function Shell({ app }: ShellProps) {
     closeAssistant,
     openDialog,
     setPendingRename,
+    setPendingNew,
     handleJump,
     handleJumpToTarget,
   } = app;
@@ -88,6 +89,7 @@ export function Shell({ app }: ShellProps) {
           onBackups={() => openDialog('backups')}
           onSettings={() => openDialog('settings')}
           onComposeLens={() => openDialog('composing')}
+          onRules={() => openDialog('rules')}
           onToggleAssistant={toggleAssistant}
           assistantOpen={assistantOpen}
         />
@@ -101,6 +103,17 @@ export function Shell({ app }: ShellProps) {
           onSelect={setSelection}
           onRename={(e) =>
             setPendingRename({ type: e.type, id: e.id, name: e.name })
+          }
+          onNewCodex={(t) =>
+            setPendingNew({
+              kind: 'codex',
+              type: t as 'character' | 'location' | 'concept' | 'lore' | 'waypoint',
+            })
+          }
+          onNewTerm={() => setPendingNew({ kind: 'term' })}
+          onNewSigil={() => setPendingNew({ kind: 'sigil' })}
+          onNewChapter={() =>
+            setPendingNew({ kind: 'chapter', tome: saga.tomeLens ?? undefined })
           }
         />
 
@@ -117,14 +130,17 @@ export function Shell({ app }: ShellProps) {
           selectionKey={selection?.key}
           onJump={handleJump}
           onSaved={onSaved}
+          onDeleted={() => setSelection(null)}
           openAssistant={openAssistant}
         />
 
         <ResolvedPanel
           entry={currentEntry}
+          chapter={currentChapter}
           sagaPath={saga.sagaPath}
           usagesCount={usagesCount}
           tracesCount={relatedTraces.length}
+          onJumpRef={(type, id) => handleJump({ kind: 'entry', key: `${type}/${id}` })}
           usagesContent={
             currentEntry && (
               <UsagesPanel

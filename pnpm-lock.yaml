@@ -114,6 +114,9 @@ importers:
       mammoth:
         specifier: 1.8.0
         version: 1.8.0
+      marked:
+        specifier: 14.1.2
+        version: 14.1.2
       pdf-parse:
         specifier: 1.1.1
         version: 1.1.1
@@ -1603,6 +1606,11 @@ packages:
   mammoth@1.8.0:
     resolution: {integrity: sha512-pJNfxSk9IEGVpau+tsZFz22ofjUsl2mnA5eT8PjPs2n0BP+rhVte4Nez6FdgEuxv3IGI3afiV46ImKqTGDVlbA==}
     engines: {node: '>=12.0.0'}
+    hasBin: true
+
+  marked@14.1.2:
+    resolution: {integrity: sha512-f3r0yqpz31VXiDB/wj9GaOB0a2PRLQl6vJmXiFrniNwjkKdvakqJRULhjFKJpxOchlCRiG5fcacoUZY5Xa6PEQ==}
+    engines: {node: '>= 18'}
     hasBin: true
 
   merge2@1.4.1:
@@ -3519,6 +3527,8 @@ snapshots:
       path-is-absolute: 1.0.1
       underscore: 1.13.8
       xmlbuilder: 10.1.1
+
+  marked@14.1.2: {}
 
   merge2@1.4.1: {}
 

@@ -4,6 +4,7 @@ import {
   ChevronDown,
   Inbox,
   Layers,
+  Scale,
   Search,
   Settings,
   Upload,
@@ -19,6 +20,7 @@ interface ActionsMenuProps {
   onBackups: () => void;
   onSettings: () => void;
   onComposeLens: () => void;
+  onRules: () => void;
   onToggleAssistant: () => void;
   assistantOpen: boolean;
 }
@@ -42,6 +44,7 @@ export function ActionsMenu({
   onBackups,
   onSettings,
   onComposeLens,
+  onRules,
   onToggleAssistant,
   assistantOpen,
 }: ActionsMenuProps) {
@@ -77,6 +80,7 @@ export function ActionsMenu({
     { icon: Upload, label: 'Export…', onClick: onExport },
     { icon: Inbox, label: 'Import…', onClick: onImport },
     { icon: Layers, label: 'Compose lens…', onClick: onComposeLens },
+    { icon: Scale, label: 'House rules…', onClick: onRules },
     { icon: Bookmark, label: 'Backups…', onClick: onBackups },
     { icon: Settings, label: 'Settings…', onClick: onSettings },
   ];

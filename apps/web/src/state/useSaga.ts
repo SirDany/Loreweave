@@ -114,15 +114,24 @@ export function useSaga(initialPath: string = DEFAULT_SAGA): SagaState {
   // Auto-reload on filesystem changes (dev server SSE).
   // Debounced inside the sidecar; this listener just schedules a reload
   // whenever an external edit lands on the Saga root we're viewing.
+  // Skipped entirely in demo mode (static GitHub Pages build, no sidecar)
+  // so we don't spam the console with /lw/events 404s.
   useEffect(() => {
     if (typeof window === 'undefined' || typeof EventSource === 'undefined') {
       return;
     }
+    const env = (import.meta as unknown as { env?: Record<string, string> })
+      .env;
+    if (env?.VITE_LW_DEMO === '1') return;
     const url = `/lw/events?sagaRoot=${encodeURIComponent(sagaPath)}`;
     let cancelled = false;
     let source: EventSource | null = null;
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
     let scheduled: ReturnType<typeof setTimeout> | null = null;
+    // If the endpoint never opens (no sidecar), stop retrying after a few
+    // attempts so we don't loop forever in `vite preview` or static hosts.
+    let consecutiveFailures = 0;
+    const MAX_FAILURES = 3;
 
     const scheduleReload = () => {
       if (scheduled) clearTimeout(scheduled);
@@ -135,11 +144,15 @@ export function useSaga(initialPath: string = DEFAULT_SAGA): SagaState {
     const connect = () => {
       if (cancelled) return;
       source = new EventSource(url);
+      source.addEventListener('open', () => {
+        consecutiveFailures = 0;
+      });
       source.addEventListener('change', scheduleReload);
       source.onerror = () => {
         source?.close();
         source = null;
-        // Retry with backoff; the dev server may still be warming up.
+        consecutiveFailures += 1;
+        if (consecutiveFailures >= MAX_FAILURES) return;
         retryTimer = setTimeout(connect, 2000);
       };
     };

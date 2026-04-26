@@ -27,13 +27,20 @@ export type DialogId =
   | 'searching'
   | 'backups'
   | 'settings'
-  | 'composing';
+  | 'composing'
+  | 'rules';
 
 export interface PendingRename {
   type: DumpEntry['type'];
   id: string;
   name: string;
 }
+
+export type PendingNew =
+  | { kind: 'codex'; type: 'character' | 'location' | 'concept' | 'lore' | 'waypoint' }
+  | { kind: 'term' }
+  | { kind: 'sigil' }
+  | { kind: 'chapter'; tome?: string };
 
 /**
  * Consolidated app-level state. Owns the Saga loader, current
@@ -56,6 +63,7 @@ export function useApp() {
     backups: false,
     settings: false,
     composing: false,
+    rules: false,
   });
   const [assistantOpen, setAssistantOpen] = useState(false);
   const [assistantSeed, setAssistantSeed] = useState<AssistantSeed | null>(
@@ -64,6 +72,7 @@ export function useApp() {
   const [pendingRename, setPendingRename] = useState<PendingRename | null>(
     null,
   );
+  const [pendingNew, setPendingNew] = useState<PendingNew | null>(null);
 
   const openDialog = useCallback((id: DialogId) => {
     setDialogs((d) => ({ ...d, [id]: true }));
@@ -94,6 +103,22 @@ export function useApp() {
     jumpToTarget(target, setSelection, setSection);
   }, []);
 
+  /**
+   * User-driven section change (Grimoire nav). Clears the selection
+   * if the currently-selected entry/chapter doesn't belong to the
+   * new section — otherwise the Workbench keeps rendering the old
+   * EntryView/ChapterView and shadows views like Constellation,
+   * Threads, Traces, Versions.
+   */
+  const changeSection = useCallback((s: Section) => {
+    setSection(s);
+    setSelection((sel) => {
+      if (!sel) return sel;
+      if (sel.kind === 'chapter') return s === 'story' ? sel : null;
+      return entryTypeToSection(sel.key) === s ? sel : null;
+    });
+  }, []);
+
   // Derived values — only meaningful once `saga.data` is loaded.
   const data = saga.data;
   const catalog = useMemo(
@@ -121,7 +146,7 @@ export function useApp() {
   return {
     saga,
     section,
-    setSection,
+    setSection: changeSection,
     selection,
     setSelection,
     dialogs,
@@ -134,6 +159,8 @@ export function useApp() {
     closeAssistant,
     pendingRename,
     setPendingRename,
+    pendingNew,
+    setPendingNew,
     catalog,
     visibleEntries,
     currentEntry,

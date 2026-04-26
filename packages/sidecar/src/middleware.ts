@@ -31,6 +31,7 @@ import {
   invalidateDigest,
   renderDigestForPrompt,
 } from './digest-cache.js';
+import { loadSagaRules } from './saga-rules.js';
 import {
   applyConfigToEnv,
   loadConfig,
@@ -358,6 +359,117 @@ export function registerSidecar(
       );
     } catch (e) {
       res.statusCode = 400;
+      res.end(String(e));
+    }
+  });
+
+  // --- /lw/create ----------------------------------------------------------
+  // Create a new file under a Saga. Body: `{ sagaRoot, relPath, content?,
+  // overwrite? }`. Defaults: empty content, fail if file exists. Used by the
+  // CRUD UI to scaffold new Codex/Lexicon/Sigil entries and chapters.
+  host.use('/lw/create', async (req, res) => {
+    if (req.method !== 'POST') {
+      res.statusCode = 405;
+      res.end('method not allowed');
+      return;
+    }
+    const body = await readBody(req, res);
+    if (body == null) return;
+    try {
+      const { sagaRoot, relPath, content, overwrite } = JSON.parse(body || '{}');
+      if (typeof sagaRoot !== 'string' || typeof relPath !== 'string') {
+        throw new Error('sagaRoot, relPath required');
+      }
+      const adapter = adapterFor(sagaRoot);
+      const exists = await adapter.exists(relPath);
+      if (exists && overwrite !== true) {
+        res.statusCode = 409;
+        res.setHeader('content-type', 'application/json');
+        res.setHeader('cache-control', 'no-store');
+        res.end(JSON.stringify({ error: 'exists', message: `${relPath} already exists` }));
+        return;
+      }
+      await adapter.writeFile(relPath, typeof content === 'string' ? content : '');
+      void invalidateDigest(path.resolve(safeRoot(sagaRoot)));
+      res.statusCode = 201;
+      res.setHeader('content-type', 'application/json');
+      res.setHeader('cache-control', 'no-store');
+      res.end(JSON.stringify({ ok: true, relPath }));
+    } catch (e) {
+      res.statusCode = 400;
+      res.end(String(e));
+    }
+  });
+
+  // --- /lw/delete ----------------------------------------------------------
+  // Delete a file or directory under a Saga. Body: `{ sagaRoot, relPath,
+  // recursive? }`. Rejects path-escapes via the adapter's safeJoin. No-op
+  // if the target is already missing.
+  host.use('/lw/delete', async (req, res) => {
+    if (req.method !== 'POST') {
+      res.statusCode = 405;
+      res.end('method not allowed');
+      return;
+    }
+    const body = await readBody(req, res);
+    if (body == null) return;
+    try {
+      const { sagaRoot, relPath, recursive } = JSON.parse(body || '{}');
+      if (typeof sagaRoot !== 'string' || typeof relPath !== 'string') {
+        throw new Error('sagaRoot, relPath required');
+      }
+      const adapter = adapterFor(sagaRoot);
+      if (!adapter.deletePath) {
+        throw new Error('storage adapter does not support delete');
+      }
+      await adapter.deletePath(relPath, { recursive: recursive === true });
+      void invalidateDigest(path.resolve(safeRoot(sagaRoot)));
+      res.statusCode = 200;
+      res.setHeader('content-type', 'application/json');
+      res.setHeader('cache-control', 'no-store');
+      res.end(JSON.stringify({ ok: true }));
+    } catch (e) {
+      res.statusCode = 400;
+      res.end(String(e));
+    }
+  });
+
+  // --- /lw/rules -----------------------------------------------------------
+  // List the Saga-level "House rules" markdown files that get prepended to
+  // every agent system prompt. Body: `?sagaRoot=…`. Returns
+  // `{ files: [{ relPath, content }], text }` so the Settings UI can render
+  // and edit them.
+  host.use('/lw/rules', async (req, res) => {
+    if (req.method !== 'GET') {
+      res.statusCode = 405;
+      res.end('method not allowed');
+      return;
+    }
+    const url = new URL(req.url ?? '', 'http://localhost');
+    const sagaRoot = url.searchParams.get('sagaRoot');
+    if (!sagaRoot) {
+      res.statusCode = 400;
+      res.end('sagaRoot required');
+      return;
+    }
+    try {
+      const abs = path.resolve(safeRoot(sagaRoot));
+      const result = await loadSagaRules(abs);
+      const out: Array<{ relPath: string; content: string }> = [];
+      for (const rel of result.files) {
+        try {
+          const content = await adapterFor(sagaRoot).readFile(rel);
+          out.push({ relPath: rel, content });
+        } catch {
+          /* skip unreadable */
+        }
+      }
+      res.statusCode = 200;
+      res.setHeader('content-type', 'application/json');
+      res.setHeader('cache-control', 'no-store');
+      res.end(JSON.stringify({ files: out, text: result.text }));
+    } catch (e) {
+      res.statusCode = 500;
       res.end(String(e));
     }
   });
@@ -725,6 +837,18 @@ export function registerSidecar(
       // so this is effectively free after the first turn.
       let system = agent.systemPrompt;
       if (preamble) system = `${preamble}\n\n---\n\n${system}`;
+      // Saga-wide House rules — always prepended so writer-set constraints
+      // win over any default agent persona guidance.
+      try {
+        const rules = await loadSagaRules(
+          path.resolve(safeRoot(payload.sagaRoot)),
+        );
+        if (rules.text) {
+          system = `${rules.text}\n\n---\n\n${system}`;
+        }
+      } catch (e) {
+        pushLog({ type: 'rules_error', error: (e as Error).message });
+      }
       system += `\n\n---\n\n## Runtime context\n\nYou are operating inside the Loreweave web app. The writer's current Saga root is \`${payload.sagaRoot}\`. Always pass that as \`sagaRoot\` when calling tools. Mutating tools (\`propose_*\`) never write to disk — they produce a pending-action card the writer must approve. Prefer \`propose_patch\` over \`propose_edit\` for localized changes.`;
       try {
         const digest = await getDigest(path.resolve(safeRoot(payload.sagaRoot)));

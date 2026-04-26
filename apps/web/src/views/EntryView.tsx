@@ -7,6 +7,7 @@ import type { RefCatalog } from '../editor/ReferenceExtension.js';
 import type { DumpEntry, KindInfo } from '../lib/lw.js';
 import { lwWrite } from '../lib/lw.js';
 import { cn } from '../lib/utils.js';
+import { ConfirmDeleteDialog } from './ConfirmDeleteDialog.js';
 import { EntryEditor } from './EntryEditor.js';
 import { RenameDialog } from './RenameDialog.js';
 
@@ -20,6 +21,8 @@ interface EntryViewProps {
   kinds: KindInfo[];
   onSaved: () => void;
   onAsk?: () => void;
+  /** Called after the entry's file is deleted; parent should clear selection. */
+  onDeleted?: () => void;
 }
 
 /**
@@ -36,9 +39,11 @@ export function EntryView({
   kinds,
   onSaved,
   onAsk,
+  onDeleted,
 }: EntryViewProps) {
   const [editing, setEditing] = useState(false);
   const [renaming, setRenaming] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [draft, setDraft] = useState(entry.body);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
@@ -105,6 +110,14 @@ export function EntryView({
             Frontmatter
           </Button>
           <Button
+            variant="ghost"
+            size="sm"
+            className="text-rose-400 hover:text-rose-300"
+            onClick={() => setDeleting(true)}
+          >
+            Delete
+          </Button>
+          <Button
             variant={dirty ? 'default' : 'outline'}
             size="sm"
             onClick={save}
@@ -135,6 +148,18 @@ export function EntryView({
           name={entry.name}
           onClose={() => setRenaming(false)}
           onRenamed={() => onSaved()}
+        />
+      )}
+      {deleting && (
+        <ConfirmDeleteDialog
+          sagaPath={sagaPath}
+          relPath={entry.relPath}
+          label={`${entry.type} "${entry.name}"`}
+          onClose={() => setDeleting(false)}
+          onDeleted={() => {
+            onDeleted?.();
+            onSaved();
+          }}
         />
       )}
     </div>

@@ -104,6 +104,19 @@ export class FsAdapter implements StorageAdapter {
     await fs.mkdir(this.resolve(rel), { recursive: true });
   }
 
+  async deletePath(
+    rel: string,
+    opts?: { recursive?: boolean },
+  ): Promise<void> {
+    const abs = this.resolve(rel);
+    try {
+      await fs.rm(abs, { recursive: opts?.recursive ?? false, force: true });
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code === 'ENOENT') return;
+      throw e;
+    }
+  }
+
   async appendFile(rel: string, content: string): Promise<void> {
     const abs = this.resolve(rel);
     await fs.mkdir(path.dirname(abs), { recursive: true });

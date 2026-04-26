@@ -81,6 +81,12 @@ export interface StorageAdapter {
   mkdirp(relPath: string): Promise<void>;
 
   /**
+   * Delete a file or empty directory. When `recursive` is true, also
+   * removes a non-empty directory. No-op if the path does not exist.
+   */
+  deletePath?(relPath: string, opts?: { recursive?: boolean }): Promise<void>;
+
+  /**
    * Append a line of text to a file, creating it if absent. Used by the
    * assistant session log; not all backends need to implement this
    * efficiently (default implementation is read-modify-write).
