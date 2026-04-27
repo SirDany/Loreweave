@@ -1,0 +1,44 @@
+# Dependabot config.
+#
+# - One grouped PR per week for minor + patch bumps (npm + GitHub Actions).
+# - Major bumps still open as individual PRs so reviews stay scoped.
+# - AI SDK majors are pinned until we do the manual migration to v5.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    groups:
+      minor-and-patch:
+        update-types:
+          - minor
+          - patch
+    ignore:
+      # AI SDK v5 has breaking changes (tools shape, maxSteps).
+      # Tracked separately; remove these entries once the migration lands.
+      - dependency-name: ai
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@ai-sdk/anthropic"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@ai-sdk/openai"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: cargo
+    directory: /apps/desktop/src-tauri
+    schedule:
+      interval: weekly
+    groups:
+      cargo-minor-and-patch:
+        update-types:
+          - minor
+          - patch
