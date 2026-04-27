@@ -79,8 +79,26 @@ const SUMMARY_CHAR_CAP = 180;
 /** Extract a one-sentence summary from a markdown body, stripping headings. */
 function summarize(body: string): string {
   if (!body) return '';
-  const cleaned = body
-    .replace(/^---\s*[\s\S]*?---\s*/, '') // stray frontmatter
+  // Bound input before any regex pass — a one-sentence digest never needs
+  // more than a few KB, and capping keeps every quantifier below linear in
+  // the worst case (CodeQL js/polynomial-redos).
+  const SUMMARIZE_INPUT_CAP = 8192;
+  let work =
+    body.length > SUMMARIZE_INPUT_CAP ? body.slice(0, SUMMARIZE_INPUT_CAP) : body;
+  // Strip a leading frontmatter block via index math instead of
+  // `/^---[\s\S]*?---\s*/` — that lazy quantifier backtracks polynomially
+  // when the closing `---` is missing.
+  if (work.startsWith('---')) {
+    const close = work.indexOf('\n---', 3);
+    if (close !== -1) {
+      let after = close + '\n---'.length;
+      while (after < work.length && (work[after] === ' ' || work[after] === '\t' || work[after] === '\r' || work[after] === '\n')) {
+        after += 1;
+      }
+      work = work.slice(after);
+    }
+  }
+  const cleaned = work
     .replace(/^#.*$/gm, '') // headings
     .replace(/`[^`]*`/g, '') // inline code
     .replace(/\!\[[^\]]*\]\([^\)]*\)/g, '') // images
@@ -217,7 +235,7 @@ export function renderPhoneBook(digest: CanonDigest): string {
   for (const p of digest.phoneBook) {
     const aliasPart =
       p.aliases && p.aliases.length > 0 ? ` _(a.k.a. ${p.aliases.join(', ')})_` : '';
-    const summary = p.summary.replace(/\|/g, '\\|');
+    const summary = p.summary.replace(/\\/g, '\\\\').replace(/\|/g, '\\|');
     lines.push(
       `| \`${p.ref}\` | ${p.name}${aliasPart} | ${p.type} | ${summary || '—'} |`,
     );

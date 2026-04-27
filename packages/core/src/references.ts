@@ -76,5 +76,13 @@ export function extractReferences(text: string): Reference[] {
  * "type/id" form so downstream lookups and renames keep working.
  */
 export function normalizeRef(ref: string): string {
-  return ref.replace(/^@/, "").replace(/\{[^}]*\}$/, "");
+  // Index-math equivalent of `.replace(/^@/, '').replace(/\{[^}]*\}$/, '')`.
+  // Avoids the unbounded `[^}]*` that CodeQL flags as polynomial-redos when
+  // the input comes from raw prose / frontmatter.
+  let s = ref.charCodeAt(0) === 64 /* @ */ ? ref.slice(1) : ref;
+  if (s.length > 0 && s.charCodeAt(s.length - 1) === 125 /* } */) {
+    const open = s.lastIndexOf('{');
+    if (open !== -1) s = s.slice(0, open);
+  }
+  return s;
 }

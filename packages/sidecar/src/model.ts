@@ -39,11 +39,12 @@ export async function resolveModel() {
     return openai(process.env.LW_AI_MODEL ?? 'gpt-4o-mini');
   }
   if (provider === 'ollama') {
-    // `ollama-ai-provider` is peer-compatible with the Vercel AI SDK.
-    // It's an optional runtime dep; import lazily so writers without
+    // `ollama-ai-provider-v2` is the maintained fork compatible with the
+    // Vercel AI SDK v5 (the original `ollama-ai-provider` only supports
+    // v3/v4). Optional runtime dep — import lazily so writers without
     // Ollama don't need the package installed.
     try {
-      const mod = (await import('ollama-ai-provider')) as unknown as {
+      const mod = (await import('ollama-ai-provider-v2')) as unknown as {
         createOllama: (opts: { baseURL: string }) => (model: string) => unknown;
       };
       const baseURL =
@@ -55,8 +56,8 @@ export async function resolveModel() {
       return ollama(process.env.LW_AI_MODEL ?? 'llama3.1');
     } catch (e) {
       throw new Error(
-        'Ollama requested but `ollama-ai-provider` is not installed. ' +
-          'Run `pnpm --filter @loreweave/sidecar add ollama-ai-provider` and retry. ' +
+        'Ollama requested but `ollama-ai-provider-v2` is not installed. ' +
+          'Run `pnpm --filter @loreweave/sidecar add ollama-ai-provider-v2` and retry. ' +
           `(inner: ${(e as Error).message})`,
       );
     }
