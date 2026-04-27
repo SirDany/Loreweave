@@ -812,7 +812,9 @@ export function registerSidecar(
       for (const [name, desc] of Object.entries(toolDescriptors)) {
         tools[name] = tool({
           description: desc.description,
-          parameters: desc.schema,
+          // AI SDK v5 renamed `parameters` -> `inputSchema`. Cast through
+          // `never` so we don't pin a type that breaks on every bump.
+          inputSchema: desc.schema as never,
           execute: async (rawArgs: unknown) => {
             send('tool_call', { name, args: rawArgs });
             pushLog({ type: 'tool_call', name, args: rawArgs });
@@ -828,7 +830,7 @@ export function registerSidecar(
             });
             return result;
           },
-        });
+        } as never);
       }
 
 
@@ -871,20 +873,21 @@ export function registerSidecar(
           .join(', ')}. Consider calling \`lw_weave\` on any you need before drafting.`;
       }
 
-      const { streamText } = await import('ai');
+      const { streamText, stepCountIs } = await import('ai');
       // The `ai` SDK type shape drifts between versions; the public runtime
       // contract (`fullStream`, `await result.usage`) is stable. Cast the
-      // result here rather than pinning a type that breaks on every bump.
-      const result = streamText({
+      // arg through `never` to avoid pinning to the current generic shape.
+      const result = (streamText as (args: never) => unknown)({
         model: model as never,
         system,
         messages: payload.messages,
-        tools: tools as Parameters<typeof streamText>[0]['tools'],
-        maxSteps: 8,
+        tools,
+        // v5 replaced `maxSteps` with the more general `stopWhen` predicate.
+        stopWhen: stepCountIs(8),
         abortSignal: abort.signal,
-      }) as unknown as {
+      } as never) as {
         fullStream: AsyncIterable<
-          | { type: 'text-delta'; textDelta: string }
+          | { type: 'text-delta'; text?: string; textDelta?: string }
           | { type: 'error'; error: unknown }
           | { type: string; [k: string]: unknown }
         >;
@@ -900,8 +903,16 @@ export function registerSidecar(
       let assistantText = '';
       for await (const part of result.fullStream) {
         if (part.type === 'text-delta') {
-          send('token', part.textDelta);
-          assistantText += part.textDelta;
+          // v5 emits `text` on text-delta parts; older versions used
+          // `textDelta`. Accept both so a future bump doesn't break us.
+          const delta =
+            (part as { text?: string; textDelta?: string }).text ??
+            (part as { textDelta?: string }).textDelta ??
+            '';
+          if (delta) {
+            send('token', delta);
+            assistantText += delta;
+          }
         } else if (part.type === 'error') {
           send('error', String(part.error));
           pushLog({ type: 'error', message: String(part.error) });
