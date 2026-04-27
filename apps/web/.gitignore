@@ -1,2 +1,4 @@
 dist/
 node_modules/
+# Pre-rendered demo snapshots are baked fresh by the GitHub Pages workflow.
+public/demo/

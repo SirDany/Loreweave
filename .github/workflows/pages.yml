@@ -29,6 +29,14 @@ jobs:
       # Workspace packages must exist as `dist/` before the web build can
       # resolve `@loreweave/core`.
       - run: pnpm -r --filter "./packages/*" build
+      # Pre-render the example saga to JSON so the static demo build has
+      # something to load when the /lw sidecar is unavailable.
+      - name: Bake demo saga snapshot
+        run: |
+          mkdir -p apps/web/public/demo
+          node packages/cli/dist/bin.js dump sagas/example-saga > apps/web/public/demo/dump.json
+          node packages/cli/dist/bin.js kinds sagas/example-saga --json > apps/web/public/demo/kinds.json
+          node packages/cli/dist/bin.js lenses sagas/example-saga --json > apps/web/public/demo/lenses.json
       - name: Build web (demo mode)
         env:
           # Repo-scoped base path — GitHub Pages serves project sites at

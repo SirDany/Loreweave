@@ -6,6 +6,21 @@
 //
 // The middleware only runs on localhost, so all filesystem mutations stay
 // on the writer's own machine.
+//
+// In static demo builds (VITE_LW_DEMO=1, e.g. GitHub Pages) the sidecar is
+// not available — read-only commands fall back to JSON snapshots baked into
+// `apps/web/public/demo/` by the deploy workflow.
+
+const IS_DEMO = import.meta.env.VITE_LW_DEMO === '1';
+const DEMO_BASE = `${import.meta.env.BASE_URL}demo/`;
+
+async function fetchDemoJson<T>(file: string): Promise<T> {
+  const res = await fetch(`${DEMO_BASE}${file}`);
+  if (!res.ok) {
+    throw new Error(`demo ${file} ${res.status}: ${await res.text()}`);
+  }
+  return (await res.json()) as T;
+}
 
 export interface LwResult {
   stdout: string;
@@ -238,6 +253,7 @@ export interface ResolvedView {
 // ---------- command wrappers ----------
 
 export function dump(saga: string, tome?: string): Promise<DumpPayload> {
+  if (IS_DEMO) return fetchDemoJson<DumpPayload>('dump.json');
   const args = ['dump', saga];
   if (tome) args.push('--tome', tome);
   return lwJson<DumpPayload>(args);
@@ -284,6 +300,7 @@ export interface KindInfo {
 }
 
 export function kinds(saga: string): Promise<KindInfo[]> {
+  if (IS_DEMO) return fetchDemoJson<KindInfo[]>('kinds.json');
   return lwJson<KindInfo[]>(['kinds', saga, '--json']);
 }
 
@@ -307,6 +324,7 @@ export interface LensManifestPayload {
 }
 
 export function lenses(saga: string): Promise<LensManifestPayload[]> {
+  if (IS_DEMO) return fetchDemoJson<LensManifestPayload[]>('lenses.json');
   return lwJson<LensManifestPayload[]>(['lenses', saga, '--json']);
 }
 
