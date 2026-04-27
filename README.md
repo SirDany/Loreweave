@@ -1,5 +1,9 @@
 # Loreweave
 
+<p align="center">
+  <img src="docs/assets/loreweave-icon.png" alt="Loreweave" width="160" />
+</p>
+
 **A local-first, agentic book-writing workbench.**
 Your canon lives as plain Markdown and YAML on your disk. A small TypeScript
 core parses and validates it, a CLI (`lw`) gives you ground-truth queries, a
@@ -12,6 +16,7 @@ story.
 ![Node](https://img.shields.io/badge/node-%E2%89%A520.10-brightgreen)
 ![pnpm](https://img.shields.io/badge/pnpm-9.12-f69220)
 ![Tests](https://img.shields.io/badge/tests-117%20passing-success)
+[![Release](https://img.shields.io/github/v/release/SirDany/Loreweave?label=download)](https://github.com/SirDany/Loreweave/releases/latest)
 
 > **Status:** early but usable end-to-end against the bundled example Saga.
 > APIs, file layout, and agent prompts may still shift before 1.0.
@@ -88,7 +93,28 @@ See [docs/conventions.md](docs/conventions.md) for the full spec.
 
 ## Quickstart
 
-### Requirements
+### Download a desktop build (non-developers)
+
+Pre-built installers are published to the [Releases page](https://github.com/SirDany/Loreweave/releases/latest)
+on every tagged commit:
+
+| Platform | Asset                            |
+| -------- | -------------------------------- |
+| Windows  | `Loreweave_<version>_x64-setup.exe` (NSIS installer) |
+| Linux    | `loreweave_<version>_amd64.deb` or `Loreweave_<version>_amd64.AppImage` |
+
+Each build is a self-contained Tauri app: a small native window, an
+embedded Node sidecar, and the bundled web UI. **No Node, pnpm, Rust, or
+browser required on the user's machine** — double-click the installer,
+launch it from the Start menu / Applications, and the app opens directly
+on your Saga library.
+
+`main`-branch builds also produce installers as workflow artifacts on
+each push, useful for testing unreleased changes.
+
+### Build from source (developers)
+
+#### Requirements
 
 - **Node.js** `>=20.10`
 - **pnpm** `9.12+` (`corepack enable` or `npm i -g pnpm`)
@@ -98,7 +124,7 @@ See [docs/conventions.md](docs/conventions.md) for the full spec.
 ### Install, build, run
 
 ```pwsh
-git clone https://github.com/<you>/loreweave.git
+git clone https://github.com/SirDany/Loreweave.git
 cd loreweave
 pnpm install
 pnpm build:all       # builds core, cli, sidecar, and the web bundle
@@ -121,6 +147,24 @@ pnpm --filter @loreweave/web dev  # explicit
 ```
 
 Vite binds to `127.0.0.1:5173` and mounts the same sidecar middleware.
+
+### Desktop app (Tauri)
+
+To iterate on the native shell or produce installers locally you also need
+a [Rust toolchain](https://www.rust-lang.org/tools/install) (stable) and,
+on Linux, the WebKit/GTK dev packages listed in
+[`.github/workflows/release.yml`](.github/workflows/release.yml).
+
+```pwsh
+pnpm desktop          # tauri dev — native window backed by `pnpm dev`
+pnpm desktop:build    # full bundle: build:all → stage resources → fetch
+                      # portable Node → `tauri build` → installer in
+                      # apps/desktop/src-tauri/target/release/bundle/
+```
+
+The bundled app spawns the embedded Node sidecar on a random localhost
+port, waits for it, and points the WebView2 / WebKitGTK window at it —
+the user never sees a browser.
 
 ### Try the CLI
 
@@ -147,10 +191,13 @@ pnpm --filter @loreweave/web test # web tests
 ```
 .github/                 Copilot instructions, agents, prompts
 apps/web/                React + Vite UI + sidecar Vite plugin
+apps/desktop/            Tauri shell (Rust + WebView2 / WebKitGTK)
 packages/core/           Loader, resolver, validator, timeline, calendar, digest
 packages/cli/            `lw` — command-line ground truth
 packages/sidecar/        HTTP middleware, agents, tools, embeddings
 scripts/launch.mjs       Standalone launcher used by `pnpm start`
+scripts/stage-desktop-resources.mjs   Copies build outputs into Tauri resources/
+scripts/fetch-desktop-node.mjs        Downloads portable Node for the bundle
 sagas/                   Your writing projects (one folder per Saga)
 sagas/example-saga/      Reference content covering every feature
 docs/                    Specs and conventions
@@ -327,12 +374,19 @@ Loreweave is local-first. The full app only makes sense with a sidecar that
 can read/write your Saga on disk, so pure static hosts (GitHub Pages,
 Netlify static, Cloudflare Pages) can't run the full experience.
 
-Two free-on-GitHub options cover the realistic cases:
+Three free-on-GitHub options cover the realistic cases:
 
+- **Desktop installer — recommended for non-developers.** The
+  [`release` workflow](.github/workflows/release.yml) builds the Tauri
+  bundle (Windows `.exe` / Linux `.deb` + `.AppImage`) for every push to
+  `main` and publishes signed artifacts to GitHub Releases on every
+  `v*` tag. Users download one file, install it, and never touch a
+  terminal.
 - **GitHub Pages — demo preview.** The [`pages` workflow](.github/workflows/pages.yml)
-  builds `apps/web` with `VITE_LW_DEMO=1` and a repo-scoped base path, then
-  deploys the static bundle with a persistent banner explaining that
-  reads/writes are disabled. Good as a landing page.
+  builds `apps/web` with `VITE_LW_DEMO=1` and a repo-scoped base path,
+  bakes a snapshot of the example Saga into the bundle, then deploys
+  with a persistent banner explaining that reads/writes are disabled.
+  Good as a landing page.
 - **GitHub Codespaces — full editor in the browser.** The
   [.devcontainer/](.devcontainer/devcontainer.json) config installs pnpm,
   builds the workspace, and forwards port `5173`. Click **Code →

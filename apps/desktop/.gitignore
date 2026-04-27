@@ -1,0 +1,18 @@
+node_modules/
+src-tauri/target/
+src-tauri/binaries/
+src-tauri/resources/apps/
+src-tauri/resources/packages/
+src-tauri/resources/scripts/
+src-tauri/resources/node_modules/
+src-tauri/resources/package.json
+src-tauri/resources/package-lock.json
+src-tauri/gen/
+# tauri icon generates these from icon.png on every build
+src-tauri/icons/32x32.png
+src-tauri/icons/128x128.png
+src-tauri/icons/128x128@2x.png
+src-tauri/icons/icon.icns
+src-tauri/icons/icon.ico
+src-tauri/icons/Square*.png
+src-tauri/icons/StoreLogo.png

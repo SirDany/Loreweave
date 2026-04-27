@@ -2,8 +2,14 @@ name: ci
 
 on:
   push:
-    branches: [main]
+    branches: [main, dev]
   pull_request:
+
+concurrency:
+  # On PRs, cancel superseded runs so a force-push doesn't queue stale CI.
+  # On branch pushes, let runs finish so the latest commit always has a status.
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   test:

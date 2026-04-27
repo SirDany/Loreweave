@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Loreweave</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0e0d12;
+        --fg: #e8e3d3;
+        --muted: #9b9387;
+        --accent: #c8a96a;
+      }
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: var(--bg);
+        color: var(--fg);
+        font-family: 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
+      }
+      main {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 1.25rem;
+        text-align: center;
+        padding: 2rem;
+      }
+      h1 {
+        margin: 0;
+        font-weight: 500;
+        letter-spacing: 0.04em;
+        font-size: 2.5rem;
+      }
+      .stage {
+        color: var(--accent);
+        font-variant: small-caps;
+        letter-spacing: 0.15em;
+      }
+      .detail {
+        color: var(--muted);
+        font-size: 0.9rem;
+        max-width: 38ch;
+        min-height: 1.2em;
+      }
+      .spinner {
+        width: 2rem;
+        height: 2rem;
+        border: 2px solid var(--muted);
+        border-top-color: var(--accent);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      pre {
+        max-height: 8rem;
+        overflow: auto;
+        font-size: 0.7rem;
+        color: var(--muted);
+        background: rgba(255, 255, 255, 0.03);
+        padding: 0.5rem 0.75rem;
+        border-radius: 4px;
+        width: min(80ch, 90%);
+        text-align: left;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Loreweave</h1>
+      <div class="spinner" id="spinner"></div>
+      <div class="stage" id="stage">starting…</div>
+      <div class="detail" id="detail"></div>
+      <pre id="log" hidden></pre>
+    </main>
+    <script type="module">
+      const stage = document.getElementById('stage');
+      const detail = document.getElementById('detail');
+      const log = document.getElementById('log');
+      const spinner = document.getElementById('spinner');
+
+      try {
+        const { listen } = await import(
+          'https://esm.sh/@tauri-apps/api@2/event'
+        );
+        listen('lw://status', (e) => {
+          const { stage: s, detail: d } = e.payload ?? {};
+          if (s) stage.textContent = s;
+          if (d !== undefined) detail.textContent = d ?? '';
+          if (s === 'error') {
+            spinner.style.borderTopColor = '#c0524d';
+            spinner.style.animation = 'none';
+          }
+        });
+        listen('lw://log', (e) => {
+          log.hidden = false;
+          const text = String(e.payload ?? '').trim();
+          if (!text) return;
+          log.textContent = (log.textContent + '\n' + text).slice(-4000);
+          log.scrollTop = log.scrollHeight;
+        });
+      } catch {
+        // Running outside Tauri (preview); ignore.
+      }
+    </script>
+  </body>
+</html>

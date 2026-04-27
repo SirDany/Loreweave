@@ -1,0 +1,225 @@
+// Loreweave desktop entry point.
+//
+// Boots the bundled Node sidecar (Tauri sidecar binary `lw-node`) with the
+// staged web/sidecar/cli resources, waits for the local HTTP server to
+// come up, then navigates the main window at it.
+
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
+use std::net::TcpListener;
+use std::path::PathBuf;
+use std::time::{Duration, Instant};
+
+use serde::Serialize;
+use tauri::{Emitter, Manager};
+use tauri_plugin_shell::process::{CommandChild, CommandEvent};
+use tauri_plugin_shell::ShellExt;
+
+#[derive(Clone, Serialize)]
+struct LauncherStatus {
+    stage: &'static str,
+    detail: Option<String>,
+}
+
+fn pick_free_port() -> u16 {
+    // Bind ephemeral, take the OS-assigned port, then drop the socket so
+    // the embedded Node server can take it. Race window is small and only
+    // matters at startup.
+    TcpListener::bind("127.0.0.1:0")
+        .ok()
+        .and_then(|l| l.local_addr().ok())
+        .map(|a| a.port())
+        .unwrap_or(4729)
+}
+
+fn resources_root(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    app.path()
+        .resolve("resources", tauri::path::BaseDirectory::Resource)
+        .map_err(|e| format!("resolve resources/: {e}"))
+}
+
+fn spawn_sidecar(
+    app: &tauri::AppHandle,
+    port: u16,
+    root: &PathBuf,
+) -> Result<CommandChild, String> {
+    let launcher = root.join("scripts").join("launch.mjs");
+    if !launcher.exists() {
+        return Err(format!("missing launcher at {}", launcher.display()));
+    }
+
+    let cmd = app
+        .shell()
+        .sidecar("lw-node")
+        .map_err(|e| format!("sidecar lw-node: {e}"))?
+        .args([
+            launcher.to_string_lossy().to_string(),
+            "--root".into(),
+            root.to_string_lossy().to_string(),
+            "--port".into(),
+            port.to_string(),
+            "--no-open".into(),
+        ]);
+
+    let (mut rx, child) = cmd.spawn().map_err(|e| format!("spawn: {e}"))?;
+    let app_handle = app.clone();
+    tauri::async_runtime::spawn(async move {
+        while let Some(event) = rx.recv().await {
+            match event {
+                CommandEvent::Stdout(line) | CommandEvent::Stderr(line) => {
+                    let text = String::from_utf8_lossy(&line).to_string();
+                    eprintln!("[lw-node] {text}");
+                    let _ = app_handle.emit("lw://log", text);
+                }
+                CommandEvent::Terminated(status) => {
+                    eprintln!("[lw-node] exited: {:?}", status.code);
+                    let _ = app_handle.emit(
+                        "lw://terminated",
+                        status.code.unwrap_or(-1),
+                    );
+                }
+                _ => {}
+            }
+        }
+    });
+
+    Ok(child)
+}
+
+async fn wait_for_port(port: u16, deadline: Duration) -> bool {
+    let url = format!("http://127.0.0.1:{port}/");
+    let start = Instant::now();
+    while start.elapsed() < deadline {
+        if let Ok(resp) = reqwest_get(&url).await {
+            if resp {
+                return true;
+            }
+        }
+        tokio::time::sleep(Duration::from_millis(150)).await;
+    }
+    false
+}
+
+// Tiny GET via std TCP — avoids pulling reqwest just to ping a port.
+async fn reqwest_get(url: &str) -> Result<bool, ()> {
+    let url = url.to_string();
+    tauri::async_runtime::spawn_blocking(move || {
+        let parsed = url
+            .strip_prefix("http://")
+            .and_then(|rest| rest.split_once('/'))
+            .map(|(host, _)| host.to_string())
+            .unwrap_or_default();
+        std::net::TcpStream::connect_timeout(
+            &parsed.parse().map_err(|_| ())?,
+            Duration::from_millis(250),
+        )
+        .map(|_| true)
+        .map_err(|_| ())
+    })
+    .await
+    .map_err(|_| ())?
+}
+
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
+pub fn run() {
+    tauri::Builder::default()
+        .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .setup(|app| {
+            let app_handle = app.handle().clone();
+            let main_window = app
+                .get_webview_window("main")
+                .ok_or("main window missing")?;
+
+            tauri::async_runtime::spawn(async move {
+                let _ = app_handle.emit(
+                    "lw://status",
+                    LauncherStatus {
+                        stage: "starting",
+                        detail: None,
+                    },
+                );
+
+                let root = match resources_root(&app_handle) {
+                    Ok(p) => p,
+                    Err(e) => {
+                        let _ = app_handle.emit(
+                            "lw://status",
+                            LauncherStatus {
+                                stage: "error",
+                                detail: Some(e),
+                            },
+                        );
+                        return;
+                    }
+                };
+
+                let port = pick_free_port();
+                match spawn_sidecar(&app_handle, port, &root) {
+                    Ok(child) => {
+                        // Stash the child so we can kill it on shutdown.
+                        app_handle.manage(SidecarHandle(std::sync::Mutex::new(
+                            Some(child),
+                        )));
+                    }
+                    Err(e) => {
+                        let _ = app_handle.emit(
+                            "lw://status",
+                            LauncherStatus {
+                                stage: "error",
+                                detail: Some(e),
+                            },
+                        );
+                        return;
+                    }
+                }
+
+                if !wait_for_port(port, Duration::from_secs(60)).await {
+                    let _ = app_handle.emit(
+                        "lw://status",
+                        LauncherStatus {
+                            stage: "error",
+                            detail: Some("sidecar failed to come up".into()),
+                        },
+                    );
+                    return;
+                }
+
+                let url = format!("http://127.0.0.1:{port}/");
+                if let Err(e) = main_window.eval(&format!(
+                    "window.location.replace('{}')",
+                    url.replace('\'', "")
+                )) {
+                    eprintln!("navigate failed: {e}");
+                }
+
+                let _ = app_handle.emit(
+                    "lw://status",
+                    LauncherStatus {
+                        stage: "ready",
+                        detail: Some(url),
+                    },
+                );
+            });
+
+            Ok(())
+        })
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { .. } = event {
+                if let Some(handle) = window.app_handle().try_state::<SidecarHandle>() {
+                    if let Ok(mut guard) = handle.0.lock() {
+                        if let Some(child) = guard.take() {
+                            let _ = child.kill();
+                        }
+                    }
+                }
+            }
+        })
+        .run(tauri::generate_context!())
+        .expect("error while running tauri application");
+}
+
+struct SidecarHandle(std::sync::Mutex<Option<CommandChild>>);

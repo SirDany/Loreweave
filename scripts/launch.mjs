@@ -18,7 +18,7 @@
 import { createServer } from 'node:http';
 import { promises as fs, createReadStream } from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { execFile } from 'node:child_process';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -28,11 +28,15 @@ const argv = process.argv.slice(2);
 const portArg = argv.indexOf('--port');
 const port = portArg >= 0 ? Number(argv[portArg + 1]) : 4729;
 const open = !argv.includes('--no-open');
+// Optional override for desktop bundles where resources live outside the
+// source tree (e.g. installed under Program Files / /usr/lib).
+const rootArg = argv.indexOf('--root');
+const root = rootArg >= 0 ? path.resolve(argv[rootArg + 1]) : repoRoot;
 
-const distDir = path.join(repoRoot, 'apps', 'web', 'dist');
-const cliBin = path.join(repoRoot, 'packages', 'cli', 'dist', 'bin.js');
+const distDir = path.join(root, 'apps', 'web', 'dist');
+const cliBin = path.join(root, 'packages', 'cli', 'dist', 'bin.js');
 const sidecarEntry = path.join(
-  repoRoot,
+  root,
   'packages',
   'sidecar',
   'dist',
@@ -45,14 +49,14 @@ for (const required of [distDir, cliBin, sidecarEntry]) {
     await fs.access(required);
   } catch {
     console.error(
-      `\n✖ missing ${path.relative(repoRoot, required)}\n` +
+      `\n✖ missing ${path.relative(root, required)}\n` +
         `  run \`pnpm install && pnpm -r build && pnpm --filter @loreweave/web build\` first.`,
     );
     process.exit(1);
   }
 }
 
-const { registerSidecar } = await import(sidecarEntry);
+const { registerSidecar } = await import(pathToFileURL(sidecarEntry).href);
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -79,7 +83,7 @@ const host = {
     return host;
   },
 };
-registerSidecar(host, { repoRoot, cliBin });
+registerSidecar(host, { repoRoot: root, cliBin });
 
 async function serveStatic(req, res) {
   let url = (req.url ?? '/').split('?')[0];
