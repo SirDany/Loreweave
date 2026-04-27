@@ -72,8 +72,8 @@ importers:
         specifier: ^2.5.2
         version: 2.6.1
       yaml:
-        specifier: 2.5.1
-        version: 2.5.1
+        specifier: 2.8.3
+        version: 2.8.3
       zod:
         specifier: ^3.25.28
         version: 3.25.76
@@ -130,8 +130,8 @@ importers:
         specifier: 1.1.0
         version: 1.1.0
       yaml:
-        specifier: 2.5.1
-        version: 2.5.1
+        specifier: 2.8.3
+        version: 2.8.3
       yauzl:
         specifier: 3.1.3
         version: 3.1.3
@@ -161,8 +161,8 @@ importers:
         specifier: 4.0.3
         version: 4.0.3
       yaml:
-        specifier: 2.5.1
-        version: 2.5.1
+        specifier: 2.8.3
+        version: 2.8.3
       zod:
         specifier: 3.23.8
         version: 3.23.8
@@ -192,8 +192,8 @@ importers:
         specifier: ^3.4.33
         version: 3.4.33(react@18.3.1)(sswr@2.2.0(svelte@5.55.5))(svelte@5.55.5)(vue@3.5.33(typescript@5.6.2))(zod@3.25.76)
       yaml:
-        specifier: 2.5.1
-        version: 2.5.1
+        specifier: 2.8.3
+        version: 2.8.3
       zod:
         specifier: ^3.25.28
         version: 3.25.76
@@ -1861,8 +1861,8 @@ packages:
     resolution: {integrity: sha512-56rxCq7G/XfB4EkXq9Egn5GCqugWvDFjafDOThIdMBsI15iqPqR5r15TfSr1YPYeEI19YeaXMCbY6u88Y76GLQ==}
     engines: {node: ^10 || ^12 || >=14}
 
-  postcss@8.5.10:
-    resolution: {integrity: sha512-pMMHxBOZKFU6HgAZ4eyGnwXF/EvPGGqUr0MnZ5+99485wwW41kW91A4LOGxSHhgugZmSChL5AlElNdwlNgcnLQ==}
+  postcss@8.5.12:
+    resolution: {integrity: sha512-W62t/Se6rA0Az3DfCL0AqJwXuKwBeYg6nOaIgzP+xZ7N5BFCI7DYi1qs6ygUYT6rvfi6t9k65UMLJC+PHZpDAA==}
     engines: {node: ^10 || ^12 || >=14}
 
   process-nextick-args@2.0.1:
@@ -2215,9 +2215,9 @@ packages:
   yallist@3.1.1:
     resolution: {integrity: sha512-a4UGQaWPH59mOXUYnAG2ewncQS4i4F43Tv3JoAM+s2VDAmS9NsK8GpDMLrCHPksFT7h3K6TOoUNn2pb7RoXx4g==}
 
-  yaml@2.5.1:
-    resolution: {integrity: sha512-bLQOjaX/ADgQ20isPJRvF0iRUHIxVhYvr53Of7wGcWlO2jvtUlH5m87DsmulFVxRpNLOnI4tB6p/oh8D7kpn9Q==}
-    engines: {node: '>= 14'}
+  yaml@2.8.3:
+    resolution: {integrity: sha512-AvbaCLOO2Otw/lW5bmh9d/WEdcDFdQp2Z2ZUH3pX9U2ihyUY0nvLv7J6TrWowklRGPYbB/IuIMfYgxaCPg5Bpg==}
+    engines: {node: '>= 14.6'}
     hasBin: true
 
   yauzl@3.1.3:
@@ -3074,7 +3074,7 @@ snapshots:
       '@vue/shared': 3.5.33
       estree-walker: 2.0.2
       magic-string: 0.30.21
-      postcss: 8.5.10
+      postcss: 8.5.12
       source-map-js: 1.2.1
 
   '@vue/compiler-ssr@3.5.33':
@@ -3765,7 +3765,7 @@ snapshots:
   postcss-load-config@4.0.2(postcss@8.4.47):
     dependencies:
       lilconfig: 3.1.3
-      yaml: 2.5.1
+      yaml: 2.8.3
     optionalDependencies:
       postcss: 8.4.47
 
@@ -3787,7 +3787,7 @@ snapshots:
       picocolors: 1.1.0
       source-map-js: 1.2.1
 
-  postcss@8.5.10:
+  postcss@8.5.12:
     dependencies:
       nanoid: 3.3.11
       picocolors: 1.1.1
@@ -4212,7 +4212,7 @@ snapshots:
 
   yallist@3.1.1: {}
 
-  yaml@2.5.1: {}
+  yaml@2.8.3: {}
 
   yauzl@3.1.3:
     dependencies:
