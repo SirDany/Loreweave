@@ -18,12 +18,20 @@ interface Node {
 }
 
 function normalize(p: string): string {
-  // Unify separators and strip leading "./" / trailing "/" so keys match.
-  const unified = p.replace(/\\/g, '/').replace(/^\.?\/+/, '').replace(/\/+$/, '');
-  if (unified.split('/').some((seg) => seg === '..' || seg === '.')) {
+  // Walk the string once to drop leading `./`, leading `/`, and trailing
+  // `/`. Avoids regex anchored-quantifier patterns (`^\.?/+` / `/+$`) that
+  // CodeQL flags as polynomial-redos on uncontrolled paths.
+  const unified = p.replace(/\\/g, '/');
+  let start = 0;
+  if (unified[start] === '.' && unified[start + 1] === '/') start += 2;
+  while (start < unified.length && unified[start] === '/') start += 1;
+  let end = unified.length;
+  while (end > start && unified[end - 1] === '/') end -= 1;
+  const result = unified.slice(start, end);
+  if (result.split('/').some((seg) => seg === '..' || seg === '.')) {
     throw new Error(`invalid path: ${p}`);
   }
-  return unified;
+  return result;
 }
 
 function parentOf(p: string): string {
