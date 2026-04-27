@@ -5,6 +5,9 @@ on:
     branches: [main, dev]
   pull_request:
 
+permissions:
+  contents: read
+
 concurrency:
   # On PRs, cancel superseded runs so a force-push doesn't queue stale CI.
   # On branch pushes, let runs finish so the latest commit always has a status.
