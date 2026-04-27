@@ -217,7 +217,7 @@ export function renderPhoneBook(digest: CanonDigest): string {
   for (const p of digest.phoneBook) {
     const aliasPart =
       p.aliases && p.aliases.length > 0 ? ` _(a.k.a. ${p.aliases.join(', ')})_` : '';
-    const summary = p.summary.replace(/\|/g, '\\|');
+    const summary = p.summary.replace(/\\/g, '\\\\').replace(/\|/g, '\\|');
     lines.push(
       `| \`${p.ref}\` | ${p.name}${aliasPart} | ${p.type} | ${summary || '—'} |`,
     );

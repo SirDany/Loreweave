@@ -519,8 +519,11 @@ async function exportCodex(
   // codex-html
   const escape = (s: string) =>
     s.replace(
-      /[&<>]/g,
-      (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]!)
+      /[&<>"']/g,
+      (c) =>
+        ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[
+          c
+        ]!)
     );
 
   const sections: string[] = [];
