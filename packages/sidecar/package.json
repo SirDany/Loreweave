@@ -22,7 +22,7 @@
     "@ai-sdk/anthropic": "^0.0.56",
     "@ai-sdk/openai": "^0.0.72",
     "@loreweave/core": "workspace:*",
-    "ai": "^3.4.33",
+    "ai": "^5.0.52",
     "yaml": "2.8.3",
     "zod": "^3.25.28"
   },
