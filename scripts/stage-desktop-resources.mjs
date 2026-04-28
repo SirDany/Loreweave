@@ -151,6 +151,10 @@ async function main() {
   });
 
   console.log('\ninstalling production dependencies (npm)…');
+  // `--legacy-peer-deps` is required because the optional
+  // `ollama-ai-provider-v2` peer-depends on `zod@^4`, while the rest of the
+  // workspace pins `zod@^3.25`. The runtime does not actually need zod 4 —
+  // npm 7+'s strict peer resolution is the only blocker.
   execFileSync(
     process.platform === 'win32' ? 'npm.cmd' : 'npm',
     [
@@ -159,6 +163,7 @@ async function main() {
       '--no-audit',
       '--no-fund',
       '--ignore-scripts',
+      '--legacy-peer-deps',
       '--loglevel=error',
     ],
     { cwd: resourcesRoot, stdio: 'inherit', shell: process.platform === 'win32' },
