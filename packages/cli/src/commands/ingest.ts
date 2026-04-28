@@ -24,12 +24,15 @@ export const ALLOWED_EXT = new Set([
 
 const BINARY_EXTRACTORS: Record<string, (buf: Buffer) => Promise<string>> = {
   ".pdf": async (buf) => {
-    // pdf-parse is CJS; import via default export.
-    const mod = (await import("pdf-parse")).default as (
-      b: Buffer,
-    ) => Promise<{ text: string }>;
-    const r = await mod(buf);
-    return r.text ?? "";
+    // pdf-parse v2: ESM class API.
+    const { PDFParse } = await import("pdf-parse");
+    const parser = new PDFParse({ data: new Uint8Array(buf) });
+    try {
+      const r = await parser.getText();
+      return r.text ?? "";
+    } finally {
+      await parser.destroy();
+    }
   },
   ".docx": async (buf) => {
     const mammoth = await import("mammoth");
