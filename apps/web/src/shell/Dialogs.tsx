@@ -11,6 +11,7 @@ import { RulesDialog } from '../views/RulesDialog.js';
 import { SagaPicker } from '../views/SagaPicker.js';
 import { SearchPanel } from '../views/SearchPanel.js';
 import { SettingsDialog } from '../views/SettingsDialog.js';
+import { addRecentSaga } from '../lib/desktop.js';
 
 interface DialogsProps {
   app: AppState;
@@ -44,6 +45,7 @@ export function Dialogs({ app, data }: DialogsProps) {
             saga.setSagaPath(p);
             setSelection(null);
             closeDialog('picking');
+            void addRecentSaga(p, data?.saga?.title ?? undefined);
           }}
           onClose={() => closeDialog('picking')}
         />
