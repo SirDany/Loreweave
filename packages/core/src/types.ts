@@ -13,6 +13,7 @@ export type EntryType =
   | 'sigil';
 
 export type EntryStatus = 'draft' | 'canon';
+export type EntryVisibility = 'public' | 'private';
 
 /** Frontmatter common to every entry. Type-specific fields live on subtypes. */
 export interface BaseFrontmatter {
@@ -26,6 +27,11 @@ export interface BaseFrontmatter {
   properties?: Record<string, unknown>;
   appears_in?: string[];
   status?: EntryStatus;
+  /**
+   * Publish-time access control. Defaults to `public` when omitted; an
+   * entry marked `private` is excluded from `lw publish` output.
+   */
+  visibility?: EntryVisibility;
   /** Characters: slang-groups the character speaks. */
   speaks?: string[];
   /** Locations: slang-groups spoken there. */

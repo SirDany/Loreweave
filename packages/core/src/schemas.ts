@@ -15,6 +15,7 @@ export const EntryTypeSchema = z.enum([
 ]);
 
 export const StatusSchema = z.enum(['draft', 'canon']);
+export const VisibilitySchema = z.enum(['public', 'private']);
 
 const Id = z.string().regex(/^[a-z0-9][a-z0-9-]*$/, 'id must be kebab-case');
 
@@ -29,6 +30,12 @@ const BaseFrontmatter = z.object({
   properties: z.record(z.unknown()).optional(),
   appears_in: z.array(z.string()).optional(),
   status: StatusSchema.optional(),
+  /**
+   * Publish-time access control. Defaults to `public` when omitted; an
+   * entry marked `private` is excluded from `lw publish` output and from
+   * any lens whose visibility is set to `public`.
+   */
+  visibility: VisibilitySchema.optional(),
   speaks: z.array(Id).optional(),
   spoken_here: z.array(Id).optional(),
 });
