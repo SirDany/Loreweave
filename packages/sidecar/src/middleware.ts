@@ -23,6 +23,11 @@ import path from 'node:path';
 import {
   FsAdapter,
   StorageNotFoundError,
+  buildEntryIndex,
+  extractReferences,
+  loadSaga,
+  summarizeSaga,
+  validateSaga,
   type StorageAdapter,
 } from '@loreweave/core';
 import { loadAgents, type AgentDescriptor } from './agents.js';
@@ -501,6 +506,131 @@ export function registerSidecar(
       res.end(JSON.stringify(digest));
     } catch (e) {
       res.statusCode = 500;
+      res.end(String(e));
+    }
+  });
+
+  // --- /lw/continuity ------------------------------------------------------
+  // Run validate + audit-style checks and roll up a structured continuity
+  // report (totals + first N diagnostics) plus a saga summary. Used by the
+  // dashboard view and the assistant's continuity panel.
+  host.use('/lw/continuity', async (req, res) => {
+    if (req.method !== 'GET') {
+      res.statusCode = 405;
+      res.end('method not allowed');
+      return;
+    }
+    const url = new URL(req.url ?? '', 'http://localhost');
+    const rootParam = url.searchParams.get('sagaRoot');
+    if (!rootParam) {
+      res.statusCode = 400;
+      res.end('sagaRoot query param required');
+      return;
+    }
+    const tomeParam = url.searchParams.get('tome');
+    const limit = Math.min(
+      500,
+      Math.max(1, parseInt(url.searchParams.get('limit') ?? '50', 10)),
+    );
+    try {
+      const abs = path.resolve(safeRoot(rootParam));
+      const saga = await loadSaga(abs);
+      const diagnostics = validateSaga(saga, { tome: tomeParam ?? null });
+      const summary = summarizeSaga(saga, { diagnostics });
+      const errors = diagnostics.filter((d) => d.severity === 'error');
+      const warnings = diagnostics.filter((d) => d.severity === 'warning');
+      res.statusCode = 200;
+      res.setHeader('content-type', 'application/json');
+      res.setHeader('cache-control', 'no-store');
+      res.end(
+        JSON.stringify({
+          summary,
+          diagnostics: {
+            errors: errors.length,
+            warnings: warnings.length,
+            sample: diagnostics.slice(0, limit),
+          },
+        }),
+      );
+    } catch (e) {
+      res.statusCode = 500;
+      res.end(String(e));
+    }
+  });
+
+  // --- /lw/refs/extract ----------------------------------------------------
+  // Given a body of prose, return three lists:
+  //   1. echoes:    @type/id refs already in the text (with positions)
+  //   2. dangling:  refs that don't resolve to an entry in the saga
+  //   3. proposed:  entries whose name/aliases appear in the text but that
+  //                 the author hasn't linked yet (useful for inline
+  //                 "Did you mean to link…?" suggestions).
+  host.use('/lw/refs/extract', async (req, res) => {
+    if (req.method !== 'POST') {
+      res.statusCode = 405;
+      res.end('method not allowed');
+      return;
+    }
+    const body = await readBody(req, res);
+    if (body == null) return;
+    try {
+      const { sagaRoot, text } = JSON.parse(body || '{}') as {
+        sagaRoot?: string;
+        text?: string;
+      };
+      if (typeof sagaRoot !== 'string' || typeof text !== 'string') {
+        throw new Error('sagaRoot and text required');
+      }
+      const abs = path.resolve(safeRoot(sagaRoot));
+      const saga = await loadSaga(abs);
+      const idx = buildEntryIndex(saga.entries);
+      const echoes = extractReferences(text);
+      const seen = new Set<string>();
+      const dangling: typeof echoes = [];
+      for (const ref of echoes) {
+        const key = `${ref.type}/${ref.id}` as `${string}/${string}`;
+        seen.add(key);
+        if (!idx.has(key)) dangling.push(ref);
+      }
+      // Lower-case haystack for cheap substring lookup. Capped to avoid
+      // pathological cost on attacker-controllable input.
+      const HAYSTACK_CAP = 32_768;
+      const haystack = (text.length > HAYSTACK_CAP
+        ? text.slice(0, HAYSTACK_CAP)
+        : text
+      ).toLowerCase();
+      interface Proposal {
+        key: string;
+        type: string;
+        id: string;
+        name: string;
+        match: string;
+      }
+      const proposed: Proposal[] = [];
+      for (const e of saga.entries) {
+        const key = `${e.frontmatter.type}/${e.frontmatter.id}`;
+        if (seen.has(key as `${string}/${string}`)) continue;
+        const probes = [e.frontmatter.name, ...(e.frontmatter.aliases ?? [])]
+          .filter((s): s is string => typeof s === 'string' && s.length >= 3);
+        for (const probe of probes) {
+          if (haystack.includes(probe.toLowerCase())) {
+            proposed.push({
+              key,
+              type: e.frontmatter.type,
+              id: e.frontmatter.id,
+              name: e.frontmatter.name ?? e.frontmatter.id,
+              match: probe,
+            });
+            break;
+          }
+        }
+      }
+      res.statusCode = 200;
+      res.setHeader('content-type', 'application/json');
+      res.setHeader('cache-control', 'no-store');
+      res.end(JSON.stringify({ echoes, dangling, proposed }));
+    } catch (e) {
+      res.statusCode = 400;
       res.end(String(e));
     }
   });

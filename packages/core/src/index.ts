@@ -37,3 +37,12 @@ export {
   type DigestThreadWaypoint,
   type BuildDigestOptions,
 } from "./digest.js";
+export {
+  summarizeSaga,
+  type SagaSummary,
+  type SummarizeOptions,
+  type KindCount,
+  type TagCount,
+  type RecentEntry,
+  type DiagnosticTotals,
+} from "./summarize.js";
