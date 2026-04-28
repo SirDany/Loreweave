@@ -72,8 +72,9 @@ export function extractReferences(text: string): Reference[] {
 }
 
 /**
- * Normalizes "@type/id", "type/id", or "@type/id{display}" to the bare
- * "type/id" form so downstream lookups and renames keep working.
+ * Normalizes "@type/id", "type/id", "@type/id{display}", or
+ * "@type/id#anchor" to the bare "type/id" form so downstream lookups and
+ * renames keep working. Anchor and display-text suffixes are stripped.
  */
 export function normalizeRef(ref: string): string {
   // Index-math equivalent of `.replace(/^@/, '').replace(/\{[^}]*\}$/, '')`.
@@ -84,5 +85,141 @@ export function normalizeRef(ref: string): string {
     const open = s.lastIndexOf('{');
     if (open !== -1) s = s.slice(0, open);
   }
+  // Strip a trailing #anchor (block transclusion). Anchors don't change the
+  // referenced entity, only which slice of its body is rendered.
+  const hash = s.indexOf('#');
+  if (hash !== -1) s = s.slice(0, hash);
   return s;
+}
+
+/**
+ * A block transclusion: an Echo with a `#anchor` suffix that selects a
+ * subsection of the target entry's body. The anchor is the slugified
+ * heading text (lowercase, non-alphanumeric → `-`, collapsed). Empty
+ * anchor (just `#`) means "from the top".
+ */
+export interface Transclusion extends Reference {
+  /** The raw anchor (without the leading `#`). Empty string means "top". */
+  anchor: string;
+}
+
+/**
+ * Canonical transclusion regex. Match groups:
+ *   1: type prefix
+ *   2: id
+ *   3: anchor (without the leading `#`; may be empty)
+ *   4: optional display-text override
+ *
+ * Carries the `g` flag; rebuild with `new RegExp(TRANSCLUSION_REGEX.source, 'g')`
+ * before calling `.exec()` repeatedly to avoid shared `lastIndex`.
+ */
+export const TRANSCLUSION_REGEX =
+  /@([a-z][a-z0-9-]*)\/([a-z0-9][a-z0-9-]*)#([a-z0-9-]*)(?:\{([^}\n]*)\})?/g;
+
+/**
+ * Extract block transclusions (`@type/id#anchor[{display}]`) from text.
+ * Returns them as a superset of {@link Reference} so existing tooling can
+ * treat them as ordinary echoes when the anchor doesn't matter.
+ */
+export function extractTransclusions(text: string): Transclusion[] {
+  const out: Transclusion[] = [];
+  const re = new RegExp(TRANSCLUSION_REGEX.source, 'g');
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(text))) {
+    const offset = match.index;
+    const prefix = text.slice(0, offset);
+    const line = prefix.split('\n').length;
+    const lastNL = prefix.lastIndexOf('\n');
+    const column = offset - (lastNL + 1) + 1;
+    out.push({
+      type: match[1]!,
+      id: match[2]!,
+      anchor: match[3] ?? '',
+      display: match[4],
+      offset,
+      line,
+      column,
+      raw: match[0],
+    });
+  }
+  return out;
+}
+
+/**
+ * Slugify a markdown heading the same way transclusion anchors do.
+ * Lowercase, replace non-alphanumeric with `-`, collapse runs, trim `-`.
+ * Done with a single linear scan to avoid regex-backtracking surprises
+ * on attacker-controlled input.
+ */
+export function slugifyHeading(heading: string): string {
+  let out = '';
+  let lastDash = true; // suppress leading dashes
+  for (let i = 0; i < heading.length; i++) {
+    const c = heading.charCodeAt(i);
+    // a-z
+    if (c >= 97 && c <= 122) {
+      out += heading[i];
+      lastDash = false;
+      continue;
+    }
+    // A-Z → lower
+    if (c >= 65 && c <= 90) {
+      out += String.fromCharCode(c + 32);
+      lastDash = false;
+      continue;
+    }
+    // 0-9
+    if (c >= 48 && c <= 57) {
+      out += heading[i];
+      lastDash = false;
+      continue;
+    }
+    if (!lastDash) {
+      out += '-';
+      lastDash = true;
+    }
+  }
+  // trim trailing dash
+  if (out.length > 0 && out.charCodeAt(out.length - 1) === 45 /* - */) {
+    out = out.slice(0, -1);
+  }
+  return out;
+}
+
+/**
+ * Resolve a transclusion's anchor against a target entry's body, returning
+ * the markdown slice from the matching heading up to (but not including)
+ * the next heading of the same-or-higher level. An empty anchor returns
+ * the whole body. Returns `null` if the anchor isn't found.
+ */
+export function resolveTransclusion(body: string, anchor: string): string | null {
+  if (!anchor) return body;
+  const lines = body.split('\n');
+  let startIdx = -1;
+  let level = 0;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i] ?? '';
+    // Headings: 1-6 leading `#` then a space.
+    let h = 0;
+    while (h < 6 && line.charCodeAt(h) === 35 /* # */) h++;
+    if (h === 0 || line.charCodeAt(h) !== 32 /* space */) continue;
+    const text = line.slice(h + 1).trim();
+    if (slugifyHeading(text) === anchor) {
+      startIdx = i;
+      level = h;
+      break;
+    }
+  }
+  if (startIdx === -1) return null;
+  let endIdx = lines.length;
+  for (let i = startIdx + 1; i < lines.length; i++) {
+    const line = lines[i] ?? '';
+    let h = 0;
+    while (h < 6 && line.charCodeAt(h) === 35) h++;
+    if (h > 0 && h <= level && line.charCodeAt(h) === 32) {
+      endIdx = i;
+      break;
+    }
+  }
+  return lines.slice(startIdx, endIdx).join('\n').trim();
 }
