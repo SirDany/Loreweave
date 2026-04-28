@@ -14,6 +14,8 @@ import { kindsCmd } from './commands/kinds.js';
 import { lensesCmd } from './commands/lenses.js';
 import { listSagasCmd } from './commands/list-sagas.js';
 import { migrateCmd } from './commands/migrate.js';
+import { newCmd } from './commands/new.js';
+import { publishCmd } from './commands/publish.js';
 import { refsCmd } from './commands/refs.js';
 import { renameCmd } from './commands/rename.js';
 import { resolveCmd } from './commands/resolve.js';
@@ -310,6 +312,38 @@ export async function run(argv: string[]): Promise<void> {
     .argument('<saga>', 'path to the Saga directory')
     .option('--json', 'emit JSON')
     .action(lensesCmd);
+
+  program
+    .command('new')
+    .description(
+      'Scaffold a new entry from the kind catalog. Writes a stub markdown file with required-property defaults pre-filled.',
+    )
+    .argument('<saga>', 'path to the Saga directory')
+    .argument('<kind>', 'kind id, echoPrefix, or alias (e.g. character)')
+    .argument('<id>', 'new entry id (kebab-case)')
+    .option('--name <name>', 'human-readable name')
+    .option('--status <status>', 'draft | canon')
+    .option('--visibility <visibility>', 'public | private')
+    .option('--tags <tags>', 'comma-separated sigil ids to seed `tags:`')
+    .option('--dry-run', 'print frontmatter to stdout instead of writing a file')
+    .option('--force', 'overwrite an existing entry with the same id')
+    .action(newCmd);
+
+  program
+    .command('publish')
+    .description(
+      'Bake a publishable static snapshot of a Saga (dump+kinds+lenses+summary+diagnostics JSON) into <out>/demo/. Private entries are excluded by default.',
+    )
+    .argument('<saga>', 'path to the Saga directory')
+    .option(
+      '--out <dir>',
+      'output directory (defaults to <saga>/.loreweave/publish)',
+    )
+    .option('--include-private', 'include entries marked visibility: private')
+    .option('--tome <slug>', 'restrict diagnostics to one tome')
+    .option('--plan', 'list what would be written without writing it')
+    .option('--json', 'emit JSON')
+    .action(publishCmd);
 
   await program.parseAsync(argv, { from: 'user' });
 }
