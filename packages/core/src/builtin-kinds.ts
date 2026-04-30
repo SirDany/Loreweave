@@ -16,6 +16,12 @@ export const BUILTIN_KIND_DEFS: KindFrontmatter[] = [
     storage: 'codex/characters',
     display: { icon: 'User', color: 'amber', sortBy: 'name' },
     description: 'A person, creature, or sapient being in the Saga.',
+    properties: {
+      progression: {
+        type: 'progression',
+        description: 'How this character changes over time (optional).',
+      },
+    },
   },
   {
     id: 'location',
@@ -25,6 +31,12 @@ export const BUILTIN_KIND_DEFS: KindFrontmatter[] = [
     storage: 'codex/locations',
     display: { icon: 'MapPin', color: 'emerald', sortBy: 'name' },
     description: 'A place — city, region, building, world.',
+    properties: {
+      progression: {
+        type: 'progression',
+        description: 'How this location changes over time (optional).',
+      },
+    },
   },
   {
     id: 'concept',
@@ -34,6 +46,12 @@ export const BUILTIN_KIND_DEFS: KindFrontmatter[] = [
     storage: 'codex/concepts',
     display: { icon: 'Lightbulb', color: 'sky', sortBy: 'name' },
     description: 'An idea, force, faction, or abstract canon element.',
+    properties: {
+      progression: {
+        type: 'progression',
+        description: 'How this concept evolves over time (optional).',
+      },
+    },
   },
   {
     id: 'lore',

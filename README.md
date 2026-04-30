@@ -49,12 +49,18 @@ Loreweave takes a different stance:
 - **Codex / Lexicon / Sigils** — characters, locations, concepts, lore,
   waypoints, terms, slang, tags, and inheritance, all as frontmatter
   Markdown.
+- **Progression tracking** — characters, locations, and concepts can track
+  how they change over time with structured `progression` fields (e.g.,
+  personality shifts, location transformations, concept evolution).
 - **Weave resolution** — compose properties across Sigil `inherits` chains
   with explicit `overrides`; inherited values are surfaced in the UI
   (italicized, with provenance tooltips).
 - **Threads with branches** — timeline YAML with absolute calendar dates,
   relational `before`/`after`/`concurrent` edges, and `branches_from`
   diffs against a parent thread.
+- **Harvest external content** — import text files, documents, or archives
+  and use AI to extract characters, locations, events, and prose into your
+  saga with interactive conflict resolution.
 - **Story mode & scene mode** — write a whole `chapter.md`, or split a
   chapter into `scenes/*.md` files and `lw compile` them back into a
   single chapter with a provenance banner.
@@ -74,18 +80,20 @@ Loreweave takes a different stance:
 
 ## Vocabulary
 
-| Term         | What it is                                                                      |
-| ------------ | ------------------------------------------------------------------------------- |
-| **Saga**     | Series. Top-level project. `sagas/<saga-slug>/`                                 |
-| **Tome**     | A book within a Saga. Holds **only prose** under `tomes/<slug>/story/`.         |
-| **Codex**    | Characters, locations, concepts, lore, waypoints. `codex/`                      |
-| **Lexicon**  | Terms, slang, pronunciations. `lexicon/`                                        |
-| **Sigil**    | Tag / group / inheritance source. `sigils/`                                     |
-| **Thread**   | Timeline of waypoints. `threads/`                                               |
-| **Waypoint** | A waypoint entry placed on a Thread (absolute date, relational edges, or both). |
-| **Echo**     | An `@type/id` reference written inline in prose or frontmatter.                 |
-| **Weave**    | The resolved view of an entry: own properties + inherited Sigils + overrides.  |
-| **Trace**    | Sticky trace (idea / todo / question / remark). `traces/`                       |
+| Term            | What it is                                                                      |
+| --------------- | ------------------------------------------------------------------------------- |
+| **Saga**        | Series. Top-level project. `sagas/<saga-slug>/`                                 |
+| **Tome**        | A book within a Saga. Holds **only prose** under `tomes/<slug>/story/`.         |
+| **Codex**       | Characters, locations, concepts, lore, waypoints. `codex/`                      |
+| **Lexicon**     | Terms, slang, pronunciations. `lexicon/`                                        |
+| **Sigil**       | Tag / group / inheritance source. `sigils/`                                     |
+| **Thread**      | Timeline of waypoints. `threads/`                                               |
+| **Waypoint**    | A waypoint entry placed on a Thread (absolute date, relational edges, or both). |
+| **Echo**        | An `@type/id` reference written inline in prose or frontmatter.                 |
+| **Weave**       | The resolved view of an entry: own properties + inherited Sigils + overrides.   |
+| **Trace**       | Sticky trace (idea / todo / question / remark). `traces/`                       |
+| **Harvest**     | Import external content and extract lore with AI conflict resolution.           |
+| **Progression** | How characters/locations/concepts change over time. `progression` property.     |
 
 See [docs/conventions.md](docs/conventions.md) for the full spec.
 
@@ -98,9 +106,9 @@ See [docs/conventions.md](docs/conventions.md) for the full spec.
 Pre-built installers are published to the [Releases page](https://github.com/SirDany/Loreweave/releases/latest)
 on every tagged commit:
 
-| Platform | Asset                            |
-| -------- | -------------------------------- |
-| Windows  | `Loreweave_<version>_x64-setup.exe` (NSIS installer) |
+| Platform | Asset                                                                   |
+| -------- | ----------------------------------------------------------------------- |
+| Windows  | `Loreweave_<version>_x64-setup.exe` (NSIS installer)                    |
 | Linux    | `loreweave_<version>_amd64.deb` or `Loreweave_<version>_amd64.AppImage` |
 
 Each build is a self-contained Tauri app: a small native window, an
@@ -229,17 +237,73 @@ sagas/<saga>/
 Open this repo in VS Code; agents in [.github/agents/](.github/agents/) appear
 in the chat agent picker:
 
-| Agent         | Scope                                                                |
-| ------------- | -------------------------------------------------------------------- |
-| `@muse`       | Sparring partner for ideation. Never commits prose.                  |
-| `@scribe`     | Writes chapters, honors the Codex, updates it when facts land.       |
-| `@warden`     | Audits prose-vs-canon drift, broken Echoes, slang misuse.            |
-| `@polisher`   | Grammar / punctuation / flow only. Never touches canon.              |
-| `@archivist`  | Drafts Codex/Lexicon entries from material staged via `lw ingest`.   |
+| Agent        | Scope                                                              |
+| ------------ | ------------------------------------------------------------------ |
+| `@muse`      | Sparring partner for ideation. Never commits prose.                |
+| `@scribe`    | Writes chapters, honors the Codex, updates it when facts land.     |
+| `@warden`    | Audits prose-vs-canon drift, broken Echoes, slang misuse.          |
+| `@polisher`  | Grammar / punctuation / flow only. Never touches canon.            |
+| `@archivist` | Drafts Codex/Lexicon entries from material staged via `lw ingest`. |
+| `@harvester` | Harvests external content with interactive conflict resolution.    |
 
 File-scoped rules in [.github/instructions/](.github/instructions/) auto-apply
 when editing files under `codex/`, `lexicon/`, `sigils/`, `traces/`, or any
 tome's `story/`.
+
+---
+
+## Harvesting external content
+
+**Harvest** brings external material into your saga with AI-powered analysis
+and interactive conflict resolution. Perfect for bootstrapping from existing
+drafts, importing research, or consolidating scattered notes.
+
+### How it works
+
+1. **Stage content** — Upload text files, documents (PDF/DOCX), or archives
+   via the **Harvest…** menu option (desktop) or file picker (web).
+2. **AI analysis** — Invoke `@harvester` to extract characters, locations,
+   events, concepts, terms, slang, and prose sections.
+3. **Conflict resolution** — Agent detects clashes with existing canon and
+   presents interactive choices: replace, merge, rename, keep existing, or
+   provide custom guidance.
+4. **Draft creation** — Generates `status: draft` entries with proper
+   `@type/id` Echoes and source attribution.
+
+### Example workflow
+
+```
+# Upload "world-building.docx" and "character-sheets.pdf"
+@harvester analyze the staged content
+
+# Agent responds:
+Found 3 characters, 2 locations, 1 new concept, 5 chapters of prose.
+
+Potential conflicts detected:
+- Character "Elena" exists but with different backstory
+- Location "Crystal Caves" described differently
+
+**Conflict: Character "Elena"**
+
+Existing: Brave knight from northern mountains
+New source: Cunning thief from southern deserts
+
+**Options:**
+1. Replace with thief version
+2. Merge both versions
+3. Rename to "Elena (Thief)"
+4. Keep existing knight
+5. Custom guidance
+
+# User chooses option 2, provides merge instructions
+# Agent creates merged draft with status: draft
+```
+
+### Supported formats
+
+- **Text**: `.txt`, `.md`, `.markdown`, `.rst`, `.html`, `.htm`, `.json`, `.yaml`, `.yml`
+- **Documents**: `.pdf` (text extraction), `.docx` (text extraction)
+- **Archives**: Folders containing any supported files
 
 ---
 

@@ -272,6 +272,34 @@ async fn reqwest_get(url: &str) -> Result<bool, ()> {
     .map_err(|_| ())?
 }
 
+#[tauri::command]
+async fn select_files() -> Result<Vec<String>, String> {
+    use tauri_plugin_dialog::DialogExt;
+    let handle = tauri::AppHandle::current();
+    let files = handle
+        .dialog()
+        .file()
+        .add_filter("Text files", &["txt", "md", "markdown", "rst", "html", "htm", "json", "yaml", "yml", "pdf", "docx"])
+        .blocking_pick_files();
+    match files {
+        Some(paths) => Ok(paths.into_iter().map(|p| p.to_string_lossy().into_owned()).collect()),
+        None => Ok(vec![]),
+    }
+}
+
+#[tauri::command]
+async fn select_folder() -> Result<String, String> {
+    use tauri_plugin_dialog::DialogExt;
+    let handle = tauri::AppHandle::current();
+    let folder = handle
+        .dialog()
+        .pick_folder();
+    match folder {
+        Some(path) => Ok(path.to_string_lossy().into_owned()),
+        None => Err("No folder selected".to_string()),
+    }
+}
+
 fn focus_main(window: Option<&tauri::WebviewWindow>) {
     if let Some(w) = window {
         let _ = w.show();
@@ -300,6 +328,8 @@ pub fn run() {
             forget_recent_saga,
             check_for_updates,
             open_log_file,
+            select_files,
+            select_folder,
         ])
         .setup(|app| {
             let app_handle = app.handle().clone();

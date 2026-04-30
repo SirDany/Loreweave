@@ -26,6 +26,7 @@ export const KindFieldTypeSchema = z.enum([
   'enum',
   'ref',
   'list',
+  'progression',
 ]);
 
 export const KindFieldSchema: z.ZodType<KindField> = z.lazy(() =>

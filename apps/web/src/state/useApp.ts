@@ -10,9 +10,9 @@ import {
   jumpToTarget,
   relatedTracesFor,
 } from '../lib/saga-helpers.js';
-import { useSaga } from './useSaga.js';
 import type { Section, Selection } from './types.js';
 import type { ChatContextAttachment } from './useChat.js';
+import { useSaga } from './useSaga.js';
 
 export interface AssistantSeed {
   agent?: string;
@@ -28,7 +28,8 @@ export type DialogId =
   | 'backups'
   | 'settings'
   | 'composing'
-  | 'rules';
+  | 'rules'
+  | 'harvesting';
 
 export interface PendingRename {
   type: DumpEntry['type'];
@@ -37,7 +38,10 @@ export interface PendingRename {
 }
 
 export type PendingNew =
-  | { kind: 'codex'; type: 'character' | 'location' | 'concept' | 'lore' | 'waypoint' }
+  | {
+      kind: 'codex';
+      type: 'character' | 'location' | 'concept' | 'lore' | 'waypoint';
+    }
   | { kind: 'term' }
   | { kind: 'sigil' }
   | { kind: 'chapter'; tome?: string };
@@ -64,6 +68,7 @@ export function useApp() {
     settings: false,
     composing: false,
     rules: false,
+    harvesting: false,
   });
   const [assistantOpen, setAssistantOpen] = useState(false);
   const [assistantSeed, setAssistantSeed] = useState<AssistantSeed | null>(
