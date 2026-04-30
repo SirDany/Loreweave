@@ -70,6 +70,18 @@ jobs:
           VERSION=${GITHUB_REF#refs/tags/v}
           echo "VERSION=$VERSION" >> $GITHUB_ENV
           echo "Setting version to $VERSION"
+          node <<'NODE'
+          const fs = require('fs');
+          const path = require('path');
+          const version = process.env.VERSION;
+          const tauriConfPath = path.resolve('apps/desktop/src-tauri/tauri.conf.json');
+          const cargoPath = path.resolve('apps/desktop/src-tauri/Cargo.toml');
+          const tauriConf = JSON.parse(fs.readFileSync(tauriConfPath, 'utf8'));
+          tauriConf.version = version;
+          fs.writeFileSync(tauriConfPath, JSON.stringify(tauriConf, null, 2) + '\n', 'utf8');
+          const cargo = fs.readFileSync(cargoPath, 'utf8').replace(/^version = .*/m, `version = "${version}"`);
+          fs.writeFileSync(cargoPath, cargo, 'utf8');
+          NODE
 
       - name: Build Tauri bundle
         env:
