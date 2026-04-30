@@ -30,7 +30,11 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["nsis", "deb", "appimage"],
+    "targets": [
+      "nsis",
+      "deb",
+      "appimage"
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -38,12 +42,21 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "resources": ["resources/**/*"],
-    "externalBin": ["binaries/lw-node"],
+    "resources": [
+      "resources/**/*"
+    ],
+    "externalBin": [
+      "binaries/lw-node"
+    ],
     "publisher": "Loreweave",
     "category": "Productivity",
     "shortDescription": "Local-first agentic book-writing workbench.",
-    "longDescription": "Loreweave is a local-first writing workbench: your canon lives as plain Markdown and YAML, the CLI gives you ground-truth queries, the web UI navigates your world, and Copilot agents help you draft without rewriting your story behind your back."
+    "longDescription": "Loreweave is a local-first writing workbench: your canon lives as plain Markdown and YAML, the CLI gives you ground-truth queries, the web UI navigates your world, and Copilot agents help you draft without rewriting your story behind your back.",
+    "windows": {
+      "nsis": {
+        "installMode": "perMachine"
+      }
+    }
   },
   "plugins": {
     "updater": {
