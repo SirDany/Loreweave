@@ -24,7 +24,7 @@
     "@loreweave/core": "workspace:*",
     "ai": "^5.0.179",
     "yaml": "2.8.3",
-    "zod": "^3.25.28"
+    "zod": "^4.4.3"
   },
   "optionalDependencies": {
     "ollama-ai-provider-v2": "^3.5.0"
