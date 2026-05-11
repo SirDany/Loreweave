@@ -12,12 +12,12 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@codemirror/autocomplete": "6.20.1",
+    "@codemirror/autocomplete": "6.20.2",
     "@codemirror/commands": "6.10.3",
     "@codemirror/lang-markdown": "6.5.0",
     "@codemirror/language": "6.12.3",
     "@codemirror/state": "6.6.0",
-    "@codemirror/view": "6.41.1",
+    "@codemirror/view": "6.42.1",
     "@loreweave/core": "workspace:*",
     "@loreweave/sidecar": "workspace:*",
     "@radix-ui/react-slot": "^1.2.4",
@@ -25,11 +25,11 @@
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
     "codemirror": "6.0.2",
-    "lucide-react": "^1.12.0",
-    "react": "19.2.5",
-    "react-dom": "19.2.5",
+    "lucide-react": "^1.14.0",
+    "react": "19.2.6",
+    "react-dom": "19.2.6",
     "tailwind-merge": "^2.5.2",
-    "yaml": "2.8.3",
+    "yaml": "2.9.0",
     "zod": "^3.25.28"
   },
   "devDependencies": {
@@ -37,10 +37,10 @@
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "^5.0.0",
     "autoprefixer": "10.5.0",
-    "postcss": "8.5.12",
+    "postcss": "8.5.14",
     "tailwindcss": "3.4.11",
     "typescript": "6.0.3",
-    "vite": "8.0.10",
-    "vitest": "4.1.5"
+    "vite": "8.0.12",
+    "vitest": "4.1.6"
   }
 }

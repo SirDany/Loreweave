@@ -19,11 +19,11 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "^3.0.71",
-    "@ai-sdk/openai": "^3.0.53",
+    "@ai-sdk/anthropic": "^3.0.76",
+    "@ai-sdk/openai": "^3.0.63",
     "@loreweave/core": "workspace:*",
-    "ai": "^5.0.179",
-    "yaml": "2.8.3",
+    "ai": "^5.0.186",
+    "yaml": "2.9.0",
     "zod": "^3.25.28"
   },
   "optionalDependencies": {
@@ -32,6 +32,6 @@
   "devDependencies": {
     "@types/node": "22.12.0",
     "typescript": "6.0.3",
-    "vitest": "4.1.5"
+    "vitest": "4.1.6"
   }
 }
