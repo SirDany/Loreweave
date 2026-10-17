@@ -1,5 +1,7 @@
 ---
+name: new-chapter
 description: "Scaffold a new chapter folder in a Tome with chapter.md and _meta.yaml, pre-linked to POV characters and referenced events."
+disable-model-invocation: true
 argument-hint: "Tome slug and chapter title"
 ---
 # New chapter

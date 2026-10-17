@@ -1,5 +1,7 @@
 ---
+name: new-character
 description: "Create a new character entry in the Codex with proper frontmatter, tags, inheritance, and a starter description."
+disable-model-invocation: true
 argument-hint: "Character name and one-line concept"
 ---
 # New character

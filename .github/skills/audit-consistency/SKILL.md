@@ -1,7 +1,8 @@
 ---
+name: audit-consistency
 description: "Run a full consistency audit on a Saga or Tome — validate schemas, references, timelines, and slang; return a structured report."
+disable-model-invocation: true
 argument-hint: "Saga slug (and optional --tome <slug>)"
-agent: "warden"
 ---
 # Audit consistency
 

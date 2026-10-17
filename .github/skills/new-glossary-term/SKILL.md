@@ -1,5 +1,7 @@
 ---
+name: new-glossary-term
 description: "Create a new glossary term (word, slang, fantasy-language lexeme) with pronunciation, definition, and optional slang-group linkage."
+disable-model-invocation: true
 argument-hint: "Term and short definition"
 ---
 # New glossary term
