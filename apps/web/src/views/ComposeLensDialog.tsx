@@ -73,29 +73,35 @@ export function ComposeLensDialog({ sagaPath, kinds, onClose, onCreated }: Props
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md p-4 animate-fade-in"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') onClose();
+      }}
+    >
       <div
-        className="w-full max-w-2xl max-h-[90vh] overflow-auto bg-card border border-border rounded-lg shadow-2xl"
-        onKeyDown={(e) => {
-          if (e.key === 'Escape') onClose();
-        }}
+        className="w-full max-w-2xl max-h-[90vh] overflow-hidden bg-card/95 border border-border/80 rounded-2xl shadow-2xl flex flex-col backdrop-blur-xl"
+        onClick={(e) => e.stopPropagation()}
       >
-        <header className="px-5 py-3 border-b border-border flex items-center gap-3">
+        <header className="px-6 py-4 border-b border-border/70 bg-muted/20 flex items-center gap-3">
           <div className="flex-1">
-            <div className="text-xs text-muted-foreground">
+            <div className="text-[11px] font-mono text-muted-foreground">
               .loreweave/lenses/{id || '<id>'}.yaml
             </div>
-            <div className="text-base text-foreground">Compose Lens</div>
+            <div className="text-base font-semibold tracking-tight text-foreground">Compose Lens</div>
           </div>
           <button
             onClick={onClose}
-            className="text-muted-foreground hover:text-foreground text-sm px-2"
+            className="text-muted-foreground hover:text-foreground text-sm p-1 rounded-md hover:bg-muted transition-colors"
           >
             ✕
           </button>
         </header>
 
-        <div className="p-5 space-y-4 text-sm">
+        <div className="p-6 space-y-4 text-sm overflow-y-auto scrollbar-ember flex-1">
           <Field
             label="id"
             hint="kebab-case; matches the filename stem"
@@ -105,10 +111,10 @@ export function ComposeLensDialog({ sagaPath, kinds, onClose, onCreated }: Props
               value={id}
               onChange={(e) => setId(e.target.value)}
               placeholder="character-kanban"
-              className="w-full bg-background border border-border rounded px-2 py-1 font-mono"
+              className="w-full bg-background border border-border rounded-lg px-3 py-2 text-xs font-mono focus:ring-1 focus:ring-primary focus:outline-none transition-colors"
             />
             {id && !idValid ? (
-              <div className="text-xs text-destructive mt-1">
+              <div className="text-xs text-destructive mt-1 font-mono">
                 id must be kebab-case (start with a letter, lowercase, no spaces).
               </div>
             ) : null}
@@ -119,7 +125,7 @@ export function ComposeLensDialog({ sagaPath, kinds, onClose, onCreated }: Props
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Character Kanban"
-              className="w-full bg-background border border-border rounded px-2 py-1"
+              className="w-full bg-background border border-border rounded-lg px-3 py-2 text-xs focus:ring-1 focus:ring-primary focus:outline-none transition-colors"
             />
           </Field>
 
@@ -127,7 +133,8 @@ export function ComposeLensDialog({ sagaPath, kinds, onClose, onCreated }: Props
             <input
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full bg-background border border-border rounded px-2 py-1"
+              placeholder="Brief description of this view"
+              className="w-full bg-background border border-border rounded-lg px-3 py-2 text-xs focus:ring-1 focus:ring-primary focus:outline-none transition-colors"
             />
           </Field>
 
@@ -135,7 +142,7 @@ export function ComposeLensDialog({ sagaPath, kinds, onClose, onCreated }: Props
             <select
               value={renderer}
               onChange={(e) => setRenderer(e.target.value)}
-              className="w-full bg-background border border-border rounded px-2 py-1"
+              className="w-full bg-background border border-border rounded-lg px-3 py-2 text-xs focus:ring-1 focus:ring-primary focus:outline-none transition-colors"
             >
               {renderers.map((r) => (
                 <option key={r.id} value={r.id}>
@@ -164,10 +171,10 @@ export function ComposeLensDialog({ sagaPath, kinds, onClose, onCreated }: Props
                     type="button"
                     key={k.id}
                     onClick={() => toggleKind(k.id)}
-                    className={`rounded border px-2 py-0.5 text-xs ${
+                    className={`rounded-lg border px-2.5 py-1 text-xs font-mono transition-colors ${
                       on
-                        ? 'border-primary bg-primary/20'
-                        : 'border-border hover:bg-muted'
+                        ? 'border-primary/60 bg-primary/20 text-primary font-medium'
+                        : 'border-border/80 hover:bg-muted text-muted-foreground'
                     }`}
                   >
                     {k.id}
@@ -184,7 +191,7 @@ export function ComposeLensDialog({ sagaPath, kinds, onClose, onCreated }: Props
                 onChange={(e) =>
                   setStatusFilter(e.target.value as '' | 'draft' | 'canon')
                 }
-                className="w-full bg-background border border-border rounded px-2 py-1"
+                className="w-full bg-background border border-border rounded-lg px-3 py-2 text-xs focus:ring-1 focus:ring-primary focus:outline-none transition-colors"
               >
                 <option value="">(any)</option>
                 <option value="draft">draft</option>
@@ -197,7 +204,7 @@ export function ComposeLensDialog({ sagaPath, kinds, onClose, onCreated }: Props
                 value={groupBy}
                 onChange={(e) => setGroupBy(e.target.value)}
                 placeholder="status"
-                className="w-full bg-background border border-border rounded px-2 py-1 font-mono"
+                className="w-full bg-background border border-border rounded-lg px-3 py-2 text-xs font-mono focus:ring-1 focus:ring-primary focus:outline-none transition-colors"
               />
             </Field>
 
@@ -206,17 +213,17 @@ export function ComposeLensDialog({ sagaPath, kinds, onClose, onCreated }: Props
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
                 placeholder="name"
-                className="w-full bg-background border border-border rounded px-2 py-1 font-mono"
+                className="w-full bg-background border border-border rounded-lg px-3 py-2 text-xs font-mono focus:ring-1 focus:ring-primary focus:outline-none transition-colors"
               />
             </Field>
 
             <Field label="editable" hint="enables drag-and-drop on supported renderers">
-              <label className="flex items-center gap-2">
+              <label className="flex items-center gap-2 pt-2">
                 <input
                   type="checkbox"
                   checked={editable}
                   onChange={(e) => setEditable(e.target.checked)}
-                  className="h-4 w-4"
+                  className="h-4 w-4 accent-primary"
                 />
                 <span className="text-xs text-muted-foreground">
                   Allow renderers to mutate entries via drop.
@@ -226,27 +233,27 @@ export function ComposeLensDialog({ sagaPath, kinds, onClose, onCreated }: Props
           </div>
 
           <Field label="preview" hint="written verbatim to the lens file">
-            <pre className="rounded border border-border bg-background/50 p-2 text-xs font-mono whitespace-pre-wrap">
+            <pre className="rounded-xl border border-border/80 bg-background/80 p-3 text-xs font-mono whitespace-pre-wrap">
               {yaml}
             </pre>
           </Field>
 
           {err && (
-            <div className="text-rose-400 text-xs whitespace-pre-wrap">{err}</div>
+            <div className="text-rose-400 text-xs whitespace-pre-wrap font-mono p-3 bg-rose-500/10 rounded-lg border border-rose-500/30">{err}</div>
           )}
         </div>
 
-        <footer className="px-5 py-3 border-t border-border flex justify-end gap-2">
+        <footer className="px-6 py-3.5 border-t border-border/70 bg-muted/20 flex justify-end gap-2.5">
           <button
             onClick={onClose}
-            className="px-3 py-1 rounded border border-border text-foreground/90 hover:bg-muted"
+            className="px-4 py-1.5 rounded-lg border border-border text-foreground hover:bg-muted text-xs font-medium transition-colors"
           >
             Cancel
           </button>
           <button
             onClick={() => void save()}
             disabled={!canSave || saving}
-            className="px-3 py-1 rounded border border-primary bg-primary/20 text-primary-foreground hover:bg-primary/30 disabled:opacity-50"
+            className="px-4 py-1.5 rounded-lg border border-primary/50 bg-primary/20 text-primary font-medium hover:bg-primary/30 disabled:opacity-40 text-xs transition-colors shadow-sm"
           >
             {saving ? 'Saving…' : 'Create lens'}
           </button>

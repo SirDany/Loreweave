@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { cn } from "../lib/utils.js";
 import type { DumpEntry, DumpPayload, EntryType } from "../lib/lw.js";
 
 interface Props {
@@ -156,30 +157,30 @@ export function ConstellationView({ data, onJump }: Props) {
   };
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
-      <header className="px-6 py-3 border-b border-border flex items-center gap-3">
-        <div className="text-lg flex-1">Constellation</div>
-        <div className="flex gap-1 text-xs">
+    <div className="flex-1 flex flex-col overflow-hidden bg-background">
+      <header className="px-6 py-3 border-b border-border/80 bg-card/60 backdrop-blur-md flex items-center gap-3">
+        <div className="text-base font-semibold tracking-tight text-foreground flex-1">Constellation</div>
+        <div className="flex gap-1.5 text-xs">
           <button
             onClick={() => setMode("all")}
-            className={
-              "px-2 py-0.5 rounded border " +
-              (mode === "all"
-                ? "border-border bg-muted"
-                : "border-border text-muted-foreground/70")
-            }
+            className={cn(
+              "px-3 py-1 rounded-lg border text-xs font-medium transition-colors",
+              mode === "all"
+                ? "border-primary/60 bg-primary/20 text-primary shadow-sm"
+                : "border-border/80 bg-background/60 hover:bg-muted text-muted-foreground",
+            )}
             title="All @echoes between entries"
           >
             echoes
           </button>
           <button
             onClick={() => setMode("inheritance")}
-            className={
-              "px-2 py-0.5 rounded border " +
-              (mode === "inheritance"
-                ? "border-border bg-muted"
-                : "border-border text-muted-foreground/70")
-            }
+            className={cn(
+              "px-3 py-1 rounded-lg border text-xs font-medium transition-colors",
+              mode === "inheritance"
+                ? "border-primary/60 bg-primary/20 text-primary shadow-sm"
+                : "border-border/80 bg-background/60 hover:bg-muted text-muted-foreground",
+            )}
             title="Sigil inheritance graph only"
           >
             inheritance
@@ -190,12 +191,12 @@ export function ConstellationView({ data, onJump }: Props) {
             <button
               key={t}
               onClick={() => toggleType(t)}
-              className={
-                "px-2 py-0.5 rounded border " +
-                (filter.has(t)
-                  ? "border-border bg-muted"
-                  : "border-border text-muted-foreground/70")
-              }
+              className={cn(
+                "px-2.5 py-1 rounded-lg border text-xs font-mono transition-colors",
+                filter.has(t)
+                  ? "border-border/90 bg-muted/70 font-semibold"
+                  : "border-border/50 text-muted-foreground/60 opacity-60",
+              )}
               style={
                 filter.has(t)
                   ? { color: TYPE_COLOR[t] }
@@ -206,7 +207,7 @@ export function ConstellationView({ data, onJump }: Props) {
             </button>
           ))}
         </div>
-        <div className="text-xs text-muted-foreground">
+        <div className="text-xs text-muted-foreground font-mono">
           {nodes.length} entries · {edges.length} {mode === "inheritance" ? "inherits" : "echoes"}
         </div>
       </header>

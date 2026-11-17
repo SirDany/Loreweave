@@ -42,11 +42,11 @@ export function TracesView({
   };
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
-      <header className="px-6 py-3 border-b border-border bg-card/40 flex items-center gap-3">
+    <div className="flex-1 flex flex-col overflow-hidden bg-background">
+      <header className="px-6 py-3 border-b border-border/80 bg-card/60 backdrop-blur-md flex items-center gap-3">
         <div className="flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-primary/80" />
-          <span className="font-serif text-lg">Traces</span>
+          <Sparkles className="h-4 w-4 text-primary" />
+          <span className="font-semibold text-base tracking-tight text-foreground">Traces</span>
         </div>
         <div className="flex flex-wrap gap-1 text-xs">
           {(['all', 'open', 'todo', 'idea', 'question'] as const).map((f) => (
@@ -54,18 +54,18 @@ export function TracesView({
               key={f}
               onClick={() => setFilter(f)}
               className={cn(
-                'rounded-md border px-2 py-1 capitalize transition-colors',
+                'rounded-lg border px-2.5 py-1 capitalize font-medium text-xs transition-colors',
                 filter === f
-                  ? 'border-primary bg-primary/15 text-primary-foreground/90'
-                  : 'border-border hover:bg-muted',
+                  ? 'border-primary/60 bg-primary/20 text-primary shadow-sm'
+                  : 'border-border/80 bg-background/60 hover:bg-muted text-muted-foreground hover:text-foreground',
               )}
             >
-              {f} <span className="text-muted-foreground">({counts[f]})</span>
+              {f} <span className="opacity-70 font-mono text-[10px]">({counts[f]})</span>
             </button>
           ))}
         </div>
         <div className="flex-1" />
-        <Button size="sm" onClick={() => setCreating(true)}>
+        <Button size="sm" onClick={() => setCreating(true)} className="rounded-lg shadow-sm">
           + New trace
         </Button>
       </header>

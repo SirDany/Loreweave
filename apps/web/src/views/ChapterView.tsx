@@ -86,16 +86,16 @@ export function ChapterView({
   const refCount = chapter.chapter.refs.length;
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
-      <header className="px-6 py-3 border-b border-border bg-card/40 flex items-center gap-4">
+    <div className="flex-1 flex flex-col overflow-hidden bg-background">
+      <header className="px-6 py-3 border-b border-border/80 bg-card/60 backdrop-blur-md flex items-center gap-4">
         <div className="flex-1 min-w-0">
           <div className="font-mono text-[11px] text-muted-foreground truncate">
             {chapter.chapter.relPath}
           </div>
           <div className="mt-0.5 flex items-center gap-2">
-            <span className="font-serif text-lg">{chapter.chapter.title}</span>
-            <Badge variant="secondary">{chapter.tome}</Badge>
-            <Badge variant="outline">
+            <span className="font-semibold text-base tracking-tight text-foreground">{chapter.chapter.title}</span>
+            <Badge variant="secondary" className="rounded-md">{chapter.tome}</Badge>
+            <Badge variant="outline" className="rounded-md">
               {refCount} echo{refCount !== 1 ? 'es' : ''}
             </Badge>
           </div>
@@ -104,6 +104,7 @@ export function ChapterView({
           {status && (
             <span
               className={cn(
+                'font-mono text-xs',
                 status.startsWith('error')
                   ? 'text-rose-400'
                   : 'text-emerald-400',
@@ -112,26 +113,26 @@ export function ChapterView({
               {status}
             </span>
           )}
-          {dirty && <span className="text-amber-400">• unsaved</span>}
+          {dirty && <span className="text-amber-400 font-mono text-xs">• unsaved</span>}
           {onAsk && (
             <Button
               variant="ghost"
               size="sm"
-              className="gap-1.5"
+              className="gap-1.5 rounded-lg text-primary hover:bg-primary/10 hover:text-primary"
               onClick={onAsk}
-              title="Ask the assistant about this chapter"
+              title="Ask Scribe about this chapter"
             >
               <Bot className="h-3.5 w-3.5" />
-              Ask
+              Scribe
             </Button>
           )}
           {onAudit && (
             <Button
               variant="ghost"
               size="sm"
-              className="gap-1.5"
+              className="gap-1.5 rounded-lg hover:bg-muted"
               onClick={onAudit}
-              title="Run @warden audit on this chapter"
+              title="Ask Scribe to audit continuity"
             >
               <Shield className="h-3.5 w-3.5" />
               Audit
@@ -140,7 +141,7 @@ export function ChapterView({
           <Button
             variant="ghost"
             size="sm"
-            className="gap-1.5"
+            className="gap-1.5 rounded-lg hover:bg-muted"
             onClick={togglePane}
             title={paneOpen ? 'Hide Codex pane' : 'Show Codex pane'}
           >
@@ -150,7 +151,7 @@ export function ChapterView({
           <Button
             variant="ghost"
             size="sm"
-            className="text-rose-400 hover:text-rose-300"
+            className="rounded-lg text-rose-400 hover:text-rose-300 hover:bg-rose-500/10"
             onClick={() => setDeleting(true)}
           >
             Delete
@@ -158,6 +159,7 @@ export function ChapterView({
           <Button
             variant={dirty ? 'default' : 'outline'}
             size="sm"
+            className="rounded-lg shadow-sm"
             onClick={save}
             disabled={!dirty || saving}
           >

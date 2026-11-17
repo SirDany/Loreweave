@@ -17,6 +17,7 @@ interface GrimoireProps {
   onNewTerm?: () => void;
   onNewSigil?: () => void;
   onNewChapter?: () => void;
+  width?: number;
 }
 
 /**
@@ -35,13 +36,17 @@ export function Grimoire({
   onNewTerm,
   onNewSigil,
   onNewChapter,
+  width,
 }: GrimoireProps) {
   const sections = getSections();
   return (
-    <nav className="w-80 shrink-0 flex flex-col border-r border-border bg-background/40 overflow-hidden">
+    <nav
+      style={{ width: width ? `${width}px` : undefined }}
+      className="w-80 shrink-0 flex flex-col border-r border-border/70 bg-card/30 backdrop-blur-sm overflow-hidden"
+    >
       <div className="px-4 pt-5 pb-3">
-        <span className="label-rune">Grimoire</span>
-        <ul className="mt-2 space-y-0.5">
+        <span className="label-rune font-semibold tracking-wider text-primary/80">Grimoire</span>
+        <ul className="mt-2.5 space-y-1">
           {sections.map((s) => {
             const Icon = s.icon;
             const active = section === s.id;
@@ -50,22 +55,22 @@ export function Grimoire({
                 <button
                   onClick={() => onSectionChange(s.id)}
                   className={cn(
-                    'group flex w-full items-center gap-3 rounded-md px-2.5 py-1.5 text-left transition-colors',
+                    'group flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left transition-all duration-150',
                     active
-                      ? 'bg-accent text-accent-foreground'
-                      : 'text-foreground/80 hover:bg-muted hover:text-foreground',
+                      ? 'bg-primary/15 text-primary border border-primary/30 shadow-sm'
+                      : 'text-foreground/80 hover:bg-muted/60 hover:text-foreground border border-transparent',
                   )}
                 >
                   <Icon
                     className={cn(
-                      'h-4 w-4 shrink-0',
+                      'h-4 w-4 shrink-0 transition-colors',
                       active
                         ? 'text-primary'
                         : 'text-muted-foreground group-hover:text-foreground',
                     )}
                   />
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium">{s.label}</div>
+                    <div className="text-xs font-semibold tracking-tight">{s.label}</div>
                     <div className="text-[11px] text-muted-foreground truncate">
                       {s.hint}
                     </div>
@@ -77,7 +82,7 @@ export function Grimoire({
         </ul>
       </div>
 
-      <Separator />
+      <Separator className="opacity-60" />
 
       <div className="flex-1 overflow-auto scrollbar-ember px-4 py-3">
         <SectionList

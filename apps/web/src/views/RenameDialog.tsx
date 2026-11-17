@@ -75,73 +75,79 @@ export function RenameDialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md p-4 animate-fade-in"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
       onKeyDown={(e) => {
         if (e.key === "Escape") onClose();
       }}
     >
-      <div className="w-full max-w-xl bg-card border border-border rounded-lg shadow-2xl">
-        <header className="px-5 py-3 border-b border-border">
-          <div className="text-xs text-muted-foreground">{type}/{id}</div>
-          <div className="text-base text-foreground">Rename "{name}"</div>
+      <div
+        className="w-full max-w-xl bg-card/95 border border-border/80 rounded-2xl shadow-2xl overflow-hidden flex flex-col backdrop-blur-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <header className="px-6 py-4 border-b border-border/70 bg-muted/20">
+          <div className="text-[11px] font-mono text-muted-foreground uppercase tracking-wider">{type}/{id}</div>
+          <div className="text-base font-semibold tracking-tight text-foreground">Rename "{name}"</div>
         </header>
 
-        <div className="p-5 space-y-3 text-sm">
+        <div className="p-6 space-y-4 text-sm">
           <label className="block">
-            <div className="text-xs text-muted-foreground mb-1">
-              new id <span className="text-muted-foreground/70">· kebab-case</span>
+            <div className="text-xs text-muted-foreground mb-1.5 font-medium">
+              New Identifier <span className="text-muted-foreground/70 font-mono">· kebab-case</span>
             </div>
             <input
               autoFocus
               value={newId}
               onChange={(e) => setNewId(e.target.value)}
-              className="w-full bg-background border border-border rounded px-2 py-1 font-mono"
+              className="w-full bg-background border border-border rounded-lg px-3 py-2 font-mono text-sm focus:ring-1 focus:ring-primary focus:outline-none transition-colors"
             />
           </label>
 
           {!validId && newId !== id && (
-            <div className="text-rose-400 text-xs">
-              id must match <code>[a-z0-9][a-z0-9-]*</code>
+            <div className="text-rose-400 text-xs font-mono">
+              Identifier must match <code>[a-z0-9][a-z0-9-]*</code>
             </div>
           )}
 
           {planning && (
-            <div className="text-muted-foreground text-xs">Computing impact…</div>
+            <div className="text-muted-foreground text-xs italic">Computing link impact and affected references…</div>
           )}
 
           {plan && (
-            <div className="border border-border rounded p-3 text-xs space-y-1 bg-background">
-              <div>
-                <span className="text-muted-foreground">file:</span>{" "}
+            <div className="border border-border/70 rounded-xl p-4 text-xs space-y-2 bg-muted/20">
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground">Target file:</span>
                 <span className="font-mono text-foreground">
                   {plan.sourceFile ?? "(none)"}
                 </span>
                 {plan.targetFile && plan.targetFile !== plan.sourceFile && (
                   <>
-                    {" → "}
-                    <span className="font-mono text-primary">
+                    <span className="text-muted-foreground">→</span>
+                    <span className="font-mono text-primary font-medium">
                       {plan.targetFile}
                     </span>
                   </>
                 )}
               </div>
               <div>
-                <span className="text-muted-foreground">echoes:</span>{" "}
-                <span className="text-foreground">
+                <span className="text-muted-foreground">Direct echoes:</span>{" "}
+                <span className="text-foreground font-medium">
                   {totalEchoes} in {plan.hits.length} file
                   {plan.hits.length === 1 ? "" : "s"}
                 </span>
               </div>
               {plan.extraHits.length > 0 && (
                 <div>
-                  <span className="text-muted-foreground">other refs:</span>{" "}
-                  <span className="text-foreground">{totalExtra}</span>
+                  <span className="text-muted-foreground">Other references:</span>{" "}
+                  <span className="text-foreground font-medium">{totalExtra}</span>
                 </div>
               )}
               {plan.conflicts.length > 0 && (
-                <div className="text-rose-400 mt-2">
-                  conflicts:
-                  <ul className="list-disc ml-5">
+                <div className="text-rose-400 mt-2 p-3 bg-rose-500/10 rounded-lg border border-rose-500/30">
+                  <div className="font-semibold mb-1">Conflicts detected:</div>
+                  <ul className="list-disc ml-5 space-y-0.5">
                     {plan.conflicts.map((c) => (
                       <li key={c}>{c}</li>
                     ))}
@@ -151,13 +157,13 @@ export function RenameDialog({
             </div>
           )}
 
-          {err && <div className="text-rose-400 text-xs whitespace-pre-wrap">{err}</div>}
+          {err && <div className="text-rose-400 text-xs whitespace-pre-wrap font-mono p-3 bg-rose-500/10 rounded-lg border border-rose-500/30">{err}</div>}
         </div>
 
-        <footer className="px-5 py-3 border-t border-border flex justify-end gap-2">
+        <footer className="px-6 py-3.5 border-t border-border/70 bg-muted/20 flex justify-end gap-2.5">
           <button
             onClick={onClose}
-            className="px-3 py-1 rounded border border-border text-foreground/90 hover:bg-muted text-xs"
+            className="px-4 py-1.5 rounded-lg border border-border text-foreground hover:bg-muted text-xs font-medium transition-colors"
           >
             Cancel
           </button>
@@ -170,7 +176,7 @@ export function RenameDialog({
               newId === id ||
               !validId
             }
-            className="px-3 py-1 rounded border border-primary bg-primary/20 text-primary-foreground hover:bg-primary/30 disabled:opacity-40 text-xs"
+            className="px-4 py-1.5 rounded-lg border border-primary/50 bg-primary/20 text-primary font-medium hover:bg-primary/30 disabled:opacity-40 text-xs transition-colors shadow-sm"
           >
             {applying ? "Renaming…" : "Apply rename"}
           </button>

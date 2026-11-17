@@ -71,27 +71,48 @@ const TOOLBAR_ACTIONS: Array<{
   label: string;
   title: string;
 }> = [
-  { id: 'muse', label: 'Muse', title: 'Brainstorm about this passage' },
-  { id: 'scribe', label: 'Scribe', title: 'Rewrite this passage' },
-  { id: 'warden', label: 'Warden', title: 'Check canon consistency' },
-  { id: 'polisher', label: 'Polisher', title: 'Polish prose without changing canon' },
+  { id: 'scribe-brainstorm', label: 'Brainstorm', title: 'Ask Scribe to brainstorm ideas for this passage' },
+  { id: 'scribe-rewrite', label: 'Rewrite', title: 'Ask Scribe to rewrite this passage honoring canon' },
+  { id: 'scribe-audit', label: 'Audit Canon', title: 'Ask Scribe to check canon consistency and Sigil terms' },
+  { id: 'scribe-polish', label: 'Polish Prose', title: 'Ask Scribe to polish rhythm and prose without changing canon' },
 ];
 
-const darkTheme = EditorView.theme(
-  {
-    "&": { backgroundColor: "transparent", color: "#e7e5e4", height: "100%" },
-    ".cm-content": { fontFamily: "ui-serif, Georgia, serif", padding: "1rem" },
-    ".cm-gutters": {
-      backgroundColor: "transparent",
-      color: "#57534e",
-      border: "none",
-    },
-    ".cm-activeLine": { backgroundColor: "rgba(120, 53, 15, 0.15)" },
-    ".cm-activeLineGutter": { backgroundColor: "transparent", color: "#a8a29e" },
-    ".cm-cursor": { borderLeftColor: "#fbbf24" },
+const modernEditorTheme = EditorView.theme({
+  "&": {
+    backgroundColor: "transparent",
+    color: "hsl(var(--foreground))",
+    height: "100%",
   },
-  { dark: true },
-);
+  ".cm-content": {
+    fontFamily:
+      "Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+    fontSize: "0.9375rem",
+    lineHeight: "1.75",
+    padding: "1.25rem 1.5rem",
+    caretColor: "hsl(var(--primary))",
+  },
+  ".cm-gutters": {
+    backgroundColor: "transparent",
+    color: "hsl(var(--muted-foreground) / 0.5)",
+    border: "none",
+    paddingRight: "0.5rem",
+  },
+  ".cm-activeLine": {
+    backgroundColor: "hsl(var(--primary) / 0.08)",
+  },
+  ".cm-activeLineGutter": {
+    backgroundColor: "transparent",
+    color: "hsl(var(--primary))",
+    fontWeight: "600",
+  },
+  ".cm-cursor": {
+    borderLeftColor: "hsl(var(--primary))",
+    borderLeftWidth: "2px",
+  },
+  "&.cm-focused .cm-selectionBackground, .cm-selectionBackground, ::selection": {
+    backgroundColor: "hsl(var(--primary) / 0.25) !important",
+  },
+});
 
 export function Editor({ value, catalog, readOnly, onChange, onAskAssistant, onRefAtCursor, hideToolbar }: Props) {
   const host = useRef<HTMLDivElement>(null);
@@ -120,7 +141,7 @@ export function Editor({ value, catalog, readOnly, onChange, onAskAssistant, onR
         ]),
         markdown(),
         syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
-        darkTheme,
+        modernEditorTheme,
         EditorView.editable.of(!readOnly),
         EditorState.readOnly.of(!!readOnly),
         lwCompartment.current.of(loreweaveExtensions(catalog)),
@@ -208,18 +229,18 @@ export function Editor({ value, catalog, readOnly, onChange, onAskAssistant, onR
       <div ref={host} className="relative flex-1 overflow-auto">
         {anchor && onAskAssistant && (
           <div
-            className="absolute z-20 flex items-center gap-1 rounded-md border border-border bg-card px-1.5 py-1 shadow-lg"
+            className="absolute z-20 flex items-center gap-1 rounded-lg border border-border/80 bg-card/95 backdrop-blur-md px-2 py-1 shadow-xl ring-1 ring-primary/25"
             style={{ top: Math.max(4, anchor.top), left: anchor.left }}
             onMouseDown={(e) => e.preventDefault()}
           >
-            <span className="px-1 text-[10px] uppercase tracking-wider text-muted-foreground">
-              Ask
+            <span className="px-1 text-[10px] font-semibold uppercase tracking-wider text-primary">
+              Scribe
             </span>
             {TOOLBAR_ACTIONS.map((a) => (
               <button
                 key={a.id}
                 title={a.title}
-                className="rounded px-2 py-0.5 text-xs text-foreground/90 hover:bg-accent hover:text-accent-foreground"
+                className="rounded-md px-2 py-0.5 text-xs text-foreground/90 hover:bg-primary/15 hover:text-primary transition-colors font-medium"
                 onClick={() =>
                   onAskAssistant(a.id, { text: anchor.text, lines: anchor.lines })
                 }
@@ -315,7 +336,7 @@ const TOOLBAR_BUTTONS: ToolbarButton[] = [
 function MarkdownToolbar({ viewRef }: { viewRef: React.MutableRefObject<EditorView | null> }) {
   return (
     <div
-      className="flex shrink-0 flex-wrap items-center gap-0.5 border-b border-border bg-card/60 px-2 py-1"
+      className="flex shrink-0 flex-wrap items-center gap-1 border-b border-border/80 bg-card/60 backdrop-blur-md px-3 py-1.5"
       onMouseDown={(e) => e.preventDefault()}
     >
       {TOOLBAR_BUTTONS.map((b, i) => {
@@ -329,7 +350,7 @@ function MarkdownToolbar({ viewRef }: { viewRef: React.MutableRefObject<EditorVi
             {divider && (
               <span
                 aria-hidden
-                className="mx-1 inline-block h-4 w-px bg-border"
+                className="mx-1 inline-block h-4 w-px bg-border/80"
               />
             )}
             <button
@@ -339,7 +360,7 @@ function MarkdownToolbar({ viewRef }: { viewRef: React.MutableRefObject<EditorVi
                 const v = viewRef.current;
                 if (v) b.run(v);
               }}
-              className="inline-flex h-7 items-center gap-1 rounded px-2 text-[11px] font-medium text-foreground/85 hover:bg-accent hover:text-accent-foreground"
+              className="inline-flex h-7 items-center gap-1 rounded-md px-2 text-[11px] font-medium text-foreground/80 hover:bg-primary/10 hover:text-primary transition-colors"
             >
               <Icon className="h-3.5 w-3.5" />
               <span className="hidden md:inline">{b.label}</span>

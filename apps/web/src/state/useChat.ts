@@ -130,7 +130,7 @@ function buildCommitMessage(agentId: string, action: PendingAction): string {
       : action.patch
         ? 'patch'
         : 'edit';
-  const subject = `Assistant (${agentId || 'unknown'}): ${verb} ${action.relPath}`;
+  const subject = `Scribe: ${verb} ${action.relPath}`;
   const rationale = action.rationale?.trim();
   return rationale ? `${subject}\n\n${rationale}` : subject;
 }
@@ -180,7 +180,7 @@ export function useChat({ sagaRoot, approvalPolicy: _policy = 'writes-approval',
         setAgents(body.agents);
         if (!agentId && body.agents.length > 0) {
           const preferred =
-            body.agents.find((a) => a.id === 'muse') ?? body.agents[0]!;
+            body.agents.find((a) => a.id === 'scribe') ?? body.agents[0]!;
           setAgentIdState(preferred.id);
         }
       })

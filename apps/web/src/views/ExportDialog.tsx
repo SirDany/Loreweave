@@ -205,32 +205,38 @@ export function ExportDialog({ sagaPath, data, onClose }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md p-4 animate-fade-in"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
       onKeyDown={(e) => {
         if (e.key === "Escape") onClose();
       }}
     >
-      <div className="w-full max-w-2xl bg-card border border-border rounded-lg shadow-2xl">
-        <header className="px-5 py-3 border-b border-border flex items-center justify-between">
+      <div
+        className="w-full max-w-2xl bg-card/95 border border-border/80 rounded-2xl shadow-2xl overflow-hidden flex flex-col backdrop-blur-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <header className="px-6 py-4 border-b border-border/70 bg-muted/20 flex items-center justify-between">
           <div>
-            <div className="text-base text-foreground">Export</div>
-            <div className="text-xs text-muted-foreground">{sagaPath}</div>
+            <div className="text-base font-semibold tracking-tight text-foreground">Export Saga</div>
+            <div className="text-[11px] font-mono text-muted-foreground truncate max-w-md">{sagaPath}</div>
           </div>
           <button
             onClick={onClose}
-            className="text-xs text-muted-foreground hover:text-foreground"
+            className="text-xs text-muted-foreground hover:text-foreground p-1 rounded-md hover:bg-muted transition-colors"
           >
             esc
           </button>
         </header>
 
-        <div className="p-5 space-y-4 text-sm">
+        <div className="p-6 space-y-4 text-sm">
           <label className="block text-xs">
-            <span className="text-muted-foreground">format</span>
+            <span className="text-muted-foreground font-medium">Export Format</span>
             <select
               value={format}
               onChange={(e) => setFormat(e.target.value as ExportFormat)}
-              className="mt-1 w-full bg-background border border-border rounded px-2 py-1 text-sm"
+              className="mt-1 w-full bg-background border border-border rounded-lg px-3 py-2 text-xs focus:ring-1 focus:ring-primary focus:outline-none transition-colors"
             >
               {FORMATS.map((f) => (
                 <option key={f.id} value={f.id}>
@@ -238,21 +244,21 @@ export function ExportDialog({ sagaPath, data, onClose }: Props) {
                 </option>
               ))}
             </select>
-            <div className="mt-1 text-muted-foreground">
+            <div className="mt-1.5 text-muted-foreground text-xs leading-relaxed">
               {def.detail}
               {def.needsPandoc && (
-                <span className="text-amber-300"> · requires pandoc on PATH</span>
+                <span className="text-amber-400 font-medium"> · requires pandoc on PATH</span>
               )}
             </div>
           </label>
 
           {def.needsTome && (
             <label className="block text-xs">
-              <span className="text-muted-foreground">tome</span>
+              <span className="text-muted-foreground font-medium">Tome</span>
               <select
                 value={tome}
                 onChange={(e) => setTome(e.target.value)}
-                className="mt-1 w-full bg-background border border-border rounded px-2 py-1 text-sm"
+                className="mt-1 w-full bg-background border border-border rounded-lg px-3 py-2 text-xs focus:ring-1 focus:ring-primary focus:outline-none transition-colors"
               >
                 {data.tomes.map((t) => (
                   <option key={t.id} value={t.id}>
@@ -265,11 +271,11 @@ export function ExportDialog({ sagaPath, data, onClose }: Props) {
 
           {def.needsChapter && tomeObj && (
             <label className="block text-xs">
-              <span className="text-muted-foreground">chapter</span>
+              <span className="text-muted-foreground font-medium">Chapter</span>
               <select
                 value={chapter}
                 onChange={(e) => setChapter(e.target.value)}
-                className="mt-1 w-full bg-background border border-border rounded px-2 py-1 text-sm"
+                className="mt-1 w-full bg-background border border-border rounded-lg px-3 py-2 text-xs focus:ring-1 focus:ring-primary focus:outline-none transition-colors"
               >
                 {tomeObj.chapters.map((c) => (
                   <option key={c.slug} value={c.slug}>
@@ -281,36 +287,35 @@ export function ExportDialog({ sagaPath, data, onClose }: Props) {
           )}
 
           <label className="block text-xs">
-            <span className="text-muted-foreground">output path</span>
+            <span className="text-muted-foreground font-medium">Destination Output Path</span>
             <input
               value={out}
               onChange={(e) => setOut(e.target.value)}
-              className="mt-1 w-full bg-background border border-border rounded px-2 py-1 font-mono text-xs"
+              className="mt-1 w-full bg-background border border-border rounded-lg px-3 py-2 font-mono text-xs focus:ring-1 focus:ring-primary focus:outline-none transition-colors"
               placeholder={`${def.ext} file path`}
             />
-            <div className="mt-1 text-muted-foreground">
-              Relative paths are resolved against the working directory the CLI
-              runs in. Use an absolute path to put the file anywhere.
+            <div className="mt-1 text-muted-foreground text-[11px]">
+              Relative paths are resolved against current workspace root. Use an absolute path to export anywhere.
             </div>
           </label>
 
           {format === "saga" && plan && (
-            <div className="border border-border rounded p-3 bg-background text-xs">
-              <div className="text-muted-foreground mb-1">
-                Will include <span className="text-foreground">{plan.totalFiles}</span> files
+            <div className="border border-border/70 rounded-xl p-4 bg-muted/20 text-xs">
+              <div className="text-muted-foreground mb-2">
+                Will bundle <span className="text-foreground font-medium">{plan.totalFiles}</span> files
                 ({(plan.totalBytes / 1024).toFixed(1)} KB).
               </div>
-              <ul className="max-h-32 overflow-auto font-mono text-[11px] text-muted-foreground">
+              <ul className="max-h-32 overflow-auto font-mono text-[11px] text-muted-foreground space-y-0.5">
                 {plan.files.slice(0, 30).map((f) => (
                   <li key={f.relPath}>
-                    <span className="text-muted-foreground/70">
+                    <span className="text-muted-foreground/60 font-mono">
                       {String(f.size).padStart(6)}
                     </span>{" "}
                     {f.relPath}
                   </li>
                 ))}
                 {plan.files.length > 30 && (
-                  <li className="text-muted-foreground/70">
+                  <li className="text-muted-foreground/70 italic">
                     … and {plan.files.length - 30} more
                   </li>
                 )}
@@ -319,24 +324,24 @@ export function ExportDialog({ sagaPath, data, onClose }: Props) {
           )}
 
           {err && (
-            <div className="text-rose-400 text-xs whitespace-pre-wrap">{err}</div>
+            <div className="text-rose-400 text-xs whitespace-pre-wrap font-mono p-3 bg-rose-500/10 rounded-lg border border-rose-500/30">{err}</div>
           )}
           {info && (
-            <div className="text-emerald-300 text-xs whitespace-pre-wrap">{info}</div>
+            <div className="text-emerald-300 text-xs whitespace-pre-wrap font-mono p-3 bg-emerald-500/10 rounded-lg border border-emerald-500/30">{info}</div>
           )}
         </div>
 
-        <footer className="px-5 py-3 border-t border-border flex justify-end gap-2">
+        <footer className="px-6 py-3.5 border-t border-border/70 bg-muted/20 flex justify-end gap-2.5">
           <button
             onClick={onClose}
-            className="px-3 py-1 rounded border border-border text-foreground/90 hover:bg-muted text-xs"
+            className="px-4 py-1.5 rounded-lg border border-border text-foreground hover:bg-muted text-xs font-medium transition-colors"
           >
             Close
           </button>
           <button
             onClick={() => void doRun()}
             disabled={!canRun}
-            className="px-3 py-1 rounded border border-primary bg-primary/20 text-primary-foreground hover:bg-primary/30 disabled:opacity-40 text-xs"
+            className="px-4 py-1.5 rounded-lg border border-primary/50 bg-primary/20 text-primary font-medium hover:bg-primary/30 disabled:opacity-40 text-xs transition-colors shadow-sm"
           >
             {busy ? "Exporting…" : "Export"}
           </button>

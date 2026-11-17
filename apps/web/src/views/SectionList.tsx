@@ -79,20 +79,20 @@ export function SectionList({
 
   if (section === 'story') {
     return (
-      <div className="space-y-2">
+      <div className="space-y-3">
         {onNewChapter && (
           <button
             onClick={onNewChapter}
-            className="flex w-full items-center gap-1 rounded-md border border-dashed border-border px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
+            className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-border/80 px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-muted/50 hover:text-foreground hover:border-primary/40 transition-colors"
           >
-            <Plus className="h-3 w-3" /> New chapter
+            <Plus className="h-3.5 w-3.5 text-primary" /> New chapter
           </button>
         )}
-        <ul className="space-y-3 text-sm">
+        <ul className="space-y-3.5 text-sm">
           {data.tomes.map((t) => (
             <li key={t.id}>
-              <div className="label-rune px-1">{t.title}</div>
-              <ul className="mt-1 space-y-0.5">
+              <div className="label-rune px-1 font-semibold text-primary/80">{t.title}</div>
+              <ul className="mt-1.5 space-y-1">
                 {t.chapters.map((c) => {
                   const key = `${t.id}::${c.slug}`;
                   const sel =
@@ -102,10 +102,10 @@ export function SectionList({
                       <button
                         onClick={() => onSelect({ kind: 'chapter', key })}
                         className={cn(
-                          'w-full rounded-md px-2 py-1 text-left transition-colors',
+                          'w-full rounded-lg px-2.5 py-1.5 text-left transition-colors text-xs font-medium',
                           sel
-                            ? 'bg-accent text-accent-foreground'
-                            : 'hover:bg-muted',
+                            ? 'bg-primary/15 text-primary border border-primary/30 shadow-sm'
+                            : 'hover:bg-muted/60 text-foreground/80 hover:text-foreground',
                         )}
                       >
                         {c.title}
@@ -254,18 +254,18 @@ function CodexChip({ label, icon: Icon, count, active, onClick }: CodexChipProps
       onClick={onClick}
       title={label}
       className={cn(
-        'flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] transition-colors',
+        'flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[11px] font-medium transition-all duration-150',
         active
-          ? 'border-primary/60 bg-primary/15 text-primary-foreground'
-          : 'border-border bg-background hover:bg-muted',
+          ? 'border-primary/60 bg-primary/20 text-primary shadow-sm'
+          : 'border-border/80 bg-background/60 hover:bg-muted text-muted-foreground hover:text-foreground',
       )}
     >
-      <Icon className="h-3.5 w-3.5" />
+      <Icon className="h-3 w-3" />
       <span className="hidden sm:inline">{label}</span>
       <span
         className={cn(
-          'rounded px-1 font-mono text-[10px]',
-          active ? 'bg-primary/30' : 'bg-muted text-muted-foreground',
+          'rounded px-1.5 py-0.2 font-mono text-[10px]',
+          active ? 'bg-primary/30 text-primary font-semibold' : 'bg-muted text-muted-foreground',
         )}
       >
         {count}
@@ -300,7 +300,7 @@ function RichEntryList({
     );
   }
   return (
-    <ul className="text-sm">
+    <ul className="text-sm space-y-0.5">
       {items.map((e) => {
         const key = `${e.type}/${e.id}`;
         const sel = selection?.kind === 'entry' && selection.key === key;
@@ -315,30 +315,30 @@ function RichEntryList({
               }}
               title="Right-click to rename"
               className={cn(
-                'group flex w-full items-start gap-2 px-2 py-1.5 text-left transition-colors',
+                'group flex w-full items-start gap-2.5 px-2.5 py-2 rounded-lg text-left transition-all duration-150',
                 sel
-                  ? 'bg-accent text-accent-foreground'
-                  : 'hover:bg-muted',
+                  ? 'bg-primary/15 text-foreground border border-primary/30 shadow-sm'
+                  : 'hover:bg-muted/60 text-foreground/80 hover:text-foreground border border-transparent',
               )}
             >
               <Icon
                 className={cn(
-                  'mt-0.5 h-4 w-4 shrink-0',
+                  'mt-0.5 h-3.5 w-3.5 shrink-0 transition-colors',
                   sel
                     ? 'text-primary'
                     : 'text-muted-foreground group-hover:text-foreground',
                 )}
               />
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1">
-                  <span className="truncate">{e.name}</span>
+                <div className="flex items-center gap-1.5">
+                  <span className="truncate font-medium text-xs text-foreground">{e.name}</span>
                   {e.status === 'draft' && (
-                    <span className="rounded border border-border px-1 py-[1px] font-mono text-[9px] uppercase text-amber-300">
+                    <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-1.5 py-[1px] font-mono text-[9px] uppercase tracking-wider text-amber-300">
                       draft
                     </span>
                   )}
                 </div>
-                <div className="truncate font-mono text-[10px] text-muted-foreground/80">
+                <div className="truncate font-mono text-[10px] text-muted-foreground/80 mt-0.5">
                   {e.type}/{e.id}
                   {e.aliases.length > 0 && (
                     <span className="ml-1 opacity-70">
@@ -348,7 +348,7 @@ function RichEntryList({
                 </div>
               </div>
               {e.appears_in && e.appears_in.length > 0 && (
-                <span className="shrink-0 self-center font-mono text-[10px] text-primary/80">
+                <span className="shrink-0 self-center font-mono text-[10px] text-primary/80 bg-primary/10 rounded px-1.5 py-0.5 border border-primary/20">
                   {e.appears_in.join(',')}
                 </span>
               )}

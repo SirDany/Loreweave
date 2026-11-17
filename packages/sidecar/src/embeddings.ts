@@ -15,15 +15,17 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { loadSaga } from '@loreweave/core';
+import type { EmbeddingsProvider } from './config.js';
+import { getGoogleApiKey, normalizeOllamaBase } from './model.js';
 
 const INDEX_REL = '.loreweave/embeddings/index.json';
 
 export interface EmbedProviderConfig {
-  provider: 'ollama' | 'openai-compatible';
-  /** Base URL. Defaults: Ollama `http://127.0.0.1:11434`, OAI-compat none. */
+  provider: EmbeddingsProvider;
+  /** Base URL. Defaults: Ollama `http://127.0.0.1:11434`, OpenAI `https://api.openai.com/v1`, Google `https://generativelanguage.googleapis.com/v1beta/openai`. */
   endpoint?: string;
   model: string;
-  /** Optional bearer token for OpenAI-compatible providers. */
+  /** Optional bearer token for authenticated or cloud providers. */
   apiKey?: string;
 }
 
@@ -58,10 +60,13 @@ export async function embed(
   cfg: EmbedProviderConfig,
 ): Promise<number[]> {
   if (cfg.provider === 'ollama') {
-    const base = cfg.endpoint ?? 'http://127.0.0.1:11434';
-    const res = await fetch(`${base.replace(/\/$/, '')}/api/embeddings`, {
+    const base = normalizeOllamaBase(cfg.endpoint);
+    const res = await fetch(`${base}/api/embeddings`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: {
+        'content-type': 'application/json',
+        ...(cfg.apiKey ? { authorization: `Bearer ${cfg.apiKey}` } : {}),
+      },
       body: JSON.stringify({ model: cfg.model, prompt: text }),
     });
     if (!res.ok) {
@@ -73,21 +78,29 @@ export async function embed(
     }
     return data.embedding;
   }
-  // OpenAI-compatible.
-  if (!cfg.endpoint) {
+
+  // OpenAI, Google Gemini (OpenAI-compat endpoint), or custom OpenAI-compatible.
+  const endpoint =
+    cfg.provider === 'openai'
+      ? cfg.endpoint?.trim() || 'https://api.openai.com/v1'
+      : cfg.provider === 'google'
+        ? cfg.endpoint?.trim() ||
+          'https://generativelanguage.googleapis.com/v1beta/openai'
+        : cfg.endpoint?.trim();
+
+  if (!endpoint) {
     throw new Error('openai-compatible provider requires `endpoint`');
   }
-  const res = await fetch(
-    `${cfg.endpoint.replace(/\/$/, '')}/embeddings`,
-    {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        ...(cfg.apiKey ? { authorization: `Bearer ${cfg.apiKey}` } : {}),
-      },
-      body: JSON.stringify({ model: cfg.model, input: text }),
+  const modelId =
+    cfg.provider === 'google' ? cfg.model.replace(/^models\//, '') : cfg.model;
+  const res = await fetch(`${endpoint.replace(/\/+$/, '')}/embeddings`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      ...(cfg.apiKey ? { authorization: `Bearer ${cfg.apiKey}` } : {}),
     },
-  );
+    body: JSON.stringify({ model: modelId, input: text }),
+  });
   if (!res.ok) {
     throw new Error(`oai embeddings ${res.status}: ${await res.text()}`);
   }
@@ -221,21 +234,52 @@ export async function searchIndex(
  * Read provider config from env. Returns null when embeddings are disabled.
  */
 export function providerFromEnv(): EmbedProviderConfig | null {
-  const p = process.env.LOREWEAVE_EMBEDDINGS;
+  const p = process.env.LOREWEAVE_EMBEDDINGS?.trim();
   if (!p) return null;
   if (p === 'ollama') {
     return {
       provider: 'ollama',
-      endpoint: process.env.LOREWEAVE_EMBEDDINGS_ENDPOINT,
+      endpoint:
+        process.env.LOREWEAVE_EMBEDDINGS_ENDPOINT ?? process.env.OLLAMA_HOST,
       model: process.env.LOREWEAVE_EMBEDDINGS_MODEL ?? 'nomic-embed-text',
+      apiKey:
+        process.env.LOREWEAVE_EMBEDDINGS_API_KEY ?? process.env.OLLAMA_API_KEY,
     };
   }
-  if (p === 'openai' || p === 'openai-compatible') {
+  if (p === 'openai') {
+    return {
+      provider: 'openai',
+      endpoint:
+        process.env.LOREWEAVE_EMBEDDINGS_ENDPOINT ??
+        'https://api.openai.com/v1',
+      model:
+        process.env.LOREWEAVE_EMBEDDINGS_MODEL ?? 'text-embedding-3-small',
+      apiKey:
+        process.env.LOREWEAVE_EMBEDDINGS_API_KEY ?? process.env.OPENAI_API_KEY,
+    };
+  }
+  if (p === 'google') {
+    return {
+      provider: 'google',
+      endpoint:
+        process.env.LOREWEAVE_EMBEDDINGS_ENDPOINT ??
+        'https://generativelanguage.googleapis.com/v1beta/openai',
+      model: process.env.LOREWEAVE_EMBEDDINGS_MODEL ?? 'gemini-embedding-001',
+      apiKey: process.env.LOREWEAVE_EMBEDDINGS_API_KEY ?? getGoogleApiKey(),
+    };
+  }
+  if (p === 'openai-compatible') {
     return {
       provider: 'openai-compatible',
-      endpoint: process.env.LOREWEAVE_EMBEDDINGS_ENDPOINT,
-      model: process.env.LOREWEAVE_EMBEDDINGS_MODEL ?? 'text-embedding-3-small',
-      apiKey: process.env.LOREWEAVE_EMBEDDINGS_API_KEY,
+      endpoint:
+        process.env.LOREWEAVE_EMBEDDINGS_ENDPOINT ??
+        process.env.OPENAI_BASE_URL,
+      model:
+        process.env.LOREWEAVE_EMBEDDINGS_MODEL ?? 'text-embedding-3-small',
+      apiKey:
+        process.env.LOREWEAVE_EMBEDDINGS_API_KEY ??
+        process.env.OPENAI_COMPATIBLE_API_KEY ??
+        process.env.OPENAI_API_KEY,
     };
   }
   return null;

@@ -24,6 +24,27 @@ export {
   revisionFor,
   type GetDigestOptions,
 } from './digest-cache.js';
-export { resolveModel } from './model.js';
+export {
+  CHAT_PROVIDERS,
+  EMBEDDING_PROVIDERS,
+  type ChatProvider,
+  type EmbeddingsProvider,
+  type ChatConfig,
+  type EmbeddingsConfig,
+  type LoreweaveConfig,
+  type MaskedConfig,
+} from './config.js';
+export {
+  resolveModel,
+  discoverModels,
+  PROVIDER_CATALOG,
+  normalizeOllamaBase,
+  detectActiveProvider,
+  getGoogleApiKey,
+  type ModelDescriptor,
+  type ProviderMeta,
+  type DiscoverModelsOptions,
+  type ModelsDiscoveryResult,
+} from './model.js';
 export { safeJoin } from './paths.js';
 export { loadSagaRules, type SagaRulesResult } from './saga-rules.js';

@@ -3,50 +3,44 @@
 @tailwind utilities;
 
 /*
- * Loreweave mythic theme.
- *
- * Built on shadcn's CSS variable contract so the ui/* primitives
- * (Button, Input, Tabs, …) stay in sync. Palette is stone + ember:
- * - background/foreground: deep stone, parchment ink
- * - primary (ember): amber/copper accents for focus & calls-to-action
- * - muted/accent: quieter stone shades
- * - ring: amber, so focus states read as "lit"
+ * Loreweave modern high-tech theme.
+ * Built on shadcn's CSS variable contract with high-precision engineering styling.
  */
 @layer base {
   :root {
     color-scheme: dark;
 
-    /* Stone base */
-    --background: 24 10% 6%;
-    --foreground: 30 20% 92%;
+    /* Cyber Dark base */
+    --background: 222 47% 7%;
+    --foreground: 210 40% 98%;
 
-    --card: 24 10% 8%;
-    --card-foreground: 30 20% 92%;
+    --card: 222 40% 10%;
+    --card-foreground: 210 40% 98%;
 
-    --popover: 24 10% 7%;
-    --popover-foreground: 30 20% 92%;
+    --popover: 222 40% 9%;
+    --popover-foreground: 210 40% 98%;
 
-    /* Ember */
-    --primary: 32 86% 52%;
-    --primary-foreground: 30 25% 12%;
+    /* Precision Cyan */
+    --primary: 186 100% 45%;
+    --primary-foreground: 222 47% 7%;
 
-    --secondary: 24 8% 15%;
-    --secondary-foreground: 30 20% 92%;
+    --secondary: 222 30% 15%;
+    --secondary-foreground: 210 40% 96%;
 
-    --muted: 24 8% 13%;
-    --muted-foreground: 30 10% 62%;
+    --muted: 222 30% 13%;
+    --muted-foreground: 215 20% 65%;
 
-    --accent: 32 60% 24%;
-    --accent-foreground: 36 90% 88%;
+    --accent: 186 100% 18%;
+    --accent-foreground: 186 100% 90%;
 
-    --destructive: 0 70% 52%;
+    --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 24 8% 18%;
-    --input: 24 8% 18%;
-    --ring: 32 86% 52%;
+    --border: 222 25% 18%;
+    --input: 222 25% 18%;
+    --ring: 186 100% 45%;
 
-    --radius: 0.5rem;
+    --radius: 0.65rem;
   }
 
   .dark {
@@ -61,6 +55,7 @@
   body,
   #root {
     height: 100%;
+    min-height: 100%;
   }
 
   body {
@@ -70,47 +65,29 @@
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
   }
-
-  .bg-parchment-grain {
-    background-image:
-      radial-gradient(
-        circle at 20% 10%,
-        hsl(32 60% 20% / 0.08),
-        transparent 50%
-      ),
-      radial-gradient(
-        circle at 80% 90%,
-        hsl(32 60% 20% / 0.06),
-        transparent 55%
-      );
-  }
 }
 
 @layer utilities {
   .scrollbar-ember::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
+    width: 6px;
+    height: 6px;
   }
   .scrollbar-ember::-webkit-scrollbar-track {
     background: transparent;
   }
   .scrollbar-ember::-webkit-scrollbar-thumb {
-    background: hsl(var(--border));
+    background: hsl(var(--border) / 0.8);
     border-radius: 9999px;
-    border: 2px solid transparent;
-    background-clip: padding-box;
   }
   .scrollbar-ember::-webkit-scrollbar-thumb:hover {
-    background: hsl(var(--muted-foreground) / 0.5);
-    background-clip: padding-box;
+    background: hsl(var(--primary) / 0.5);
   }
 
   .label-rune {
     text-transform: uppercase;
-    letter-spacing: 0.18em;
-    font-size: 0.7rem;
+    letter-spacing: 0.12em;
+    font-size: 0.68rem;
+    font-weight: 600;
     color: hsl(var(--muted-foreground));
   }
 }
-
-

@@ -120,7 +120,9 @@ export function RulesDialog({ sagaPath, onClose }: Props) {
   return (
     <div
       className="fixed inset-0 bg-black/60 flex items-center justify-center z-50"
-      onClick={onClose}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
       <div
         className="bg-card border border-border rounded shadow-xl w-[56rem] max-w-[95vw] h-[36rem] max-h-[90vh] flex flex-col overflow-hidden"

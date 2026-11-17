@@ -96,12 +96,20 @@ export function buildTargetSuggestions(data: DumpPayload): TargetSuggestion[] {
 export function assistantPromptFor(action: string): string {
   switch (action) {
     case 'scribe':
+    case 'rewrite':
+    case 'scribe-rewrite':
       return 'Rewrite the selected passage. Honor existing canon; do not invent new facts.';
     case 'warden':
+    case 'audit':
+    case 'scribe-audit':
       return 'Does the selected passage contradict anything in the Codex? Check canon and Sigil slang.';
     case 'polisher':
-      return 'Polish the selected passage for grammar and flow. Do not change meaning or canon.';
+    case 'polish':
+    case 'scribe-polish':
+      return 'Polish the selected passage for grammar, rhythm, and flow. Do not change meaning or canon.';
     case 'muse':
+    case 'brainstorm':
+    case 'scribe-brainstorm':
     default:
       return 'What should I think about regarding this passage? Offer 2–4 distinct options, each with tradeoffs.';
   }

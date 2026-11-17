@@ -78,7 +78,9 @@ export function NewChapterDialog({
   return (
     <div
       className="fixed inset-0 bg-black/60 flex items-center justify-center z-50"
-      onClick={onClose}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
       <div
         className="bg-card border border-border rounded shadow-xl w-[32rem] max-w-full p-4 space-y-3"

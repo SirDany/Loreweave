@@ -38,10 +38,13 @@ import {
 } from './digest-cache.js';
 import { loadSagaRules } from './saga-rules.js';
 import {
+  CHAT_PROVIDERS,
   applyConfigToEnv,
   loadConfig,
   maskConfig,
   patchConfig,
+  type ChatProvider,
+  type LoreweaveConfig,
 } from './config.js';
 import {
   buildIndex,
@@ -50,7 +53,10 @@ import {
   searchIndex,
 } from './embeddings.js';
 import { commitFile } from './git.js';
-import { resolveModel } from './model.js';
+import {
+  discoverModels,
+  resolveModel,
+} from './model.js';
 import { safeJoin } from './paths.js';
 import {
   runTool,
@@ -101,6 +107,36 @@ const CLI_TIMEOUT_MS = 30_000;
 const MAX_CONCURRENT_CLI = 4;
 const CHAT_WINDOW_MS = 60_000;
 const CHAT_MAX_PER_WINDOW = 20;
+
+function savedKeyFor(
+  cfg: LoreweaveConfig,
+  provider: ChatProvider,
+): string | undefined {
+  const c = cfg.chat;
+  if (!c) return undefined;
+  switch (provider) {
+    case 'anthropic':
+      return c.anthropicApiKey;
+    case 'openai':
+      return c.openaiApiKey;
+    case 'google':
+      return c.googleApiKey;
+    case 'ollama':
+      return c.ollamaApiKey;
+    case 'openrouter':
+      return c.openrouterApiKey;
+    case 'groq':
+      return c.groqApiKey;
+    case 'deepseek':
+      return c.deepseekApiKey;
+    case 'mistral':
+      return c.mistralApiKey;
+    case 'xai':
+      return c.xaiApiKey;
+    case 'openai-compatible':
+      return c.customApiKey;
+  }
+}
 
 function readBody(req: IncomingMessage, res: ServerResponse): Promise<string | null> {
   return new Promise((resolve) => {
@@ -773,6 +809,93 @@ export function registerSidecar(
       }
       res.statusCode = 405;
       res.end('method not allowed');
+    } catch (e) {
+      res.statusCode = 400;
+      res.end(String(e));
+    }
+  });
+
+  // --- /lw/models (live model discovery) -----------------------------------
+  host.use('/lw/models', async (req, res) => {
+    try {
+      let providerParam = '';
+      let apiKeyParam: string | undefined;
+      let hasOllamaHost = false;
+      let ollamaHostParam: string | undefined;
+      let ollamaApiKeyParam: string | undefined;
+      let hasBaseUrl = false;
+      let baseUrlParam: string | undefined;
+      let scopeParam: 'chat' | 'embeddings' = 'chat';
+
+      if (req.method === 'GET') {
+        const url = new URL(req.url ?? '', 'http://localhost');
+        providerParam = (url.searchParams.get('provider') ?? '').trim();
+        hasOllamaHost = url.searchParams.has('ollamaHost');
+        ollamaHostParam = url.searchParams.get('ollamaHost')?.trim() || undefined;
+        hasBaseUrl = url.searchParams.has('baseUrl');
+        baseUrlParam = url.searchParams.get('baseUrl')?.trim() || undefined;
+        if (url.searchParams.get('scope') === 'embeddings') {
+          scopeParam = 'embeddings';
+        }
+      } else if (req.method === 'POST') {
+        const body = await readBody(req, res);
+        if (body == null) return;
+        const parsed = JSON.parse(body || '{}') as {
+          provider?: string;
+          apiKey?: string;
+          ollamaHost?: string;
+          ollamaApiKey?: string;
+          baseUrl?: string;
+          scope?: string;
+        };
+        providerParam = (parsed.provider ?? '').trim();
+        apiKeyParam = parsed.apiKey?.trim() || undefined;
+        hasOllamaHost = parsed.ollamaHost !== undefined;
+        ollamaHostParam = parsed.ollamaHost?.trim() || undefined;
+        ollamaApiKeyParam = parsed.ollamaApiKey?.trim() || undefined;
+        hasBaseUrl = parsed.baseUrl !== undefined;
+        baseUrlParam = parsed.baseUrl?.trim() || undefined;
+        if (parsed.scope === 'embeddings') scopeParam = 'embeddings';
+      } else {
+        res.statusCode = 405;
+        res.end('method not allowed');
+        return;
+      }
+
+      if (
+        !providerParam ||
+        !(CHAT_PROVIDERS as readonly string[]).includes(providerParam)
+      ) {
+        res.statusCode = 400;
+        res.end('valid provider parameter required');
+        return;
+      }
+
+      const provider = providerParam as ChatProvider;
+      const cfg = await loadConfig();
+      const chatSavedKey = savedKeyFor(cfg, provider);
+      const embSavedKey =
+        scopeParam === 'embeddings' ? cfg.embeddings?.apiKey : undefined;
+      const embSavedEndpoint =
+        scopeParam === 'embeddings' ? cfg.embeddings?.endpoint : undefined;
+
+      const result = await discoverModels({
+        provider,
+        apiKey: apiKeyParam ?? embSavedKey ?? chatSavedKey,
+        ollamaHost: hasOllamaHost
+          ? ollamaHostParam
+          : (embSavedEndpoint ?? cfg.chat?.ollamaHost),
+        ollamaApiKey:
+          ollamaApiKeyParam ?? embSavedKey ?? cfg.chat?.ollamaApiKey,
+        baseUrl: hasBaseUrl
+          ? baseUrlParam
+          : (embSavedEndpoint ?? cfg.chat?.customBaseUrl),
+      });
+
+      res.statusCode = 200;
+      res.setHeader('content-type', 'application/json');
+      res.setHeader('cache-control', 'no-store');
+      res.end(JSON.stringify(result));
     } catch (e) {
       res.statusCode = 400;
       res.end(String(e));

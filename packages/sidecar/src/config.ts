@@ -6,24 +6,57 @@
  * callers should never touch the file directly.
  *
  * Precedence when resolving effective settings:
- *   1. process.env (for CI / power users who want to force a value)
- *   2. config file
+ *   1. External process.env (for CI / power users who want to force a value)
+ *   2. config file (`~/.loreweave/config.json`)
  *   3. built-in defaults
  */
 import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
+export const CHAT_PROVIDERS = [
+  'anthropic',
+  'openai',
+  'google',
+  'ollama',
+  'openrouter',
+  'groq',
+  'deepseek',
+  'mistral',
+  'xai',
+  'openai-compatible',
+] as const;
+
+export type ChatProvider = (typeof CHAT_PROVIDERS)[number];
+
+export const EMBEDDING_PROVIDERS = [
+  'ollama',
+  'openai',
+  'google',
+  'openai-compatible',
+] as const;
+
+export type EmbeddingsProvider = (typeof EMBEDDING_PROVIDERS)[number];
+
 export interface ChatConfig {
-  provider?: 'anthropic' | 'openai' | 'ollama';
+  provider?: ChatProvider;
   model?: string;
   anthropicApiKey?: string;
   openaiApiKey?: string;
+  googleApiKey?: string;
   ollamaHost?: string;
+  ollamaApiKey?: string;
+  openrouterApiKey?: string;
+  groqApiKey?: string;
+  deepseekApiKey?: string;
+  mistralApiKey?: string;
+  xaiApiKey?: string;
+  customBaseUrl?: string;
+  customApiKey?: string;
 }
 
 export interface EmbeddingsConfig {
-  provider?: 'ollama' | 'openai-compatible';
+  provider?: EmbeddingsProvider;
   model?: string;
   endpoint?: string;
   apiKey?: string;
@@ -37,22 +70,85 @@ export interface LoreweaveConfig {
 /** Safe-for-UI view: API keys replaced with `true`/`false` booleans. */
 export interface MaskedConfig {
   chat: {
-    provider?: ChatConfig['provider'];
+    provider?: ChatProvider;
     model?: string;
     anthropicApiKey: boolean;
     openaiApiKey: boolean;
+    googleApiKey: boolean;
     ollamaHost?: string;
+    ollamaApiKey: boolean;
+    openrouterApiKey: boolean;
+    groqApiKey: boolean;
+    deepseekApiKey: boolean;
+    mistralApiKey: boolean;
+    xaiApiKey: boolean;
+    customBaseUrl?: string;
+    customApiKey: boolean;
   };
   embeddings: {
-    provider?: EmbeddingsConfig['provider'];
+    provider?: EmbeddingsProvider;
     model?: string;
     endpoint?: string;
     apiKey: boolean;
   };
-  /** Which env overrides are currently active (names only, never values). */
+  /** Which external env overrides are currently active (names only, never values). */
   envOverrides: string[];
   /** Absolute path of the config file on this machine. */
   path: string;
+}
+
+const CHAT_STRING_KEYS = [
+  'model',
+  'anthropicApiKey',
+  'openaiApiKey',
+  'googleApiKey',
+  'ollamaHost',
+  'ollamaApiKey',
+  'openrouterApiKey',
+  'groqApiKey',
+  'deepseekApiKey',
+  'mistralApiKey',
+  'xaiApiKey',
+  'customBaseUrl',
+  'customApiKey',
+] as const;
+
+const TRACKED_ENV_NAMES = [
+  'LW_AI_PROVIDER',
+  'LW_AI_MODEL',
+  'ANTHROPIC_API_KEY',
+  'OPENAI_API_KEY',
+  'GEMINI_API_KEY',
+  'GOOGLE_GENERATIVE_AI_API_KEY',
+  'GOOGLE_API_KEY',
+  'OLLAMA_HOST',
+  'OLLAMA_API_KEY',
+  'OPENROUTER_API_KEY',
+  'GROQ_API_KEY',
+  'DEEPSEEK_API_KEY',
+  'MISTRAL_API_KEY',
+  'XAI_API_KEY',
+  'OPENAI_BASE_URL',
+  'OPENAI_COMPATIBLE_API_KEY',
+  'LOREWEAVE_EMBEDDINGS',
+  'LOREWEAVE_EMBEDDINGS_MODEL',
+  'LOREWEAVE_EMBEDDINGS_ENDPOINT',
+  'LOREWEAVE_EMBEDDINGS_API_KEY',
+] as const;
+
+/**
+ * Tracks exact key/value pairs written into `process.env` by `applyConfigToEnv()`.
+ * This lets us distinguish config-managed env vars (which must update or clear
+ * when the user edits Settings in the UI) from external env vars set by the
+ * launching shell or CI.
+ */
+const appliedEnvValues = new Map<string, string>();
+
+function isExternalEnvOverride(name: string): boolean {
+  const current = process.env[name];
+  if (!current) return false;
+  if (!appliedEnvValues.has(name)) return true;
+  return current !== appliedEnvValues.get(name);
 }
 
 function configPath(): string {
@@ -82,7 +178,7 @@ export async function saveConfig(cfg: LoreweaveConfig): Promise<void> {
 }
 
 /**
- * Merge a partial patch into the existing config. Keys set to `null`
+ * Merge a partial patch into the existing config. Keys set to `null` or `""`
  * are deleted; keys omitted are left untouched.
  */
 export async function patchConfig(
@@ -100,35 +196,34 @@ export async function patchConfig(
     for (const [k, v] of Object.entries(patch.chat)) {
       const key = k as keyof ChatConfig;
       if (v === null || v === '') delete next.chat![key];
-      else (next.chat as Record<string, unknown>)[key] = v;
+      else if (typeof v === 'string') {
+        const trimmed = v.trim();
+        if (!trimmed) delete next.chat![key];
+        else (next.chat as Record<string, unknown>)[key] = trimmed;
+      }
     }
   }
   if (patch.embeddings) {
     for (const [k, v] of Object.entries(patch.embeddings)) {
       const key = k as keyof EmbeddingsConfig;
       if (v === null || v === '') delete next.embeddings![key];
-      else (next.embeddings as Record<string, unknown>)[key] = v;
+      else if (typeof v === 'string') {
+        const trimmed = v.trim();
+        if (!trimmed) delete next.embeddings![key];
+        else (next.embeddings as Record<string, unknown>)[key] = trimmed;
+      }
     }
   }
-  await saveConfig(next);
-  return next;
+  const clean = sanitize(next);
+  await saveConfig(clean);
+  return clean;
 }
 
 /** Produce a key-free view safe to ship to the web UI. */
 export function maskConfig(cfg: LoreweaveConfig): MaskedConfig {
   const envOverrides: string[] = [];
-  for (const name of [
-    'LW_AI_PROVIDER',
-    'LW_AI_MODEL',
-    'ANTHROPIC_API_KEY',
-    'OPENAI_API_KEY',
-    'OLLAMA_HOST',
-    'LOREWEAVE_EMBEDDINGS',
-    'LOREWEAVE_EMBEDDINGS_MODEL',
-    'LOREWEAVE_EMBEDDINGS_ENDPOINT',
-    'LOREWEAVE_EMBEDDINGS_API_KEY',
-  ]) {
-    if (process.env[name]) envOverrides.push(name);
+  for (const name of TRACKED_ENV_NAMES) {
+    if (isExternalEnvOverride(name)) envOverrides.push(name);
   }
   return {
     chat: {
@@ -136,7 +231,16 @@ export function maskConfig(cfg: LoreweaveConfig): MaskedConfig {
       model: cfg.chat?.model,
       anthropicApiKey: !!cfg.chat?.anthropicApiKey,
       openaiApiKey: !!cfg.chat?.openaiApiKey,
+      googleApiKey: !!cfg.chat?.googleApiKey,
       ollamaHost: cfg.chat?.ollamaHost,
+      ollamaApiKey: !!cfg.chat?.ollamaApiKey,
+      openrouterApiKey: !!cfg.chat?.openrouterApiKey,
+      groqApiKey: !!cfg.chat?.groqApiKey,
+      deepseekApiKey: !!cfg.chat?.deepseekApiKey,
+      mistralApiKey: !!cfg.chat?.mistralApiKey,
+      xaiApiKey: !!cfg.chat?.xaiApiKey,
+      customBaseUrl: cfg.chat?.customBaseUrl,
+      customApiKey: !!cfg.chat?.customApiKey,
     },
     embeddings: {
       provider: cfg.embeddings?.provider,
@@ -149,42 +253,51 @@ export function maskConfig(cfg: LoreweaveConfig): MaskedConfig {
   };
 }
 
+function syncEnvVar(envName: string, configValue: string | undefined): void {
+  if (isExternalEnvOverride(envName)) return;
+  if (configValue) {
+    process.env[envName] = configValue;
+    appliedEnvValues.set(envName, configValue);
+  } else if (appliedEnvValues.has(envName)) {
+    delete process.env[envName];
+    appliedEnvValues.delete(envName);
+  }
+}
+
 /**
- * Resolve effective chat settings: env wins, then config, then nothing.
- * Mutates `process.env` so downstream code (`model.ts`, SDK clients)
- * picks them up without further plumbing.
+ * Resolve effective AI settings: external env wins, then config, then nothing.
+ * Mutates `process.env` so downstream code (`model.ts`, `embeddings.ts`, SDK
+ * clients) picks them up transparently, while allowing UI updates to overwrite
+ * or clear config-managed values.
  */
 export async function applyConfigToEnv(): Promise<void> {
   const cfg = await loadConfig();
   const c = cfg.chat ?? {};
-  if (c.provider && !process.env.LW_AI_PROVIDER) {
-    process.env.LW_AI_PROVIDER = c.provider;
-  }
-  if (c.model && !process.env.LW_AI_MODEL) {
-    process.env.LW_AI_MODEL = c.model;
-  }
-  if (c.anthropicApiKey && !process.env.ANTHROPIC_API_KEY) {
-    process.env.ANTHROPIC_API_KEY = c.anthropicApiKey;
-  }
-  if (c.openaiApiKey && !process.env.OPENAI_API_KEY) {
-    process.env.OPENAI_API_KEY = c.openaiApiKey;
-  }
-  if (c.ollamaHost && !process.env.OLLAMA_HOST) {
-    process.env.OLLAMA_HOST = c.ollamaHost;
-  }
-
   const e = cfg.embeddings ?? {};
-  if (e.provider && !process.env.LOREWEAVE_EMBEDDINGS) {
-    process.env.LOREWEAVE_EMBEDDINGS = e.provider;
-  }
-  if (e.model && !process.env.LOREWEAVE_EMBEDDINGS_MODEL) {
-    process.env.LOREWEAVE_EMBEDDINGS_MODEL = e.model;
-  }
-  if (e.endpoint && !process.env.LOREWEAVE_EMBEDDINGS_ENDPOINT) {
-    process.env.LOREWEAVE_EMBEDDINGS_ENDPOINT = e.endpoint;
-  }
-  if (e.apiKey && !process.env.LOREWEAVE_EMBEDDINGS_API_KEY) {
-    process.env.LOREWEAVE_EMBEDDINGS_API_KEY = e.apiKey;
+
+  const mappings: Array<[string, string | undefined]> = [
+    ['LW_AI_PROVIDER', c.provider],
+    ['LW_AI_MODEL', c.model],
+    ['ANTHROPIC_API_KEY', c.anthropicApiKey],
+    ['OPENAI_API_KEY', c.openaiApiKey],
+    ['GEMINI_API_KEY', c.googleApiKey],
+    ['OLLAMA_HOST', c.ollamaHost],
+    ['OLLAMA_API_KEY', c.ollamaApiKey],
+    ['OPENROUTER_API_KEY', c.openrouterApiKey],
+    ['GROQ_API_KEY', c.groqApiKey],
+    ['DEEPSEEK_API_KEY', c.deepseekApiKey],
+    ['MISTRAL_API_KEY', c.mistralApiKey],
+    ['XAI_API_KEY', c.xaiApiKey],
+    ['OPENAI_BASE_URL', c.customBaseUrl],
+    ['OPENAI_COMPATIBLE_API_KEY', c.customApiKey],
+    ['LOREWEAVE_EMBEDDINGS', e.provider],
+    ['LOREWEAVE_EMBEDDINGS_MODEL', e.model],
+    ['LOREWEAVE_EMBEDDINGS_ENDPOINT', e.endpoint],
+    ['LOREWEAVE_EMBEDDINGS_API_KEY', e.apiKey],
+  ];
+
+  for (const [envName, val] of mappings) {
+    syncEnvVar(envName, val);
   }
 }
 
@@ -193,34 +306,36 @@ function sanitize(cfg: LoreweaveConfig): LoreweaveConfig {
   if (cfg.chat && typeof cfg.chat === 'object') {
     const c: ChatConfig = {};
     if (
-      cfg.chat.provider === 'anthropic' ||
-      cfg.chat.provider === 'openai' ||
-      cfg.chat.provider === 'ollama'
+      typeof cfg.chat.provider === 'string' &&
+      (CHAT_PROVIDERS as readonly string[]).includes(cfg.chat.provider)
     ) {
-      c.provider = cfg.chat.provider;
+      c.provider = cfg.chat.provider as ChatProvider;
     }
-    for (const k of [
-      'model',
-      'anthropicApiKey',
-      'openaiApiKey',
-      'ollamaHost',
-    ] as const) {
+    for (const k of CHAT_STRING_KEYS) {
       const v = cfg.chat[k];
-      if (typeof v === 'string' && v) c[k] = v;
+      if (typeof v === 'string') {
+        const trimmed = v.trim();
+        if (trimmed) c[k] = trimmed;
+      }
     }
     out.chat = c;
   }
   if (cfg.embeddings && typeof cfg.embeddings === 'object') {
     const e: EmbeddingsConfig = {};
     if (
-      cfg.embeddings.provider === 'ollama' ||
-      cfg.embeddings.provider === 'openai-compatible'
+      typeof cfg.embeddings.provider === 'string' &&
+      (EMBEDDING_PROVIDERS as readonly string[]).includes(
+        cfg.embeddings.provider,
+      )
     ) {
-      e.provider = cfg.embeddings.provider;
+      e.provider = cfg.embeddings.provider as EmbeddingsProvider;
     }
     for (const k of ['model', 'endpoint', 'apiKey'] as const) {
       const v = cfg.embeddings[k];
-      if (typeof v === 'string' && v) e[k] = v;
+      if (typeof v === 'string') {
+        const trimmed = v.trim();
+        if (trimmed) e[k] = trimmed;
+      }
     }
     out.embeddings = e;
   }

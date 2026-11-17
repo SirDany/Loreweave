@@ -213,6 +213,30 @@ export async function gitCheckout(
   }
 }
 
+export async function gitBranchDelete(
+  sagaPath: string,
+  branch: string,
+  opts: { remote?: string; force?: boolean } = {},
+): Promise<{ output: string }> {
+  if (!/^[A-Za-z0-9._\-/]+$/.test(branch)) {
+    throw new Error(`invalid branch name "${branch}"`);
+  }
+  const repoRoot = await ensureRepo(sagaPath);
+  if (opts.remote) {
+    const r = await runGit(repoRoot, ["push", opts.remote, "--delete", branch]);
+    if (r.code !== 0) {
+      throw new Error(r.stderr.trim() || r.stdout.trim() || `failed to delete remote branch ${branch}`);
+    }
+    return { output: r.stdout.trim() || `Deleted remote branch ${branch}` };
+  }
+  const flag = opts.force ? "-D" : "-d";
+  const r = await runGit(repoRoot, ["branch", flag, branch]);
+  if (r.code !== 0) {
+    throw new Error(r.stderr.trim() || r.stdout.trim() || `failed to delete branch ${branch}`);
+  }
+  return { output: r.stdout.trim() || `Deleted branch ${branch}` };
+}
+
 export async function gitInit(sagaPath: string): Promise<string> {
   const abs = path.resolve(sagaPath);
   await fs.mkdir(abs, { recursive: true });
@@ -358,6 +382,7 @@ type Sub =
   | "log"
   | "commit"
   | "checkout"
+  | "branch-delete"
   | "init"
   | "remotes"
   | "remote-add"
@@ -432,6 +457,13 @@ export async function gitCmd(sub: string, saga: string, opts: GitOpts): Promise<
         if (!opts.branch) throw new Error("--branch <name> is required for checkout");
         await gitCheckout(saga, opts.branch, { create: !!opts.all });
         if (!opts.json) console.log(pc.green(`switched to ${opts.branch}`));
+        return;
+      }
+      case "branch-delete": {
+        if (!opts.branch) throw new Error("--branch <name> is required for branch-delete");
+        const r = await gitBranchDelete(saga, opts.branch, { remote: opts.remote, force: !!opts.all });
+        if (opts.json) console.log(JSON.stringify(r, null, 2));
+        else console.log(pc.green(r.output));
         return;
       }
       case "init": {

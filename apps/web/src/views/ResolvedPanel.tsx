@@ -13,6 +13,7 @@ interface Props {
   tracesCount?: number;
   usagesCount?: number;
   onJumpRef?: (type: string, id: string) => void;
+  width?: number;
 }
 
 function provenanceBadge(prov: string | undefined) {
@@ -61,14 +62,18 @@ export function ResolvedPanel({
   tracesCount = 0,
   usagesCount = 0,
   onJumpRef,
+  width,
 }: Props) {
   const [tab, setTab] = useState<Tab>("resolved");
   if (!entry) {
     if (chapter) {
-      return <ChapterInspector chapter={chapter} onJumpRef={onJumpRef} />;
+      return <ChapterInspector chapter={chapter} onJumpRef={onJumpRef} width={width} />;
     }
     return (
-      <aside className="w-80 bg-card/40 border-l border-border p-6 text-muted-foreground text-sm">
+      <aside
+        style={{ width: width ? `${width}px` : undefined }}
+        className="w-80 bg-card/40 border-l border-border p-6 text-muted-foreground text-sm"
+      >
         <div className="label-rune mb-2">Inspector</div>
         <p className="mb-2">
           Select a Codex / Lexicon / Sigil entry from the Grimoire to see its
@@ -83,20 +88,23 @@ export function ResolvedPanel({
   }
   const keys = Object.keys(entry.properties).sort();
   return (
-    <aside className="w-80 bg-card/40 border-l border-border flex flex-col">
-      <div className="px-4 pt-4 pb-3 border-b border-border">
+    <aside
+      style={{ width: width ? `${width}px` : undefined }}
+      className="w-80 bg-card/75 border-l border-border/80 backdrop-blur-md flex flex-col"
+    >
+      <div className="px-4 pt-4 pb-3 border-b border-border/80">
         <div className="label-rune">{entry.type}</div>
-        <div className="mt-1 font-serif text-lg text-foreground">{entry.name}</div>
+        <div className="mt-1 font-semibold text-base tracking-tight text-foreground">{entry.name}</div>
         <div className="font-mono text-[11px] text-muted-foreground">
           {entry.type}/{entry.id}
         </div>
         {entry.appears_in && entry.appears_in.length > 0 && (
-          <div className="mt-1 text-[11px] text-primary/80">
+          <div className="mt-1 text-[11px] text-primary">
             appears in: {entry.appears_in.join(", ")}
           </div>
         )}
       </div>
-      <nav className="flex text-xs border-b border-border">
+      <nav className="flex text-xs border-b border-border/80 bg-muted/15 p-1 gap-1">
         <TabButton
           active={tab === "resolved"}
           onClick={() => setTab("resolved")}
@@ -193,10 +201,10 @@ function TabButton({
     <button
       onClick={onClick}
       className={
-        "flex-1 px-3 py-2 uppercase tracking-widest transition-colors " +
+        "flex-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all " +
         (active
-          ? "bg-accent text-accent-foreground border-b-2 border-primary"
-          : "text-muted-foreground hover:text-foreground hover:bg-muted/60")
+          ? "bg-card text-foreground shadow-sm ring-1 ring-border/80 font-semibold"
+          : "text-muted-foreground hover:text-foreground hover:bg-muted/40")
       }
     >
       {label}
@@ -241,9 +249,11 @@ function ResolvedTab({
 function ChapterInspector({
   chapter,
   onJumpRef,
+  width,
 }: {
   chapter: { tome: string; chapter: DumpChapter };
   onJumpRef?: (type: string, id: string) => void;
+  width?: number;
 }) {
   const c = chapter.chapter;
   const meta = (c.meta ?? {}) as Record<string, unknown>;
@@ -259,10 +269,13 @@ function ChapterInspector({
     new Map(c.refs.map((r) => [`${r.type}/${r.id}`, r])).values(),
   );
   return (
-    <aside className="w-80 bg-card/40 border-l border-border flex flex-col">
-      <div className="px-4 pt-4 pb-3 border-b border-border">
+    <aside
+      style={{ width: width ? `${width}px` : undefined }}
+      className="w-80 bg-card/75 border-l border-border/80 backdrop-blur-md flex flex-col"
+    >
+      <div className="px-4 pt-4 pb-3 border-b border-border/80">
         <div className="label-rune">chapter · {chapter.tome}</div>
-        <div className="mt-1 font-serif text-lg text-foreground">{c.title}</div>
+        <div className="mt-1 font-semibold text-base tracking-tight text-foreground">{c.title}</div>
         <div className="font-mono text-[11px] text-muted-foreground truncate">
           {c.relPath}
         </div>

@@ -1,23 +1,25 @@
 <!doctype html>
-<html lang="en" class="dark">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="color-scheme" content="dark" />
     <meta
       name="description"
       content="Loreweave — a local-first agentic book-writing workbench."
     />
     <title>Loreweave</title>
     <style>
-      /* Pre-hydration background so the splash doesn't flash white. */
-      html, body { margin: 0; padding: 0; background: hsl(24 10% 6%); color: hsl(30 20% 92%); }
+      html, body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+      }
     </style>
   </head>
   <body>
     <div id="root"></div>
     <noscript>
-      <div style="padding: 2rem; font-family: Georgia, serif;">
+      <div style="padding: 2rem; font-family: ui-sans-serif, system-ui, sans-serif;">
         Loreweave needs JavaScript to render. Please enable it.
       </div>
     </noscript>

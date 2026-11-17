@@ -33,36 +33,36 @@ export function TracesList({ traces, forTarget, onJump }: Props) {
   }
 
   return (
-    <ul className="space-y-2">
+    <ul className="space-y-2.5">
       {visible.map((n) => (
         <li
           key={n.id}
           className={
-            'rounded border p-3 text-sm ' +
+            'rounded-xl border p-4 text-sm transition-all duration-150 backdrop-blur-sm shadow-sm ' +
             (n.status === 'resolved'
-              ? 'border-border bg-card/40 opacity-60'
+              ? 'border-border/60 bg-card/30 opacity-60'
               : n.kind === 'todo'
               ? 'border-primary/40 bg-primary/10'
               : n.kind === 'question'
-              ? 'border-sky-900/70 bg-sky-950/30'
+              ? 'border-sky-500/30 bg-sky-500/10'
               : n.kind === 'idea'
-              ? 'border-violet-900/70 bg-violet-950/30'
-              : 'border-border bg-card/40')
+              ? 'border-violet-500/30 bg-violet-500/10'
+              : 'border-border/80 bg-card/60')
           }
         >
-          <div className="flex items-start gap-2">
-            <span>{KIND_LABEL[n.kind]}</span>
+          <div className="flex items-start gap-3">
+            <span className="text-base select-none">{KIND_LABEL[n.kind]}</span>
             <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between gap-2">
-                <div className="font-mono text-xs text-muted-foreground">{n.id}</div>
-                <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-muted-foreground">
-                  <span>{n.kind}</span>
+                <div className="font-mono text-xs text-foreground font-semibold">{n.id}</div>
+                <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-medium text-muted-foreground">
+                  <span className="rounded bg-muted px-1.5 py-0.5">{n.kind}</span>
                   {n.author && <span>· {n.author}</span>}
                   {n.created && <span>· {n.created}</span>}
                 </div>
               </div>
               {n.target && (
-                <div className="mt-0.5 text-[11px]">
+                <div className="mt-1 text-[11px]">
                   <button
                     className="text-primary hover:underline font-mono"
                     onClick={() => onJump?.(n.target!)}
@@ -71,12 +71,16 @@ export function TracesList({ traces, forTarget, onJump }: Props) {
                   </button>
                 </div>
               )}
-              <div className="mt-1.5 text-foreground/90 whitespace-pre-wrap">
+              <div className="mt-2 text-foreground/90 whitespace-pre-wrap text-xs leading-relaxed">
                 {n.body}
               </div>
               {n.tags.length > 0 && (
-                <div className="mt-1 text-[10px] text-muted-foreground">
-                  {n.tags.map((t) => `#${t}`).join(' ')}
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {n.tags.map((t) => (
+                    <span key={t} className="rounded bg-muted/60 border border-border/50 px-1.5 py-0.5 text-[10px] text-muted-foreground font-mono">
+                      #{t}
+                    </span>
+                  ))}
                 </div>
               )}
             </div>

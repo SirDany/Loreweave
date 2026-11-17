@@ -57,27 +57,33 @@ export function ImportDialog({ onClose, onImported }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md p-4 animate-fade-in"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
       onKeyDown={(e) => {
         if (e.key === "Escape") onClose();
       }}
     >
-      <div className="w-full max-w-2xl bg-card border border-border rounded-lg shadow-2xl">
-        <header className="px-5 py-3 border-b border-border flex items-center justify-between">
+      <div
+        className="w-full max-w-2xl bg-card/95 border border-border/80 rounded-2xl shadow-2xl overflow-hidden flex flex-col backdrop-blur-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <header className="px-6 py-4 border-b border-border/70 bg-muted/20 flex items-center justify-between">
           <div>
-            <div className="text-base text-foreground">Import Saga zip</div>
-            <div className="text-xs text-muted-foreground">
-              Drop a Loreweave .zip; preview the plan; apply with conflict policy.
+            <div className="text-base font-semibold tracking-tight text-foreground">Import Saga Zip</div>
+            <div className="text-xs text-muted-foreground mt-0.5">
+              Select or provide a Loreweave .zip bundle; preview the plan; apply with conflict policy.
             </div>
           </div>
-          <button onClick={onClose} className="text-xs text-muted-foreground hover:text-foreground">
+          <button onClick={onClose} className="text-xs text-muted-foreground hover:text-foreground p-1 rounded-md hover:bg-muted transition-colors">
             esc
           </button>
         </header>
 
-        <div className="p-5 space-y-4 text-sm">
+        <div className="p-6 space-y-4 text-sm">
           <label className="block text-xs">
-            <span className="text-muted-foreground">zip path</span>
+            <span className="text-muted-foreground font-medium">ZIP Archive Path</span>
             <input
               value={zipPath}
               onChange={(e) => {
@@ -86,12 +92,12 @@ export function ImportDialog({ onClose, onImported }: Props) {
                 setResult(null);
               }}
               placeholder="path/to/saga-export.zip"
-              className="mt-1 w-full bg-background border border-border rounded px-2 py-1 font-mono text-xs"
+              className="mt-1 w-full bg-background border border-border rounded-lg px-3 py-2 font-mono text-xs focus:ring-1 focus:ring-primary focus:outline-none transition-colors"
             />
           </label>
 
           <label className="block text-xs">
-            <span className="text-muted-foreground">import into</span>
+            <span className="text-muted-foreground font-medium">Import Destination Folder</span>
             <input
               value={into}
               onChange={(e) => {
@@ -99,10 +105,10 @@ export function ImportDialog({ onClose, onImported }: Props) {
                 setPlan(null);
                 setResult(null);
               }}
-              className="mt-1 w-full bg-background border border-border rounded px-2 py-1 font-mono text-xs"
+              className="mt-1 w-full bg-background border border-border rounded-lg px-3 py-2 font-mono text-xs focus:ring-1 focus:ring-primary focus:outline-none transition-colors"
             />
-            <div className="mt-1 text-muted-foreground">
-              The bundle root becomes a subdirectory of this folder.
+            <div className="mt-1 text-muted-foreground text-[11px]">
+              The bundle root is extracted into this target folder.
             </div>
           </label>
 
@@ -110,29 +116,29 @@ export function ImportDialog({ onClose, onImported }: Props) {
             <button
               onClick={() => void doPlan()}
               disabled={busy || !zipPath.trim()}
-              className="px-3 py-1 rounded border border-border text-foreground hover:bg-muted text-xs disabled:opacity-40"
+              className="px-3 py-1.5 rounded-lg border border-border text-foreground hover:bg-muted text-xs font-medium disabled:opacity-40 transition-colors"
             >
-              {busy && !plan ? "Planning…" : plan ? "Re-plan" : "Plan"}
+              {busy && !plan ? "Planning…" : plan ? "Re-plan" : "Preview Plan"}
             </button>
           </div>
 
           {plan && (
-            <div className="border border-border rounded p-3 bg-background text-xs space-y-2">
+            <div className="border border-border/70 rounded-xl p-4 bg-muted/20 text-xs space-y-3">
               <div>
-                <span className="text-muted-foreground">target:</span>{" "}
-                <span className="font-mono text-primary">{plan.targetSaga}</span>
+                <span className="text-muted-foreground">Target location:</span>{" "}
+                <span className="font-mono text-primary font-medium">{plan.targetSaga}</span>
               </div>
-              <div className="flex gap-3">
-                <span className="text-emerald-400">+{plan.newFiles.length} new</span>
-                <span className="text-amber-300">~{plan.conflicts.length} conflicts</span>
-                <span className="text-muted-foreground">·{plan.unchanged.length} unchanged</span>
+              <div className="flex gap-4">
+                <span className="text-emerald-400 font-medium">+{plan.newFiles.length} new</span>
+                <span className="text-amber-300 font-medium">~{plan.conflicts.length} conflicts</span>
+                <span className="text-muted-foreground">· {plan.unchanged.length} unchanged</span>
               </div>
               {plan.conflicts.length > 0 && (
-                <details>
-                  <summary className="text-muted-foreground cursor-pointer">
+                <details className="mt-1">
+                  <summary className="text-muted-foreground cursor-pointer hover:text-foreground">
                     show {plan.conflicts.length} conflict file(s)
                   </summary>
-                  <ul className="mt-1 max-h-32 overflow-auto font-mono text-[11px] text-primary/80">
+                  <ul className="mt-1 max-h-32 overflow-auto font-mono text-[11px] text-amber-300/90 space-y-0.5">
                     {plan.conflicts.map((c) => (
                       <li key={c.relPath}>~ {c.relPath}</li>
                     ))}
@@ -140,11 +146,11 @@ export function ImportDialog({ onClose, onImported }: Props) {
                 </details>
               )}
               {plan.newFiles.length > 0 && (
-                <details>
-                  <summary className="text-muted-foreground cursor-pointer">
+                <details className="mt-1">
+                  <summary className="text-muted-foreground cursor-pointer hover:text-foreground">
                     show {plan.newFiles.length} new file(s)
                   </summary>
-                  <ul className="mt-1 max-h-32 overflow-auto font-mono text-[11px] text-emerald-300/80">
+                  <ul className="mt-1 max-h-32 overflow-auto font-mono text-[11px] text-emerald-300/80 space-y-0.5">
                     {plan.newFiles.map((f) => (
                       <li key={f}>+ {f}</li>
                     ))}
@@ -153,35 +159,39 @@ export function ImportDialog({ onClose, onImported }: Props) {
               )}
 
               {plan.conflicts.length > 0 && (
-                <fieldset className="border border-border rounded p-2 mt-2">
-                  <legend className="text-muted-foreground px-1">conflict policy</legend>
-                  <label className="flex items-center gap-2 text-xs">
-                    <input
-                      type="radio"
-                      name="resolution"
-                      checked={resolution === "keep"}
-                      onChange={() => setResolution("keep")}
-                    />
-                    Keep existing files (only apply new ones)
-                  </label>
-                  <label className="flex items-center gap-2 text-xs">
-                    <input
-                      type="radio"
-                      name="resolution"
-                      checked={resolution === "overwrite"}
-                      onChange={() => setResolution("overwrite")}
-                    />
-                    Overwrite existing with incoming
-                  </label>
+                <fieldset className="border border-border/70 rounded-lg p-3 mt-2 bg-background/50">
+                  <legend className="text-muted-foreground px-1 text-[11px] uppercase tracking-wider font-semibold">Conflict Policy</legend>
+                  <div className="space-y-2 mt-1">
+                    <label className="flex items-center gap-2 text-xs cursor-pointer">
+                      <input
+                        type="radio"
+                        name="resolution"
+                        className="accent-primary"
+                        checked={resolution === "keep"}
+                        onChange={() => setResolution("keep")}
+                      />
+                      <span>Keep existing files (only apply new files)</span>
+                    </label>
+                    <label className="flex items-center gap-2 text-xs cursor-pointer">
+                      <input
+                        type="radio"
+                        name="resolution"
+                        className="accent-primary"
+                        checked={resolution === "overwrite"}
+                        onChange={() => setResolution("overwrite")}
+                      />
+                      <span>Overwrite existing files with incoming bundle</span>
+                    </label>
+                  </div>
                 </fieldset>
               )}
             </div>
           )}
 
           {result && (
-            <div className="border border-emerald-900 bg-emerald-950/30 rounded p-3 text-xs">
-              Applied:
-              <ul className="mt-1">
+            <div className="border border-emerald-500/30 bg-emerald-500/10 rounded-xl p-4 text-xs font-mono">
+              <div className="font-semibold text-emerald-400 mb-1">Import Applied Successfully:</div>
+              <ul className="space-y-0.5">
                 <li className="text-emerald-300">
                   {result.actions.filter((a) => a.action === "created").length} created
                 </li>
@@ -196,21 +206,21 @@ export function ImportDialog({ onClose, onImported }: Props) {
           )}
 
           {err && (
-            <div className="text-rose-400 text-xs whitespace-pre-wrap">{err}</div>
+            <div className="text-rose-400 text-xs whitespace-pre-wrap font-mono p-3 bg-rose-500/10 rounded-lg border border-rose-500/30">{err}</div>
           )}
         </div>
 
-        <footer className="px-5 py-3 border-t border-border flex justify-end gap-2">
+        <footer className="px-6 py-3.5 border-t border-border/70 bg-muted/20 flex justify-end gap-2.5">
           <button
             onClick={onClose}
-            className="px-3 py-1 rounded border border-border text-foreground/90 hover:bg-muted text-xs"
+            className="px-4 py-1.5 rounded-lg border border-border text-foreground hover:bg-muted text-xs font-medium transition-colors"
           >
             Close
           </button>
           <button
             onClick={() => void doApply()}
             disabled={busy || !plan || (plan.newFiles.length === 0 && plan.conflicts.length === 0)}
-            className="px-3 py-1 rounded border border-primary bg-primary/20 text-primary-foreground hover:bg-primary/30 disabled:opacity-40 text-xs"
+            className="px-4 py-1.5 rounded-lg border border-primary/50 bg-primary/20 text-primary font-medium hover:bg-primary/30 disabled:opacity-40 text-xs transition-colors shadow-sm"
           >
             {busy && plan ? "Importing…" : "Apply import"}
           </button>

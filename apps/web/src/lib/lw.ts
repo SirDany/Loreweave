@@ -447,16 +447,43 @@ export async function fetchDigest(
 
 // ---------- config (AI providers + keys) ----------
 
+export type ChatProviderId =
+  | 'anthropic'
+  | 'openai'
+  | 'google'
+  | 'ollama'
+  | 'openrouter'
+  | 'groq'
+  | 'deepseek'
+  | 'mistral'
+  | 'xai'
+  | 'openai-compatible';
+
+export type EmbeddingsProviderId =
+  | 'ollama'
+  | 'openai'
+  | 'google'
+  | 'openai-compatible';
+
 export interface MaskedLoreweaveConfig {
   chat: {
-    provider?: 'anthropic' | 'openai' | 'ollama';
+    provider?: ChatProviderId;
     model?: string;
     anthropicApiKey: boolean;
     openaiApiKey: boolean;
+    googleApiKey: boolean;
     ollamaHost?: string;
+    ollamaApiKey: boolean;
+    openrouterApiKey: boolean;
+    groqApiKey: boolean;
+    deepseekApiKey: boolean;
+    mistralApiKey: boolean;
+    xaiApiKey: boolean;
+    customBaseUrl?: string;
+    customApiKey: boolean;
   };
   embeddings: {
-    provider?: 'ollama' | 'openai-compatible';
+    provider?: EmbeddingsProviderId;
     model?: string;
     endpoint?: string;
     apiKey: boolean;
@@ -467,19 +494,57 @@ export interface MaskedLoreweaveConfig {
 
 export type ConfigPatch = {
   chat?: Partial<{
-    provider: 'anthropic' | 'openai' | 'ollama' | null;
+    provider: ChatProviderId | null;
     model: string | null;
     anthropicApiKey: string | null;
     openaiApiKey: string | null;
+    googleApiKey: string | null;
     ollamaHost: string | null;
+    ollamaApiKey: string | null;
+    openrouterApiKey: string | null;
+    groqApiKey: string | null;
+    deepseekApiKey: string | null;
+    mistralApiKey: string | null;
+    xaiApiKey: string | null;
+    customBaseUrl: string | null;
+    customApiKey: string | null;
   }>;
   embeddings?: Partial<{
-    provider: 'ollama' | 'openai-compatible' | null;
+    provider: EmbeddingsProviderId | null;
     model: string | null;
     endpoint: string | null;
     apiKey: string | null;
   }>;
 };
+
+export interface ModelDescriptor {
+  id: string;
+  name: string;
+  description?: string;
+  capability?: 'chat' | 'embedding';
+  recommended?: boolean;
+}
+
+export interface ModelsDiscoveryResponse {
+  provider: ChatProviderId;
+  source: 'live' | 'curated';
+  connected: boolean;
+  models: ModelDescriptor[];
+  embeddingModels: ModelDescriptor[];
+  defaultModel: string;
+  defaultEmbeddingModel?: string;
+  resolvedEndpoint?: string;
+  error?: string;
+}
+
+export interface DiscoverModelsParams {
+  provider: ChatProviderId;
+  apiKey?: string;
+  ollamaHost?: string;
+  ollamaApiKey?: string;
+  baseUrl?: string;
+  scope?: 'chat' | 'embeddings';
+}
 
 export async function fetchConfig(): Promise<MaskedLoreweaveConfig> {
   const res = await fetch('/lw/config');
@@ -497,6 +562,20 @@ export async function saveConfigPatch(
   });
   if (!res.ok) throw new Error(`/lw/config ${res.status}: ${await res.text()}`);
   return (await res.json()) as MaskedLoreweaveConfig;
+}
+
+export async function fetchProviderModels(
+  params: DiscoverModelsParams,
+  signal?: AbortSignal,
+): Promise<ModelsDiscoveryResponse> {
+  const res = await fetch('/lw/models', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(params),
+    signal,
+  });
+  if (!res.ok) throw new Error(`/lw/models ${res.status}: ${await res.text()}`);
+  return (await res.json()) as ModelsDiscoveryResponse;
 }
 
 export function threadOf(
@@ -600,6 +679,18 @@ export async function gitCheckout(
   if (create) args.push('--all');
   const r = await lw(args);
   if (r.code !== 0) throw new Error(r.stderr || `checkout failed`);
+}
+
+export async function gitBranchDelete(
+  saga: string,
+  branch: string,
+  opts: { remote?: string; force?: boolean } = {},
+): Promise<void> {
+  const args = ['git', 'branch-delete', saga, '--branch', branch];
+  if (opts.remote) args.push('--remote', opts.remote);
+  if (opts.force) args.push('--all');
+  const r = await lw(args);
+  if (r.code !== 0) throw new Error(r.stderr || `delete branch failed`);
 }
 
 export async function gitInit(saga: string): Promise<void> {

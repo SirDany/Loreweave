@@ -21,7 +21,18 @@ const TRACKED_ENV = [
   'LW_AI_MODEL',
   'ANTHROPIC_API_KEY',
   'OPENAI_API_KEY',
+  'GEMINI_API_KEY',
+  'GOOGLE_GENERATIVE_AI_API_KEY',
+  'GOOGLE_API_KEY',
   'OLLAMA_HOST',
+  'OLLAMA_API_KEY',
+  'OPENROUTER_API_KEY',
+  'GROQ_API_KEY',
+  'DEEPSEEK_API_KEY',
+  'MISTRAL_API_KEY',
+  'XAI_API_KEY',
+  'OPENAI_BASE_URL',
+  'OPENAI_COMPATIBLE_API_KEY',
   'LOREWEAVE_EMBEDDINGS',
   'LOREWEAVE_EMBEDDINGS_MODEL',
   'LOREWEAVE_EMBEDDINGS_ENDPOINT',
@@ -64,15 +75,24 @@ describe('config module', () => {
     expect(cfg).toEqual({});
   });
 
-  it('saveConfig + loadConfig roundtrip preserves values', async () => {
+  it('saveConfig + loadConfig roundtrip preserves values across providers', async () => {
     await saveConfig({
-      chat: { provider: 'anthropic', anthropicApiKey: 'sk-xxx', model: 'claude' },
-      embeddings: { provider: 'ollama', model: 'nomic-embed-text' },
+      chat: {
+        provider: 'google',
+        googleApiKey: 'AIza-test',
+        ollamaApiKey: 'ollama-secret',
+        openrouterApiKey: 'or-secret',
+        model: 'gemini-2.5-flash',
+      },
+      embeddings: { provider: 'google', model: 'gemini-embedding-001' },
     });
     const cfg = await loadConfig();
-    expect(cfg.chat?.provider).toBe('anthropic');
-    expect(cfg.chat?.anthropicApiKey).toBe('sk-xxx');
-    expect(cfg.embeddings?.provider).toBe('ollama');
+    expect(cfg.chat?.provider).toBe('google');
+    expect(cfg.chat?.googleApiKey).toBe('AIza-test');
+    expect(cfg.chat?.ollamaApiKey).toBe('ollama-secret');
+    expect(cfg.chat?.openrouterApiKey).toBe('or-secret');
+    expect(cfg.embeddings?.provider).toBe('google');
+    expect(cfg.embeddings?.model).toBe('gemini-embedding-001');
   });
 
   it('sanitize drops unknown providers and non-string values', async () => {
@@ -103,20 +123,32 @@ describe('config module', () => {
     expect(cfg.embeddings?.provider).toBe('ollama');
   });
 
-  it('maskConfig hides API keys and reports env overrides', async () => {
+  it('maskConfig hides API keys and reports only external env overrides', async () => {
     await saveConfig({
-      chat: { provider: 'anthropic', anthropicApiKey: 'sk-secret' },
+      chat: {
+        provider: 'google',
+        googleApiKey: 'AIza-secret',
+        anthropicApiKey: 'sk-secret',
+        ollamaApiKey: 'ollama-tok',
+      },
       embeddings: { provider: 'ollama', apiKey: 'sk-secret-2' },
     });
+    await applyConfigToEnv();
     process.env.ANTHROPIC_API_KEY = 'env-key';
     const masked = maskConfig(await loadConfig());
+    expect(masked.chat.googleApiKey).toBe(true);
     expect(masked.chat.anthropicApiKey).toBe(true);
+    expect(masked.chat.ollamaApiKey).toBe(true);
     expect(masked.embeddings.apiKey).toBe(true);
     expect(JSON.stringify(masked)).not.toContain('sk-secret');
+    expect(JSON.stringify(masked)).not.toContain('AIza-secret');
+    expect(JSON.stringify(masked)).not.toContain('ollama-tok');
     expect(masked.envOverrides).toContain('ANTHROPIC_API_KEY');
+    expect(masked.envOverrides).not.toContain('GEMINI_API_KEY');
+    expect(masked.envOverrides).not.toContain('LW_AI_PROVIDER');
   });
 
-  it('applyConfigToEnv respects existing env (env > config)', async () => {
+  it('applyConfigToEnv respects existing external env (env > config)', async () => {
     await saveConfig({
       chat: { provider: 'anthropic', anthropicApiKey: 'from-config' },
     });
@@ -124,6 +156,38 @@ describe('config module', () => {
     await applyConfigToEnv();
     expect(process.env.ANTHROPIC_API_KEY).toBe('from-env');
     expect(process.env.LW_AI_PROVIDER).toBe('anthropic');
+  });
+
+  it('applyConfigToEnv updates and clears config-managed env vars across consecutive saves', async () => {
+    await saveConfig({
+      chat: {
+        provider: 'ollama',
+        ollamaHost: 'http://127.0.0.1:11434',
+        ollamaApiKey: 'tok-1',
+        model: 'llama3.1',
+      },
+    });
+    await applyConfigToEnv();
+    expect(process.env.LW_AI_PROVIDER).toBe('ollama');
+    expect(process.env.OLLAMA_HOST).toBe('http://127.0.0.1:11434');
+    expect(process.env.OLLAMA_API_KEY).toBe('tok-1');
+
+    // Update provider & clear ollamaHost + ollamaApiKey
+    await patchConfig({
+      chat: {
+        provider: 'google',
+        googleApiKey: 'AIza-new',
+        model: 'gemini-2.5-flash',
+        ollamaHost: null,
+        ollamaApiKey: null,
+      },
+    });
+    await applyConfigToEnv();
+    expect(process.env.LW_AI_PROVIDER).toBe('google');
+    expect(process.env.LW_AI_MODEL).toBe('gemini-2.5-flash');
+    expect(process.env.GEMINI_API_KEY).toBe('AIza-new');
+    expect(process.env.OLLAMA_HOST).toBeUndefined();
+    expect(process.env.OLLAMA_API_KEY).toBeUndefined();
   });
 
   it('applyConfigToEnv fills missing env from config', async () => {

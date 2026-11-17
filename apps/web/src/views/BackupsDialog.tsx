@@ -54,7 +54,9 @@ export function BackupsDialog({ sagaPath, onClose, onRestored }: Props) {
   return (
     <div
       className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-8"
-      onClick={onClose}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
       <div
         className="w-full max-w-2xl rounded-lg border border-border bg-background shadow-2xl flex flex-col max-h-[80vh]"

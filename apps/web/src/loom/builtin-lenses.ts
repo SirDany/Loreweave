@@ -75,10 +75,10 @@ export const BUILTIN_LENSES: LensManifest[] = [
   },
   {
     id: 'versions',
-    name: 'Versions',
+    name: 'Timeline',
     icon: 'GitBranch',
     renderer: 'versions',
-    description: 'Git: branches, commits, restore points.',
+    description: 'Storylines, draft revisions, and cloud sync.',
     builtin: true,
   },
 ];

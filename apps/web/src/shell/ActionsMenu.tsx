@@ -76,7 +76,7 @@ export function ActionsMenu({
     { icon: Search, label: 'Search…', onClick: onSearch, hint: 'Ctrl+P' },
     {
       icon: Bot,
-      label: assistantOpen ? 'Hide assistant' : 'Assistant…',
+      label: assistantOpen ? 'Hide Scribe' : 'Scribe…',
       onClick: onToggleAssistant,
       hint: 'Ctrl+Shift+A',
     },

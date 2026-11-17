@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from 'react';
 import {
-  ArrowRight,
   Bot,
   Check,
   ChevronDown,
@@ -21,6 +20,11 @@ import {
 import { Badge } from '../components/ui/badge.js';
 import { Button } from '../components/ui/button.js';
 import { Separator } from '../components/ui/separator.js';
+import {
+  fetchConfig,
+  type ChatProviderId,
+  type MaskedLoreweaveConfig,
+} from '../lib/lw.js';
 import { cn } from '../lib/utils.js';
 import {
   useChat,
@@ -36,12 +40,14 @@ interface Props {
   onClose: () => void;
   /** Optional initial context (a text selection from the editor). */
   initialContext?: ChatContextAttachment;
-  /** Optional agent to pre-select (e.g. when the user picks from the selection toolbar). */
-  initialAgent?: string;
   /** Optional initial prompt to seed the composer with. */
   initialPrompt?: string;
   /** Fire after the writer approves a pending action so the app can reload. */
   onApplied?: () => void;
+  /** Open the global AI Settings dialog. */
+  onOpenAiSettings?: () => void;
+  /** Resizable width in pixels */
+  width?: number;
 }
 
 const POLICY_KEY = (sagaRoot: string) => `lw.chat.approvalPolicy.${sagaRoot}`;
@@ -73,13 +79,70 @@ function loadAutoCommit(sagaRoot: string): boolean {
   }
 }
 
+function inferActiveAiLabel(cfg: MaskedLoreweaveConfig | null): {
+  configured: boolean;
+  label: string;
+  title: string;
+} {
+  if (!cfg) {
+    return {
+      configured: true,
+      label: 'AI…',
+      title: 'Open AI Engine & Model settings',
+    };
+  }
+  const c = cfg.chat;
+  const detectedProvider: ChatProviderId | undefined =
+    c.provider ??
+    (c.anthropicApiKey
+      ? 'anthropic'
+      : c.googleApiKey
+        ? 'google'
+        : c.openaiApiKey
+          ? 'openai'
+          : c.openrouterApiKey
+            ? 'openrouter'
+            : c.groqApiKey
+              ? 'groq'
+              : c.deepseekApiKey
+                ? 'deepseek'
+                : c.mistralApiKey
+                  ? 'mistral'
+                  : c.xaiApiKey
+                    ? 'xai'
+                    : c.customBaseUrl
+                      ? 'openai-compatible'
+                      : c.ollamaHost || c.ollamaApiKey
+                        ? 'ollama'
+                        : undefined);
+
+  const hasEnv = cfg.envOverrides.some(
+    (name) => !name.startsWith('LOREWEAVE_EMBEDDINGS'),
+  );
+  if (!detectedProvider && !hasEnv) {
+    return {
+      configured: false,
+      label: 'Configure AI',
+      title: 'No AI provider configured — click to open AI Settings',
+    };
+  }
+  const providerLabel = detectedProvider ?? 'env';
+  const modelLabel = c.model ? `${providerLabel} · ${c.model}` : `${providerLabel} · default`;
+  return {
+    configured: true,
+    label: modelLabel,
+    title: `Active AI: ${modelLabel} — click to change in AI Settings`,
+  };
+}
+
 export function AssistantPanel({
   sagaRoot,
   onClose,
   initialContext,
-  initialAgent,
   initialPrompt,
   onApplied,
+  onOpenAiSettings,
+  width,
 }: Props) {
   const [policy, setPolicy] = useState<ApprovalPolicy>(() =>
     loadPolicy(sagaRoot),
@@ -113,14 +176,35 @@ export function AssistantPanel({
     initialContext,
   );
   const [showingSettings, setShowingSettings] = useState(false);
+  const [aiCfg, setAiCfg] = useState<
+    MaskedLoreweaveConfig | null | 'unavailable'
+  >(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (initialAgent && chat.agents.some((a) => a.id === initialAgent)) {
-      chat.setAgentId(initialAgent);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialAgent, chat.agents.length]);
+    let active = true;
+    fetchConfig()
+      .then((c) => {
+        if (active) setAiCfg(c);
+      })
+      .catch(() => {
+        if (active) setAiCfg('unavailable');
+      });
+    const onUpdated = (evt: Event) => {
+      const detail = (evt as CustomEvent<MaskedLoreweaveConfig>).detail;
+      if (detail) setAiCfg(detail);
+    };
+    window.addEventListener('lw-config-updated', onUpdated);
+    return () => {
+      active = false;
+      window.removeEventListener('lw-config-updated', onUpdated);
+    };
+  }, []);
+
+  const aiPill = useMemo(
+    () => (aiCfg === 'unavailable' ? null : inferActiveAiLabel(aiCfg)),
+    [aiCfg],
+  );
 
   // Auto-scroll to the latest message.
   useEffect(() => {
@@ -137,7 +221,6 @@ export function AssistantPanel({
     setAttachment(undefined);
   };
 
-  const selectedAgent = chat.agents.find((a) => a.id === chat.agentId);
   const pendingVisible = chat.pending.filter(
     (p) =>
       p.status === 'pending' ||
@@ -148,11 +231,11 @@ export function AssistantPanel({
 
   const copyTranscript = useCallback(() => {
     const lines: string[] = [
-      `# Loreweave chat — ${selectedAgent?.name ?? chat.agentId}`,
+      '# Loreweave chat — Scribe',
       '',
     ];
     for (const m of chat.messages) {
-      lines.push(m.role === 'user' ? '## You' : `## ${selectedAgent?.name ?? 'Assistant'}`);
+      lines.push(m.role === 'user' ? '## You' : '## Scribe');
       lines.push('');
       lines.push(m.content || '_(empty)_');
       if (m.toolCalls && m.toolCalls.length > 0) {
@@ -168,29 +251,48 @@ export function AssistantPanel({
     navigator.clipboard?.writeText(md).catch(() => {
       /* ignore */
     });
-  }, [chat.agentId, chat.messages, selectedAgent]);
-
-  const handoffTo = useCallback(
-    (to: string, instructions: string) => {
-      chat.setAgentId(to);
-      // Pre-fill the next message with the handoff rationale so the writer
-      // can edit it instead of retyping.
-      setDraft(instructions);
-    },
-    [chat],
-  );
+  }, [chat.messages]);
 
   return (
-    <aside className="w-[420px] shrink-0 flex flex-col border-l border-border bg-card/60 h-full overflow-hidden">
-      <header className="px-4 py-3 border-b border-border flex items-center gap-2">
-        <Bot className="h-4 w-4 text-primary" />
-        <span className="label-rune flex-1">Assistant</span>
+    <aside
+      style={{ width: width ? `${width}px` : undefined }}
+      className="w-[420px] shrink-0 flex flex-col border-l border-border/80 bg-card/85 backdrop-blur-md h-full overflow-hidden transition-colors"
+    >
+      <header className="px-4 py-2.5 border-b border-border/80 bg-muted/15 flex items-center gap-2">
+        <span className="h-2 w-2 rounded-full bg-primary animate-pulse shrink-0" />
+        <span className="font-semibold text-xs tracking-tight text-foreground">Scribe</span>
+        {onOpenAiSettings && aiPill ? (
+          <button
+            type="button"
+            onClick={onOpenAiSettings}
+            title={aiPill.title}
+            className={cn(
+              'ml-1 mr-auto max-w-[165px] truncate rounded-full border px-2 py-0.5 font-mono text-[10px] transition-colors',
+              aiPill.configured
+                ? 'border-border bg-muted/40 text-muted-foreground hover:border-primary/40 hover:text-foreground'
+                : 'border-amber-500/40 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20',
+            )}
+          >
+            {aiPill.label}
+          </button>
+        ) : (
+          <span className="flex-1" />
+        )}
+        {tokenTotal > 0 && (
+          <span
+            title={`Prompt ${chat.usageTotal.promptTokens ?? 0} / completion ${chat.usageTotal.completionTokens ?? 0}`}
+            className="inline-flex items-center gap-1 rounded border border-border bg-muted/40 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground mr-1"
+          >
+            <Gauge className="h-3 w-3" />
+            {formatTokens(tokenTotal)}
+          </span>
+        )}
         <Button
           variant="ghost"
           size="sm"
           className="h-7 px-2 text-muted-foreground hover:text-foreground"
           onClick={() => setShowingSettings((v) => !v)}
-          title="Settings"
+          title="Scribe settings"
         >
           <Settings className="h-3.5 w-3.5" />
         </Button>
@@ -209,7 +311,7 @@ export function AssistantPanel({
           size="sm"
           className="h-7 px-2 text-muted-foreground hover:text-foreground"
           onClick={chat.reset}
-          title="Start a new chat with this agent"
+          title="Start a new chat with Scribe"
         >
           <Trash2 className="h-3.5 w-3.5" />
         </Button>
@@ -218,49 +320,11 @@ export function AssistantPanel({
           size="sm"
           className="h-7 px-2 text-muted-foreground hover:text-foreground"
           onClick={onClose}
-          title="Close (Ctrl+Shift+A)"
+          title="Close Scribe panel (Ctrl+Shift+A)"
         >
           <X className="h-4 w-4" />
         </Button>
       </header>
-
-      {/* Agent picker */}
-      <div className="px-4 py-3 border-b border-border space-y-2">
-        {chat.agentsError ? (
-          <div className="text-xs text-destructive">
-            Failed to load agents: {chat.agentsError}
-          </div>
-        ) : chat.agents.length === 0 ? (
-          <div className="text-xs text-muted-foreground">Loading agents…</div>
-        ) : (
-          <>
-            <div className="flex items-center gap-2">
-              <label className="label-rune flex-1">Agent</label>
-              {tokenTotal > 0 && (
-                <span
-                  title={`Prompt ${chat.usageTotal.promptTokens ?? 0} / completion ${chat.usageTotal.completionTokens ?? 0}`}
-                  className="inline-flex items-center gap-1 rounded border border-border bg-muted/40 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
-                >
-                  <Gauge className="h-3 w-3" />
-                  {formatTokens(tokenTotal)}
-                </span>
-              )}
-            </div>
-            <select
-              className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
-              value={chat.agentId}
-              onChange={(e) => chat.setAgentId(e.target.value)}
-            >
-              {chat.agents.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.name}
-                </option>
-              ))}
-            </select>
-            {selectedAgent && <AgentRoleBanner agent={selectedAgent} />}
-          </>
-        )}
-      </div>
 
       {showingSettings && (
         <SettingsPanel
@@ -278,10 +342,17 @@ export function AssistantPanel({
         className="flex-1 overflow-auto scrollbar-ember px-4 py-3 space-y-4"
       >
         {chat.messages.length === 0 && (
-          <div className="text-sm text-muted-foreground italic">
-            <Sparkles className="inline h-3.5 w-3.5 mr-1 text-primary/80" />
-            Ask the agent about your Saga. It can read the Codex, validate canon,
-            search the Lexicon, and propose edits you approve.
+          <div className="text-sm text-muted-foreground italic space-y-2">
+            <div className="flex items-center gap-1.5 text-foreground/90 font-medium not-italic">
+              <Sparkles className="h-4 w-4 text-primary" />
+              <span>Scribe — Universal Assistant</span>
+            </div>
+            <p>
+              Ask Scribe anything about your Saga. Scribe dynamically assumes the
+              roles of <strong>Muse</strong> (creative drafting), <strong>Archivist</strong> (saving canon),{' '}
+              <strong>Harvester</strong> (searching lore), <strong>Polisher</strong> (style refinement), and{' '}
+              <strong>Warden</strong> (canon audits) based on your prompt.
+            </p>
           </div>
         )}
         {chat.messages.map((m, idx) => {
@@ -291,7 +362,6 @@ export function AssistantPanel({
             <MessageBubble
               key={m.id}
               message={m}
-              onHandoff={handoffTo}
               onRetry={
                 isLastAssistant && chat.canRetry && !chat.streaming
                   ? () => void chat.retry()
@@ -326,7 +396,39 @@ export function AssistantPanel({
       </div>
 
       {/* Composer */}
-      <div className="border-t border-border bg-background/60 p-3 space-y-2">
+      <div className="border-t border-border/80 bg-background/70 backdrop-blur-md p-3 space-y-2">
+        {/* Quick Scribe Intent Chips */}
+        <div className="flex flex-wrap items-center gap-1.5 pb-0.5">
+          <button
+            type="button"
+            onClick={() => setDraft('Brainstorm 3 creative options for: ')}
+            className="rounded-full border border-border/70 bg-card/60 hover:border-primary/40 hover:bg-primary/10 px-2 py-0.5 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+          >
+            💡 Brainstorm
+          </button>
+          <button
+            type="button"
+            onClick={() => setDraft('Polish and refine this prose for rhythm and flow: ')}
+            className="rounded-full border border-border/70 bg-card/60 hover:border-primary/40 hover:bg-primary/10 px-2 py-0.5 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+          >
+            ✍️ Polish
+          </button>
+          <button
+            type="button"
+            onClick={() => setDraft('Audit this passage for canon consistency and established facts: ')}
+            className="rounded-full border border-border/70 bg-card/60 hover:border-primary/40 hover:bg-primary/10 px-2 py-0.5 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+          >
+            🛡️ Canon Audit
+          </button>
+          <button
+            type="button"
+            onClick={() => setDraft('Scan this chapter and list all potential new Codex entries: ')}
+            className="rounded-full border border-border/70 bg-card/60 hover:border-primary/40 hover:bg-primary/10 px-2 py-0.5 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+          >
+            🌾 Harvest
+          </button>
+        </div>
+
         {attachment?.selection && (
           <div className="rounded-md border border-border bg-muted/40 p-2 text-[11px]">
             <div className="flex items-center gap-2 mb-1">
@@ -360,13 +462,8 @@ export function AssistantPanel({
               chat.cancel();
             }
           }}
-          placeholder={
-            selectedAgent
-              ? `Ask ${selectedAgent.name}… (Ctrl+Enter to send, Esc to stop)`
-              : 'Loading…'
-          }
+          placeholder="Ask Scribe… (Ctrl+Enter to send, Esc to stop)"
           className="w-full min-h-[80px] max-h-[200px] resize-y rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-          disabled={!chat.agentId}
         />
         <div className="flex items-center gap-2">
           {chat.streaming ? (
@@ -379,7 +476,7 @@ export function AssistantPanel({
               size="sm"
               className="gap-1.5"
               onClick={() => void onSubmit()}
-              disabled={!draft.trim() || !chat.agentId}
+              disabled={!draft.trim()}
             >
               <Send className="h-3.5 w-3.5" />
               Send
@@ -426,7 +523,7 @@ function SettingsPanel({
     <div className="border-b border-border bg-muted/20 px-4 py-3 space-y-3">
       <div className="flex items-center gap-2">
         <Settings className="h-3.5 w-3.5 text-primary/80" />
-        <span className="label-rune flex-1">Assistant settings</span>
+        <span className="label-rune flex-1">Scribe settings</span>
         <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
           <X className="h-3.5 w-3.5" />
         </button>
@@ -456,7 +553,7 @@ function SettingsPanel({
         />
       </div>
       <div className="space-y-1 text-xs pt-1 border-t border-border/50">
-        <div className="label-rune text-[10px] text-muted-foreground">Git</div>
+        <div className="label-rune text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Story Timeline & Checkpoints</div>
         <label className="flex items-start gap-2 cursor-pointer rounded-md border border-border bg-background px-2 py-1.5 hover:bg-muted">
           <input
             type="checkbox"
@@ -465,10 +562,9 @@ function SettingsPanel({
             onChange={(e) => onAutoCommitChange(e.target.checked)}
           />
           <div className="flex-1">
-            <div className="text-xs font-medium">Auto-commit approved writes</div>
+            <div className="text-xs font-medium">Auto-checkpoint approved updates</div>
             <div className="mt-0.5 text-[11px] text-muted-foreground">
-              When on, each Apply creates a single git commit in the Saga repo.
-              Silently skipped if the Saga isn't a git repo.
+              When enabled, Scribe automatically records a revision checkpoint in your story timeline whenever you apply suggested changes.
             </div>
           </div>
         </label>
@@ -517,11 +613,9 @@ function PolicyOption({
 
 function MessageBubble({
   message,
-  onHandoff,
   onRetry,
 }: {
   message: ChatMessage;
-  onHandoff: (agentId: string, instructions: string) => void;
   onRetry?: () => void;
 }) {
   const isUser = message.role === 'user';
@@ -536,7 +630,7 @@ function MessageBubble({
     >
       <div className="flex items-center gap-2 mb-1">
         <span className="label-rune flex-1">
-          {isUser ? 'You' : 'Assistant'}
+          {isUser ? 'You' : 'Scribe'}
         </span>
         {onRetry && (
           <button
@@ -559,21 +653,6 @@ function MessageBubble({
         <div className="mt-2 space-y-1">
           {message.toolCalls.map((tc, i) => (
             <ToolCallChip key={i} call={tc} />
-          ))}
-        </div>
-      )}
-      {message.handoffs && message.handoffs.length > 0 && (
-        <div className="mt-2 space-y-1">
-          {message.handoffs.map((h, i) => (
-            <button
-              key={i}
-              onClick={() => onHandoff(h.to, h.instructions)}
-              className="flex w-full items-center gap-2 rounded-md border border-primary/50 bg-primary/10 px-2 py-1.5 text-left text-xs hover:bg-primary/20"
-            >
-              <ArrowRight className="h-3.5 w-3.5 text-primary" />
-              <span className="font-medium">Continue with {h.to}</span>
-              <span className="truncate text-muted-foreground">{h.instructions}</span>
-            </button>
           ))}
         </div>
       )}
@@ -764,50 +843,8 @@ function PendingActionCard({
   );
 }
 
-function AgentRoleBanner({
-  agent,
-}: {
-  agent: { description: string; tools: string[] };
-}) {
-  const [open, setOpen] = useState(false);
-  return (
-    <div className="text-[11px] leading-snug">
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center gap-1 text-muted-foreground hover:text-foreground"
-      >
-        {open ? (
-          <ChevronDown className="h-3 w-3" />
-        ) : (
-          <ChevronRight className="h-3 w-3" />
-        )}
-        <span className="flex-1 text-left">{agent.description}</span>
-      </button>
-      {open && agent.tools.length > 0 && (
-        <div className="mt-1 flex flex-wrap gap-1 pl-4">
-          {agent.tools.map((t) => (
-            <span
-              key={t}
-              className="rounded bg-muted/50 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
-            >
-              {t}
-            </span>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ---------- tiny safe markdown renderer -----------------------------------
 
-/**
- * Renders the most common markdown constructs found in assistant replies:
- * headings, bullets, ordered lists, fenced code, inline code, bold/italic,
- * links, and `@type/id` echoes. Everything else falls through as plain
- * text. Deliberately zero-dep — we avoid pulling `marked` or `remark`
- * just for chat bubbles.
- */
 function MarkdownContent({ text }: { text: string }) {
   const blocks = useMemo(() => splitBlocks(text), [text]);
   return (
@@ -950,8 +987,6 @@ function renderBlock(b: Block, key: number): JSX.Element {
 
 function renderInline(text: string): (JSX.Element | string)[] {
   const tokens: (JSX.Element | string)[] = [];
-  // Combined regex: inline code | bold | italic | link | @type/id echo
-  // (with optional `{display}` override).
   const re =
     /`([^`]+)`|\*\*([^*]+)\*\*|\b_([^_]+)_\b|\[([^\]]+)\]\(([^)]+)\)|@([a-z][a-z0-9-]*)\/([a-z0-9][a-z0-9-]*)(?:\{([^}\n]*)\})?/g;
   let last = 0;

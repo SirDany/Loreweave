@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import YAML from "yaml";
+import { cn } from "../lib/utils.js";
 import type { DumpPayload, Thread, Waypoint } from "../lib/lw.js";
 import { lwWrite, threadOf } from "../lib/lw.js";
 
@@ -50,31 +51,32 @@ export function ThreadView({ data, sagaPath, tomeLens, onReloaded }: Props) {
   const thread = data.threads.find((t) => t.id === selected) ?? null;
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
-      <header className="px-6 py-3 border-b border-border flex items-center gap-4 flex-wrap">
-        <div className="text-lg">Threads</div>
-        <div className="flex gap-1 flex-wrap">
+    <div className="flex-1 flex flex-col overflow-hidden bg-background">
+      <header className="px-6 py-3 border-b border-border/80 bg-card/60 backdrop-blur-md flex items-center gap-4 flex-wrap">
+        <div className="text-base font-semibold tracking-tight text-foreground">Threads</div>
+        <div className="flex gap-1.5 flex-wrap">
           {data.threads.map((t) => (
             <button
               key={t.id}
               onClick={() => setSelected(t.id)}
-              className={
-                "text-xs px-2 py-1 rounded border " +
-                (selected === t.id
-                  ? "border-primary bg-primary/25 text-primary-foreground"
-                  : "border-border hover:bg-muted")
-              }
+              className={cn(
+                "text-xs px-2.5 py-1 rounded-lg border font-medium transition-colors",
+                selected === t.id
+                  ? "border-primary/60 bg-primary/20 text-primary shadow-sm"
+                  : "border-border/80 bg-background/60 hover:bg-muted text-muted-foreground",
+              )}
             >
               {t.id}
               {t.branches_from && (
-                <span className="text-muted-foreground"> ⇢{t.branches_from.thread}</span>
+                <span className="text-muted-foreground/80 font-mono text-[10px]"> ⇢{t.branches_from.thread}</span>
               )}
             </button>
           ))}
         </div>
-        <label className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
+        <label className="ml-auto flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
           <input
             type="checkbox"
+            className="accent-primary"
             checked={withBranches}
             onChange={(e) => setWithBranches(e.target.checked)}
           />
@@ -83,12 +85,12 @@ export function ThreadView({ data, sagaPath, tomeLens, onReloaded }: Props) {
         {thread && (
           <button
             onClick={() => setReorderMode((v) => !v)}
-            className={
-              "text-xs px-2 py-1 rounded border " +
-              (reorderMode
-                ? "border-primary bg-primary/25 text-primary-foreground"
-                : "border-border hover:bg-muted")
-            }
+            className={cn(
+              "text-xs px-3 py-1 rounded-lg border font-medium transition-colors",
+              reorderMode
+                ? "border-primary/60 bg-primary/20 text-primary shadow-sm"
+                : "border-border/80 bg-background/60 hover:bg-muted text-muted-foreground",
+            )}
             title="Reorder waypoints and save the thread"
           >
             {reorderMode ? "✓ done" : "reorder"}
@@ -97,12 +99,12 @@ export function ThreadView({ data, sagaPath, tomeLens, onReloaded }: Props) {
         {thread?.branches_from && (
           <button
             onClick={() => setShowBranchDiff((v) => !v)}
-            className={
-              "text-xs px-2 py-1 rounded border " +
-              (showBranchDiff
-                ? "border-primary bg-primary/25 text-primary-foreground"
-                : "border-border hover:bg-muted")
-            }
+            className={cn(
+              "text-xs px-3 py-1 rounded-lg border font-medium transition-colors",
+              showBranchDiff
+                ? "border-primary/60 bg-primary/20 text-primary shadow-sm"
+                : "border-border/80 bg-background/60 hover:bg-muted text-muted-foreground",
+            )}
             title={`Compare with parent thread ${thread.branches_from.thread}`}
           >
             branch diff

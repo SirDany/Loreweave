@@ -31,6 +31,7 @@ interface ShelfProps {
   onRules: () => void;
   onToggleAssistant: () => void;
   assistantOpen: boolean;
+  width?: number;
 }
 
 /**
@@ -55,6 +56,7 @@ export function Shelf({
   onRules,
   onToggleAssistant,
   assistantOpen,
+  width,
 }: ShelfProps) {
   const errors = data.diagnostics.filter((d) => d.severity === 'error').length;
   const warnings = data.diagnostics.filter(
@@ -62,13 +64,16 @@ export function Shelf({
   ).length;
 
   return (
-    <aside className="w-60 shrink-0 flex flex-col gap-5 border-r border-border bg-card/60 px-4 py-5 bg-parchment-grain">
+    <aside
+      style={{ width: width ? `${width}px` : undefined }}
+      className="w-60 shrink-0 flex flex-col gap-5 border-r border-border/70 bg-card/70 backdrop-blur-md px-4 py-5"
+    >
       <div>
         <div className="flex items-center gap-2">
           <Compass className="h-4 w-4 text-primary" />
-          <span className="label-rune">Shelf</span>
+          <span className="label-rune font-semibold tracking-wider">Shelf</span>
         </div>
-        <div className="mt-2 font-serif text-xl leading-tight text-foreground">
+        <div className="mt-2 font-semibold text-lg leading-snug tracking-tight text-foreground">
           {data.saga.title ?? data.saga.id}
         </div>
         <div className="font-mono text-[11px] text-muted-foreground truncate">
@@ -166,10 +171,10 @@ function TomeItem({
       <button
         onClick={onClick}
         className={cn(
-          'w-full rounded-md px-2 py-1 text-left text-sm transition-colors',
+          'w-full rounded-lg px-2.5 py-1.5 text-left text-xs font-medium transition-all duration-150',
           active
-            ? 'bg-accent text-accent-foreground'
-            : 'text-foreground/85 hover:bg-muted hover:text-foreground',
+            ? 'bg-primary/15 text-primary border border-primary/30 shadow-sm'
+            : 'text-foreground/80 hover:bg-muted/60 hover:text-foreground border border-transparent',
         )}
       >
         {label}

@@ -87,132 +87,131 @@ export function NewTraceDialog({ sagaPath, initialTarget, suggestions, onClose, 
 
   return (
     <div
-      className="fixed inset-0 bg-black/60 flex items-center justify-center z-50"
-      onClick={onClose}
+      className="fixed inset-0 bg-black/75 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-fade-in"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
       <div
-        className="bg-card border border-border rounded shadow-xl w-[32rem] max-w-full p-4 space-y-3"
+        className="bg-card/95 border border-border/80 rounded-2xl shadow-2xl w-[32rem] max-w-full overflow-hidden flex flex-col backdrop-blur-xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between">
-          <h2 className="text-base">New trace</h2>
+        <header className="px-6 py-4 border-b border-border/70 bg-muted/20 flex items-center justify-between">
+          <h2 className="text-base font-semibold tracking-tight text-foreground">New Trace</h2>
           <button
             onClick={onClose}
-            className="text-xs text-muted-foreground hover:text-foreground"
+            className="text-xs text-muted-foreground hover:text-foreground p-1 rounded-md hover:bg-muted transition-colors"
           >
             esc
           </button>
+        </header>
+
+        <div className="p-6 space-y-4 text-sm">
+          <label className="block text-xs">
+            <span className="text-muted-foreground font-medium">Headline Title</span>
+            <input
+              autoFocus
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Short headline"
+              className="mt-1 w-full bg-background border border-border rounded-lg px-3 py-2 text-xs focus:ring-1 focus:ring-primary focus:outline-none transition-colors"
+            />
+            {title && (
+              <span className="text-muted-foreground font-mono text-[11px] mt-1 block">
+                id: {id || <em className="text-rose-400">invalid</em>}
+              </span>
+            )}
+          </label>
+
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block text-xs">
+              <span className="text-muted-foreground font-medium">Trace Kind</span>
+              <select
+                value={kind}
+                onChange={(e) => setKind(e.target.value as TraceKind)}
+                className="mt-1 w-full bg-background border border-border rounded-lg px-3 py-2 text-xs focus:ring-1 focus:ring-primary focus:outline-none transition-colors"
+              >
+                {KINDS.map((k) => (
+                  <option key={k} value={k}>
+                    {k}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block text-xs">
+              <span className="text-muted-foreground font-medium">
+                Target Reference <span className="text-muted-foreground/70">(optional)</span>
+              </span>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={target}
+                  onChange={(e) => {
+                    setTarget(e.target.value);
+                    setShowSuggest(true);
+                  }}
+                  onFocus={() => setShowSuggest(true)}
+                  onBlur={() => setTimeout(() => setShowSuggest(false), 150)}
+                  placeholder="@character/aaron or chapter:..."
+                  className="mt-1 w-full bg-background border border-border rounded-lg px-3 py-2 text-xs font-mono focus:ring-1 focus:ring-primary focus:outline-none transition-colors"
+                />
+                {showSuggest && filteredSuggestions.length > 0 && (
+                  <ul className="absolute left-0 right-0 top-full mt-1 z-10 bg-card border border-border/80 rounded-xl shadow-xl max-h-56 overflow-auto py-1">
+                    {filteredSuggestions.map((s) => (
+                      <li key={s.value}>
+                        <button
+                          type="button"
+                          onMouseDown={(ev) => ev.preventDefault()}
+                          onClick={() => {
+                            setTarget(s.value);
+                            setShowSuggest(false);
+                          }}
+                          className="w-full text-left px-3 py-1.5 hover:bg-muted transition-colors"
+                        >
+                          <div className="text-foreground text-xs font-medium">{s.label}</div>
+                          <div className="text-muted-foreground text-[10px] font-mono truncate">
+                            {s.value}
+                            {s.detail ? ` · ${s.detail}` : ""}
+                          </div>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </label>
+          </div>
+
+          <label className="block text-xs">
+            <span className="text-muted-foreground font-medium">Trace Body</span>
+            <textarea
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              rows={5}
+              placeholder="Freeform markdown notes, observations, or ideas…"
+              className="mt-1 w-full bg-background border border-border rounded-lg px-3 py-2 text-xs font-mono focus:ring-1 focus:ring-primary focus:outline-none transition-colors"
+            />
+          </label>
+
+          {err && <div className="text-xs text-rose-400 font-mono p-3 bg-rose-500/10 rounded-lg border border-rose-500/30">{err}</div>}
         </div>
 
-        <label className="block text-xs">
-          <span className="text-muted-foreground">title</span>
-          <input
-            autoFocus
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="short headline"
-            className="mt-1 w-full bg-background border border-border rounded px-2 py-1 text-sm"
-          />
-          {title && (
-            <span className="text-muted-foreground font-mono">
-              id: {id || <em className="text-red-400">invalid</em>}
-            </span>
-          )}
-        </label>
-
-        <div className="grid grid-cols-2 gap-3">
-          <label className="block text-xs">
-            <span className="text-muted-foreground">kind</span>
-            <select
-              value={kind}
-              onChange={(e) => setKind(e.target.value as TraceKind)}
-              className="mt-1 w-full bg-background border border-border rounded px-2 py-1 text-sm"
-            >
-              {KINDS.map((k) => (
-                <option key={k} value={k}>
-                  {k}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="block text-xs">
-            <span className="text-muted-foreground">
-              target <span className="text-muted-foreground/70">(optional)</span>
-            </span>
-            <div className="relative">
-              <input
-                type="text"
-                value={target}
-                onChange={(e) => {
-                  setTarget(e.target.value);
-                  setShowSuggest(true);
-                }}
-                onFocus={() => setShowSuggest(true)}
-                onBlur={() => setTimeout(() => setShowSuggest(false), 150)}
-                placeholder="@character/aaron or chapter:book-one/01-arrival"
-                className="mt-1 w-full bg-background border border-border rounded px-2 py-1 text-sm font-mono"
-              />
-              {showSuggest && filteredSuggestions.length > 0 && (
-                <ul className="absolute left-0 right-0 top-full mt-1 z-10 bg-background border border-border rounded shadow-lg max-h-56 overflow-auto">
-                  {filteredSuggestions.map((s) => (
-                    <li key={s.value}>
-                      <button
-                        type="button"
-                        onMouseDown={(ev) => ev.preventDefault()}
-                        onClick={() => {
-                          setTarget(s.value);
-                          setShowSuggest(false);
-                        }}
-                        className="w-full text-left px-2 py-1 hover:bg-muted"
-                      >
-                        <div className="text-foreground text-xs">{s.label}</div>
-                        <div className="text-muted-foreground text-[11px] font-mono truncate">
-                          {s.value}
-                          {s.detail ? ` · ${s.detail}` : ""}
-                        </div>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </label>
-        </div>
-
-        <label className="block text-xs">
-          <span className="text-muted-foreground">body</span>
-          <textarea
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            rows={6}
-            placeholder="freeform markdown…"
-            className="mt-1 w-full bg-background border border-border rounded px-2 py-1 text-sm font-mono"
-          />
-        </label>
-
-        {err && <div className="text-xs text-red-400">{err}</div>}
-
-        <div className="flex justify-end gap-2 pt-1">
+        <footer className="px-6 py-3.5 border-t border-border/70 bg-muted/20 flex justify-end gap-2.5">
           <button
             onClick={onClose}
-            className="px-3 py-1 text-sm border border-border rounded hover:bg-muted"
+            className="px-4 py-1.5 rounded-lg border border-border text-foreground hover:bg-muted text-xs font-medium transition-colors"
           >
             Cancel
           </button>
           <button
             onClick={handleSave}
             disabled={!canSave || saving}
-            className={
-              "px-3 py-1 text-sm rounded " +
-              (canSave && !saving
-                ? "bg-primary hover:bg-primary/90 text-primary-foreground"
-                : "bg-muted text-muted-foreground cursor-not-allowed")
-            }
+            className="px-4 py-1.5 rounded-lg border border-primary/50 bg-primary/20 text-primary font-medium hover:bg-primary/30 disabled:opacity-40 text-xs transition-colors shadow-sm"
           >
             {saving ? "Saving…" : "Create trace"}
           </button>
-        </div>
+        </footer>
       </div>
     </div>
   );

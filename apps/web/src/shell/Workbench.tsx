@@ -76,7 +76,6 @@ export function Workbench({
           onDeleted={onDeleted}
           onAsk={() =>
             openAssistant({
-              agent: 'muse',
               prompt: `Tell me about \`@${currentEntry.type}/${currentEntry.id}\`. Read the Codex and list what's established vs. open questions.`,
               context: {
                 path: currentEntry.relPath,
@@ -88,8 +87,8 @@ export function Workbench({
         />
       )}
       {currentChapter && section === 'story' && (
-        <div className="border-b border-border bg-card/40">
-          <div className="flex px-2 py-1 gap-1">
+        <div className="border-b border-border/80 bg-card/60 backdrop-blur-md">
+          <div className="flex px-3 py-1.5 gap-1.5">
             <StoryTabButton
               active={storyTab === 'edit'}
               onClick={() => setStoryTab('edit')}
@@ -121,7 +120,6 @@ export function Workbench({
               ),
             );
             openAssistant({
-              agent: action,
               prompt: assistantPromptFor(action),
               context: {
                 selection: sel.text,
@@ -138,7 +136,6 @@ export function Workbench({
               ),
             );
             openAssistant({
-              agent: 'muse',
               prompt:
                 "Discuss this chapter with me — structure, pacing, what works, what doesn't.",
               context: { path: currentChapter.chapter.relPath, likelyRefs },
@@ -151,7 +148,6 @@ export function Workbench({
               ),
             );
             openAssistant({
-              agent: 'warden',
               prompt:
                 'Audit this chapter against the Codex: list contradictions, broken @refs, slang misuse, and Thread conflicts. Cite files.',
               context: { path: currentChapter.chapter.relPath, likelyRefs },
@@ -231,10 +227,10 @@ function StoryTabButton({
     <button
       onClick={onClick}
       className={cn(
-        'rounded-md px-4 py-1.5 text-xs uppercase tracking-widest transition-colors',
+        'rounded-lg px-3.5 py-1 text-xs font-semibold tracking-wide transition-all duration-150',
         active
-          ? 'bg-accent text-accent-foreground'
-          : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+          ? 'bg-primary/20 text-primary border border-primary/30 shadow-sm'
+          : 'text-muted-foreground hover:bg-muted hover:text-foreground border border-transparent',
       )}
     >
       {label}

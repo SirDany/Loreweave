@@ -1,4 +1,5 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useUrlState } from '../hooks/useUrlState.js';
 import { buildCatalog } from '../lib/catalog.js';
 import type { DumpEntry } from '../lib/lw.js';
 import {
@@ -15,7 +16,6 @@ import type { ChatContextAttachment } from './useChat.js';
 import { useSaga } from './useSaga.js';
 
 export interface AssistantSeed {
-  agent?: string;
   prompt?: string;
   context?: ChatContextAttachment;
 }
@@ -46,19 +46,36 @@ export type PendingNew =
   | { kind: 'sigil' }
   | { kind: 'chapter'; tome?: string };
 
+const SCRIBE_OPEN_KEY = 'lw.scribe.open';
+
+function loadScribeOpen(): boolean {
+  try {
+    const val = localStorage.getItem(SCRIBE_OPEN_KEY);
+    // Default: open (true)
+    if (val === '0' || val === 'false') return false;
+    return true;
+  } catch {
+    return true;
+  }
+}
+
 /**
  * Consolidated app-level state. Owns the Saga loader, current
- * section + selection, dialog flags, the Assistant panel state, and
+ * section + selection (synced with browser history/URL), dialog flags,
+ * the Scribe panel state (open by default, auto-persisted), and
  * derives the catalog/visibleEntries/currentEntry/currentChapter
  * convenience values used by the Shell.
- *
- * Returns a single big object — verbose by design so the Shell
- * destructure stays explicit.
  */
 export function useApp() {
   const saga = useSaga();
-  const [section, setSection] = useState<Section>('codex');
-  const [selection, setSelection] = useState<Selection | null>(null);
+  const {
+    section,
+    selection,
+    setSection,
+    setSelection,
+    setNavLocation,
+  } = useUrlState();
+
   const [dialogs, setDialogs] = useState<Record<DialogId, boolean>>({
     picking: false,
     exporting: false,
@@ -70,7 +87,20 @@ export function useApp() {
     rules: false,
     harvesting: false,
   });
-  const [assistantOpen, setAssistantOpen] = useState(false);
+
+  // Scribe chat window open per default, persisted in user preferences
+  const [assistantOpen, setAssistantOpen] = useState<boolean>(() =>
+    loadScribeOpen(),
+  );
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(SCRIBE_OPEN_KEY, assistantOpen ? '1' : '0');
+    } catch {
+      /* ignore */
+    }
+  }, [assistantOpen]);
+
   const [assistantSeed, setAssistantSeed] = useState<AssistantSeed | null>(
     null,
   );
@@ -99,30 +129,37 @@ export function useApp() {
   }, []);
 
   const handleJump = useCallback<Jumper>((loc) => {
-    setSelection({ kind: loc.kind, key: loc.key });
-    if (loc.kind === 'chapter') setSection('story');
-    else setSection(entryTypeToSection(loc.key));
-  }, []);
+    const targetSection =
+      loc.kind === 'chapter' ? 'story' : entryTypeToSection(loc.key);
+    setNavLocation({
+      section: targetSection,
+      selection: { kind: loc.kind, key: loc.key },
+    });
+  }, [setNavLocation]);
 
   const handleJumpToTarget = useCallback((target: string) => {
     jumpToTarget(target, setSelection, setSection);
-  }, []);
+  }, [setSelection, setSection]);
 
   /**
    * User-driven section change (Grimoire nav). Clears the selection
    * if the currently-selected entry/chapter doesn't belong to the
-   * new section — otherwise the Workbench keeps rendering the old
-   * EntryView/ChapterView and shadows views like Constellation,
-   * Threads, Traces, Versions.
+   * new section.
    */
-  const changeSection = useCallback((s: Section) => {
-    setSection(s);
-    setSelection((sel) => {
-      if (!sel) return sel;
-      if (sel.kind === 'chapter') return s === 'story' ? sel : null;
-      return entryTypeToSection(sel.key) === s ? sel : null;
-    });
-  }, []);
+  const changeSection = useCallback(
+    (s: Section) => {
+      setNavLocation({
+        section: s,
+        selection:
+          selection &&
+          ((selection.kind === 'chapter' && s === 'story') ||
+            (selection.kind === 'entry' && entryTypeToSection(selection.key) === s))
+            ? selection
+            : null,
+      });
+    },
+    [selection, setNavLocation],
+  );
 
   // Derived values — only meaningful once `saga.data` is loaded.
   const data = saga.data;

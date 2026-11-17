@@ -133,7 +133,7 @@ export function EntryEditor({ entry, sagaPath, allEntries, kinds, onClose, onSav
             <div className="text-xs text-muted-foreground">
               {entry.type}/{entry.id} · {entry.relPath}
             </div>
-            <div className="text-base text-foreground">Edit frontmatter</div>
+            <div className="text-base text-foreground font-medium">Edit Properties</div>
           </div>
           <button
             onClick={onClose}

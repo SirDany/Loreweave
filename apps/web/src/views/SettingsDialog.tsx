@@ -1,306 +1,1227 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from '../components/ui/tabs.js';
+  Check,
+  ExternalLink,
+  Info,
+  Loader2,
+  Pencil,
+  RefreshCw,
+  Sparkles,
+  X,
+} from 'lucide-react';
 import {
   fetchConfig,
+  fetchProviderModels,
   saveConfigPatch,
+  type ChatProviderId,
   type ConfigPatch,
+  type EmbeddingsProviderId,
   type MaskedLoreweaveConfig,
+  type ModelDescriptor,
+  type ModelsDiscoveryResponse,
 } from '../lib/lw.js';
 import { cn } from '../lib/utils.js';
 import { useSkin } from '../theme/SkinProvider.js';
+import { type SkinTokens } from '../theme/skins.js';
 
 interface Props {
   onClose: () => void;
 }
 
+type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
+
+type KeyFieldName =
+  | 'anthropicApiKey'
+  | 'openaiApiKey'
+  | 'googleApiKey'
+  | 'ollamaApiKey'
+  | 'openrouterApiKey'
+  | 'groqApiKey'
+  | 'deepseekApiKey'
+  | 'mistralApiKey'
+  | 'xaiApiKey'
+  | 'customApiKey';
+
+interface ProviderUiMeta {
+  label: string;
+  keyField: KeyFieldName;
+  keyLabel: string;
+  keyPlaceholder: string;
+  keyHelpUrl?: string;
+  keyHelpLabel?: string;
+  defaultModel: string;
+}
+
+const PROVIDER_UI: Record<ChatProviderId, ProviderUiMeta> = {
+  google: {
+    label: 'Google Gemini (AI Studio)',
+    keyField: 'googleApiKey',
+    keyLabel: 'Google AI Studio API Key',
+    keyPlaceholder: 'AIza…',
+    keyHelpUrl: 'https://aistudio.google.com/apikey',
+    keyHelpLabel: 'Get key at Google AI Studio',
+    defaultModel: 'gemini-2.5-flash',
+  },
+  anthropic: {
+    label: 'Anthropic (Claude)',
+    keyField: 'anthropicApiKey',
+    keyLabel: 'Anthropic API Key',
+    keyPlaceholder: 'sk-ant-…',
+    keyHelpUrl: 'https://console.anthropic.com/settings/keys',
+    keyHelpLabel: 'Anthropic Console',
+    defaultModel: 'claude-sonnet-4-20250514',
+  },
+  openai: {
+    label: 'OpenAI (GPT / o3 / o4)',
+    keyField: 'openaiApiKey',
+    keyLabel: 'OpenAI API Key',
+    keyPlaceholder: 'sk-…',
+    keyHelpUrl: 'https://platform.openai.com/api-keys',
+    keyHelpLabel: 'OpenAI Platform',
+    defaultModel: 'gpt-4o-mini',
+  },
+  openrouter: {
+    label: 'OpenRouter (300+ Models / Free Tier)',
+    keyField: 'openrouterApiKey',
+    keyLabel: 'OpenRouter API Key',
+    keyPlaceholder: 'sk-or-…',
+    keyHelpUrl: 'https://openrouter.ai/keys',
+    keyHelpLabel: 'OpenRouter Keys',
+    defaultModel: 'google/gemini-2.5-flash',
+  },
+  groq: {
+    label: 'Groq (Fast Inference)',
+    keyField: 'groqApiKey',
+    keyLabel: 'Groq API Key',
+    keyPlaceholder: 'gsk_…',
+    keyHelpUrl: 'https://console.groq.com/keys',
+    keyHelpLabel: 'Groq Console',
+    defaultModel: 'llama-3.3-70b-versatile',
+  },
+  deepseek: {
+    label: 'DeepSeek',
+    keyField: 'deepseekApiKey',
+    keyLabel: 'DeepSeek API Key',
+    keyPlaceholder: 'sk-…',
+    keyHelpUrl: 'https://platform.deepseek.com/api_keys',
+    keyHelpLabel: 'DeepSeek Platform',
+    defaultModel: 'deepseek-chat',
+  },
+  mistral: {
+    label: 'Mistral AI',
+    keyField: 'mistralApiKey',
+    keyLabel: 'Mistral API Key',
+    keyPlaceholder: 'Mistral API key…',
+    keyHelpUrl: 'https://console.mistral.ai/api-keys',
+    keyHelpLabel: 'Mistral Console',
+    defaultModel: 'mistral-small-latest',
+  },
+  xai: {
+    label: 'xAI (Grok)',
+    keyField: 'xaiApiKey',
+    keyLabel: 'xAI API Key',
+    keyPlaceholder: 'xai-…',
+    keyHelpUrl: 'https://console.x.ai',
+    keyHelpLabel: 'xAI Console',
+    defaultModel: 'grok-3-mini',
+  },
+  ollama: {
+    label: 'Ollama (Local / Remote / Cloud)',
+    keyField: 'ollamaApiKey',
+    keyLabel: 'Ollama API Key / Bearer Token (optional)',
+    keyPlaceholder: 'Optional token for remote Ollama or ollama.com',
+    keyHelpUrl: 'https://ollama.com/settings/keys',
+    keyHelpLabel: 'Ollama Cloud Keys',
+    defaultModel: 'llama3.1',
+  },
+  'openai-compatible': {
+    label: 'Custom OpenAI-Compatible (LM Studio / vLLM / llama.cpp)',
+    keyField: 'customApiKey',
+    keyLabel: 'API Key (optional)',
+    keyPlaceholder: 'Optional bearer token',
+    defaultModel: 'local-model',
+  },
+};
+
+const ALL_KEY_FIELDS: KeyFieldName[] = [
+  'anthropicApiKey',
+  'openaiApiKey',
+  'googleApiKey',
+  'ollamaApiKey',
+  'openrouterApiKey',
+  'groqApiKey',
+  'deepseekApiKey',
+  'mistralApiKey',
+  'xaiApiKey',
+  'customApiKey',
+];
+
+const CLOUD_PROVIDERS: ChatProviderId[] = [
+  'google',
+  'anthropic',
+  'openai',
+  'openrouter',
+  'groq',
+  'deepseek',
+  'mistral',
+  'xai',
+];
+
+const LOCAL_PROVIDERS: ChatProviderId[] = ['ollama', 'openai-compatible'];
+
+interface DraftState {
+  chatProvider: ChatProviderId | '';
+  chatModel: string;
+  ollamaHost: string;
+  customBaseUrl: string;
+  keys: Partial<Record<KeyFieldName, string>>;
+  embProvider: EmbeddingsProviderId | '';
+  embModel: string;
+  embEndpoint: string;
+  embKey: string;
+}
+
 /**
- * User-level AI settings dialog. Reads and writes `~/.loreweave/config.json`
- * via the sidecar's `/lw/config` endpoint. API keys are never echoed back
- * from the server — we show `••••••••` for saved keys and let the writer
- * replace them explicitly.
- *
- * Environment variables that are already set override this config; the
- * dialog shows which ones are active so the writer understands why a saved
- * value might not be taking effect.
+ * User-level AI and appearance settings dialog.
+ * All settings are automatically applied and persisted immediately on change.
  */
 export function SettingsDialog({ onClose }: Props) {
+  const [tab, setTab] = useState<'ai' | 'appearance'>('ai');
   const [cfg, setCfg] = useState<MaskedLoreweaveConfig | null>(null);
-  const [err, setErr] = useState<string | null>(null);
-  const [info, setInfo] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const debounceTimer = useRef<number | null>(null);
 
   // Chat fields
+  const [chatProvider, setChatProvider] = useState<ChatProviderId | ''>('');
   const [chatModel, setChatModel] = useState<string>('');
-  const [anthropicKey, setAnthropicKey] = useState<string>('');
-  const [openaiKey, setOpenaiKey] = useState<string>('');
   const [ollamaHost, setOllamaHost] = useState<string>('');
+  const [customBaseUrl, setCustomBaseUrl] = useState<string>('');
+  const [keys, setKeys] = useState<Partial<Record<KeyFieldName, string>>>({});
+  const [customChatModelMode, setCustomChatModelMode] = useState(false);
+
+  // Chat model discovery state
+  const [chatDiscovery, setChatDiscovery] =
+    useState<ModelsDiscoveryResponse | null>(null);
+  const [chatDiscovering, setChatDiscovering] = useState(false);
+  const [chatRefreshTick, setChatRefreshTick] = useState(0);
 
   // Embeddings fields
-  const [embProvider, setEmbProvider] = useState<string>('');
+  const [embProvider, setEmbProvider] = useState<EmbeddingsProviderId | ''>('');
   const [embModel, setEmbModel] = useState<string>('');
   const [embEndpoint, setEmbEndpoint] = useState<string>('');
   const [embKey, setEmbKey] = useState<string>('');
+  const [customEmbModelMode, setCustomEmbModelMode] = useState(false);
 
+  // Embeddings model discovery state
+  const [embDiscovery, setEmbDiscovery] =
+    useState<ModelsDiscoveryResponse | null>(null);
+  const [embDiscovering, setEmbDiscovering] = useState(false);
+  const [embRefreshTick, setEmbRefreshTick] = useState(0);
+
+  const isInitialLoad = useRef(true);
+  const draftRef = useRef<DraftState>({
+    chatProvider: '',
+    chatModel: '',
+    ollamaHost: '',
+    customBaseUrl: '',
+    keys: {},
+    embProvider: '',
+    embModel: '',
+    embEndpoint: '',
+    embKey: '',
+  });
+
+  // Fetch initial config from sidecar
   useEffect(() => {
     fetchConfig()
       .then((c) => {
         setCfg(c);
-        setChatProvider(c.chat.provider ?? '');
-        setChatModel(c.chat.model ?? '');
-        setOllamaHost(c.chat.ollamaHost ?? '');
-        setEmbProvider(c.embeddings.provider ?? '');
-        setEmbModel(c.embeddings.model ?? '');
-        setEmbEndpoint(c.embeddings.endpoint ?? '');
+        const cp = c.chat.provider ?? '';
+        const cm = c.chat.model ?? '';
+        const oh = c.chat.ollamaHost ?? '';
+        const cbu = c.chat.customBaseUrl ?? '';
+        const ep = c.embeddings.provider ?? '';
+        const em = c.embeddings.model ?? '';
+        const ee = c.embeddings.endpoint ?? '';
+
+        setChatProvider(cp);
+        setChatModel(cm);
+        setOllamaHost(oh);
+        setCustomBaseUrl(cbu);
+        setEmbProvider(ep);
+        setEmbModel(em);
+        setEmbEndpoint(ee);
+
+        draftRef.current = {
+          chatProvider: cp,
+          chatModel: cm,
+          ollamaHost: oh,
+          customBaseUrl: cbu,
+          keys: {},
+          embProvider: ep,
+          embModel: em,
+          embEndpoint: ee,
+          embKey: '',
+        };
+        isInitialLoad.current = false;
       })
-      .catch((e) => setErr((e as Error).message));
+      .catch((e) => {
+        setSaveStatus('error');
+        setStatusMessage((e as Error).message);
+        isInitialLoad.current = false;
+      });
   }, []);
 
-  const save = async () => {
-    setBusy(true);
-    setErr(null);
-    setInfo(null);
-    try {
-      const patch: ConfigPatch = {
-        chat: {
-          provider:
-            chatProvider === ''
-              ? null
-              : (chatProvider as 'anthropic' | 'openai' | 'ollama'),
-          model: chatModel === '' ? null : chatModel,
-          ollamaHost: ollamaHost === '' ? undefined : ollamaHost,
-        },
-        embeddings: {
-          provider:
-            embProvider === ''
-              ? null
-              : (embProvider as 'ollama' | 'openai-compatible'),
-          model: embModel === '' ? null : embModel,
-          endpoint: embEndpoint === '' ? null : embEndpoint,
-        },
-      };
-      // Only send API keys if the writer typed a new one — empty string
-      // means "no change"; explicit "-" means "clear".
-      if (anthropicKey === '-') patch.chat!.anthropicApiKey = null;
-      else if (anthropicKey) patch.chat!.anthropicApiKey = anthropicKey;
-      if (openaiKey === '-') patch.chat!.openaiApiKey = null;
-      else if (openaiKey) patch.chat!.openaiApiKey = openaiKey;
-      if (embKey === '-') patch.embeddings!.apiKey = null;
-      else if (embKey) patch.embeddings!.apiKey = embKey;
+  useEffect(() => {
+    return () => {
+      if (debounceTimer.current) window.clearTimeout(debounceTimer.current);
+    };
+  }, []);
 
-      const updated = await saveConfigPatch(patch);
+  const flushSave = useCallback(async () => {
+    if (isInitialLoad.current) return;
+    const d = draftRef.current;
+    try {
+      const chatPatch: NonNullable<ConfigPatch['chat']> = {
+        provider: d.chatProvider === '' ? null : d.chatProvider,
+        model: d.chatModel.trim() === '' ? null : d.chatModel.trim(),
+        ollamaHost: d.ollamaHost.trim() === '' ? null : d.ollamaHost.trim(),
+        customBaseUrl:
+          d.customBaseUrl.trim() === '' ? null : d.customBaseUrl.trim(),
+      };
+      const clearedKeyFields: KeyFieldName[] = [];
+      for (const field of ALL_KEY_FIELDS) {
+        const val = d.keys[field];
+        if (val === '-') {
+          chatPatch[field] = null;
+          clearedKeyFields.push(field);
+        } else if (val && val.trim()) {
+          chatPatch[field] = val.trim();
+        }
+      }
+
+      const embPatch: NonNullable<ConfigPatch['embeddings']> = {
+        provider: d.embProvider === '' ? null : d.embProvider,
+        model: d.embModel.trim() === '' ? null : d.embModel.trim(),
+        endpoint: d.embEndpoint.trim() === '' ? null : d.embEndpoint.trim(),
+      };
+      let clearedEmbKey = false;
+      if (d.embKey === '-') {
+        embPatch.apiKey = null;
+        clearedEmbKey = true;
+      } else if (d.embKey.trim()) {
+        embPatch.apiKey = d.embKey.trim();
+      }
+
+      const updated = await saveConfigPatch({
+        chat: chatPatch,
+        embeddings: embPatch,
+      });
       setCfg(updated);
-      setAnthropicKey('');
-      setOpenaiKey('');
-      setEmbKey('');
-      setInfo('Saved.');
+
+      if (clearedKeyFields.length > 0) {
+        setKeys((prev) => {
+          const next = { ...prev };
+          for (const f of clearedKeyFields) delete next[f];
+          draftRef.current.keys = next;
+          return next;
+        });
+      }
+      if (clearedEmbKey) {
+        setEmbKey('');
+        draftRef.current.embKey = '';
+      }
+
+      window.dispatchEvent(
+        new CustomEvent('lw-config-updated', { detail: updated }),
+      );
+
+      setSaveStatus('saved');
+      setStatusMessage('All changes saved');
+      window.setTimeout(() => {
+        setSaveStatus((cur) => (cur === 'saved' ? 'idle' : cur));
+      }, 1800);
     } catch (e) {
-      setErr((e as Error).message);
-    } finally {
-      setBusy(false);
+      setSaveStatus('error');
+      setStatusMessage((e as Error).message);
     }
+  }, []);
+
+  const scheduleSave = useCallback(
+    (delayMs = 350) => {
+      if (isInitialLoad.current) return;
+      if (debounceTimer.current) window.clearTimeout(debounceTimer.current);
+      setSaveStatus('saving');
+      setStatusMessage('Saving…');
+      debounceTimer.current = window.setTimeout(() => {
+        debounceTimer.current = null;
+        void flushSave();
+      }, delayMs);
+    },
+    [flushSave],
+  );
+
+  // Active key value for the currently selected chat provider (if typed in this session)
+  const activeMeta = chatProvider ? PROVIDER_UI[chatProvider] : null;
+  const activeTypedChatKey = activeMeta ? (keys[activeMeta.keyField] ?? '') : '';
+  const validTypedChatKey =
+    activeTypedChatKey && activeTypedChatKey !== '-'
+      ? activeTypedChatKey.trim()
+      : undefined;
+
+  // Live model discovery for Chat provider
+  useEffect(() => {
+    if (!cfg || !chatProvider) {
+      setChatDiscovery(null);
+      setChatDiscovering(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      setChatDiscovering(true);
+      fetchProviderModels(
+        {
+          provider: chatProvider,
+          apiKey: validTypedChatKey,
+          ollamaHost: chatProvider === 'ollama' ? ollamaHost : undefined,
+          ollamaApiKey:
+            chatProvider === 'ollama' ? validTypedChatKey : undefined,
+          baseUrl:
+            chatProvider === 'openai-compatible' ? customBaseUrl : undefined,
+        },
+        controller.signal,
+      )
+        .then((res) => {
+          if (!controller.signal.aborted) {
+            setChatDiscovery(res);
+          }
+        })
+        .catch(() => {
+          // Ignore aborted requests
+        })
+        .finally(() => {
+          if (!controller.signal.aborted) setChatDiscovering(false);
+        });
+    }, 350);
+
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [
+    cfg,
+    chatProvider,
+    validTypedChatKey,
+    ollamaHost,
+    customBaseUrl,
+    chatRefreshTick,
+  ]);
+
+  // Live model discovery for Embeddings provider
+  const validTypedEmbKey =
+    embKey && embKey !== '-' ? embKey.trim() : undefined;
+  const inheritedChatKeyForEmb = useMemo(() => {
+    if (embProvider === 'ollama') {
+      const k = keys.ollamaApiKey;
+      return k && k !== '-' ? k.trim() : undefined;
+    }
+    if (embProvider === 'openai') {
+      const k = keys.openaiApiKey;
+      return k && k !== '-' ? k.trim() : undefined;
+    }
+    if (embProvider === 'google') {
+      const k = keys.googleApiKey;
+      return k && k !== '-' ? k.trim() : undefined;
+    }
+    if (embProvider === 'openai-compatible') {
+      const k = keys.customApiKey;
+      return k && k !== '-' ? k.trim() : undefined;
+    }
+    return undefined;
+  }, [embProvider, keys]);
+
+  useEffect(() => {
+    if (!cfg || !embProvider) {
+      setEmbDiscovery(null);
+      setEmbDiscovering(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      setEmbDiscovering(true);
+      const effectiveKey = validTypedEmbKey ?? inheritedChatKeyForEmb;
+      fetchProviderModels(
+        {
+          provider: embProvider,
+          scope: 'embeddings',
+          apiKey: effectiveKey,
+          ollamaHost:
+            embProvider === 'ollama'
+              ? embEndpoint.trim() || ollamaHost.trim() || undefined
+              : undefined,
+          ollamaApiKey: embProvider === 'ollama' ? effectiveKey : undefined,
+          baseUrl:
+            embProvider === 'openai-compatible'
+              ? embEndpoint.trim() || customBaseUrl.trim() || undefined
+              : undefined,
+        },
+        controller.signal,
+      )
+        .then((res) => {
+          if (!controller.signal.aborted) {
+            setEmbDiscovery(res);
+          }
+        })
+        .catch(() => {
+          // Ignore aborted requests
+        })
+        .finally(() => {
+          if (!controller.signal.aborted) setEmbDiscovering(false);
+        });
+    }, 400);
+
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [
+    cfg,
+    embProvider,
+    validTypedEmbKey,
+    inheritedChatKeyForEmb,
+    embEndpoint,
+    ollamaHost,
+    customBaseUrl,
+    embRefreshTick,
+  ]);
+
+  const chatModels: ModelDescriptor[] = chatDiscovery?.models ?? [];
+  const chatModelInList =
+    chatModel === '' || chatModels.some((m) => m.id === chatModel);
+
+  const embModels: ModelDescriptor[] = embDiscovery?.embeddingModels ?? [];
+  const embModelInList =
+    embModel === '' || embModels.some((m) => m.id === embModel);
+
+  const savedChatProviders = useMemo(() => {
+    if (!cfg) return [];
+    const list: ChatProviderId[] = [];
+    for (const pid of [...CLOUD_PROVIDERS, ...LOCAL_PROVIDERS]) {
+      const meta = PROVIDER_UI[pid];
+      if (cfg.chat[meta.keyField]) list.push(pid);
+    }
+    if (cfg.chat.ollamaHost && !list.includes('ollama')) list.push('ollama');
+    if (cfg.chat.customBaseUrl && !list.includes('openai-compatible')) {
+      list.push('openai-compatible');
+    }
+    return list;
+  }, [cfg]);
+
+  const handleClose = () => {
+    if (debounceTimer.current) {
+      window.clearTimeout(debounceTimer.current);
+      debounceTimer.current = null;
+      void flushSave();
+    }
+    onClose();
   };
+
+  const selectChatProvider = (next: ChatProviderId | '') => {
+    const prev = draftRef.current.chatProvider;
+    setChatProvider(next);
+    draftRef.current.chatProvider = next;
+    if (prev !== next) {
+      setChatModel('');
+      draftRef.current.chatModel = '';
+      setCustomChatModelMode(false);
+    }
+    scheduleSave(80);
+  };
+
+  const updateKeyField = (field: KeyFieldName, val: string) => {
+    setKeys((prev) => {
+      const next = { ...prev, [field]: val };
+      draftRef.current.keys = next;
+      return next;
+    });
+    scheduleSave(350);
+  };
+
+  const embInheritedNote = useMemo(() => {
+    if (!cfg || !embProvider) return null;
+    if (embProvider === 'ollama') {
+      if (embEndpoint || cfg.embeddings.apiKey) return null;
+      if (ollamaHost || cfg.chat.ollamaHost || cfg.chat.ollamaApiKey) {
+        return 'Reusing your configured Ollama host & token automatically.';
+      }
+      return 'Uses local Ollama (127.0.0.1:11434) unless overridden below.';
+    }
+    if (embProvider === 'google') {
+      if (cfg.embeddings.apiKey || embKey) return null;
+      if (cfg.chat.googleApiKey || keys.googleApiKey) {
+        return 'Reusing your saved Google Gemini API key automatically.';
+      }
+      return 'Configure a Google AI Studio key above or supply an override key below.';
+    }
+    if (embProvider === 'openai') {
+      if (cfg.embeddings.apiKey || embKey) return null;
+      if (cfg.chat.openaiApiKey || keys.openaiApiKey) {
+        return 'Reusing your saved OpenAI API key automatically.';
+      }
+      return 'Configure an OpenAI API key above or supply an override key below.';
+    }
+    if (embProvider === 'openai-compatible') {
+      if (embEndpoint || cfg.embeddings.endpoint) return null;
+      if (customBaseUrl || cfg.chat.customBaseUrl) {
+        return 'Reusing your custom OpenAI-compatible Base URL automatically.';
+      }
+    }
+    return null;
+  }, [cfg, embProvider, embEndpoint, embKey, ollamaHost, customBaseUrl, keys]);
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-8"
-      onClick={onClose}
+      className="fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-center justify-center p-6 animate-fade-in"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) handleClose();
+      }}
     >
       <div
-        className="w-full max-w-2xl rounded-lg border border-border bg-background shadow-2xl flex flex-col max-h-[85vh]"
+        className="w-full max-w-2xl rounded-xl border border-border/70 bg-card/95 shadow-2xl backdrop-blur-xl flex flex-col max-h-[85vh] overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-border px-5 py-3">
-          <h2 className="text-lg font-semibold">Settings</h2>
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-border/70 px-6 py-4 bg-muted/20">
+          <div className="flex items-center gap-3">
+            <h2 className="text-base font-semibold tracking-tight text-foreground">
+              Settings & Customization
+            </h2>
+            {saveStatus === 'saving' && (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[11px] text-primary animate-pulse">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                <span>Saving…</span>
+              </span>
+            )}
+            {saveStatus === 'saved' && (
+              <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] text-emerald-400">
+                <Check className="h-3 w-3" />
+                <span>Saved</span>
+              </span>
+            )}
+            {saveStatus === 'error' && (
+              <span className="inline-flex items-center gap-1 rounded-full border border-destructive/30 bg-destructive/10 px-2 py-0.5 text-[11px] text-destructive">
+                <span>{statusMessage ?? 'Save failed'}</span>
+              </span>
+            )}
+          </div>
           <button
-            className="text-sm text-muted-foreground hover:text-foreground"
-            onClick={onClose}
+            type="button"
+            className="rounded-lg p-1 text-muted-foreground hover:bg-muted/60 hover:text-foreground transition-colors"
+            onClick={handleClose}
+            title="Close"
           >
-            Close
+            <X className="h-4 w-4" />
           </button>
         </div>
 
-        <Tabs defaultValue="ai" className="flex-1 flex flex-col overflow-hidden">
-          <TabsList className="mx-5 mt-3 w-fit">
-            <TabsTrigger value="ai">AI</TabsTrigger>
-            <TabsTrigger value="appearance">Appearance</TabsTrigger>
-          </TabsList>
-
-          <TabsContent
-            value="ai"
-            className="flex-1 overflow-y-auto px-5 py-4 space-y-6 mt-3"
-          >
-            {err && (
-              <div className="rounded border border-red-500/50 bg-red-500/10 px-3 py-2 text-sm text-red-200">
-                {err}
-              </div>
-            )}
-            {info && (
-              <div className="rounded border border-emerald-500/50 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200">
-                {info}
-              </div>
-            )}
-
-          {cfg && cfg.envOverrides.length > 0 && (
-            <div className="rounded border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
-              Environment variables are overriding saved settings:{' '}
-              <code className="font-mono">{cfg.envOverrides.join(', ')}</code>.
-              Unset them to use the values saved here.
-            </div>
-          )}
-
-          <section>
-            <h3 className="text-sm font-semibold mb-2">Chat agents</h3>
-            <p className="text-xs text-muted-foreground mb-3">
-              Provider and model used by <code>@muse</code>, <code>@scribe</code>,{' '}
-              <code>@warden</code>, <code>@polisher</code>, and{' '}
-              <code>@archivist</code>.
-            </p>
-            <div className="grid grid-cols-2 gap-3">
-  
-              <label className="text-sm">
-                <div className="mb-1 text-xs text-muted-foreground">Model</div>
-                <input
-                  className="w-full rounded border border-border bg-background px-2 py-1 font-mono text-xs"
-                  placeholder={
-                    chatProvider === 'anthropic'
-                      ? 'claude-3-5-sonnet-latest'
-                      : chatProvider === 'openai'
-                        ? 'gpt-4o-mini'
-                        : chatProvider === 'ollama'
-                          ? 'llama3.1'
-                          : ''
-                  }
-                  value={chatModel}
-                  onChange={(e) => setChatModel(e.target.value)}
-                />
-              </label>
-            </div>
-            <div className="mt-3 space-y-2">
-              <KeyField
-                label="Anthropic API key"
-                saved={!!cfg?.chat.anthropicApiKey}
-                value={anthropicKey}
-                setValue={setAnthropicKey}
-              />
-              <KeyField
-                label="OpenAI API key"
-                saved={!!cfg?.chat.openaiApiKey}
-                value={openaiKey}
-                setValue={setOpenaiKey}
-              />
-              <label className="block text-sm">
-                <div className="mb-1 text-xs text-muted-foreground">
-                  Ollama host
-                </div>
-                <input
-                  className="w-full rounded border border-border bg-background px-2 py-1 font-mono text-xs"
-                  placeholder="http://127.0.0.1:11434"
-                  value={ollamaHost}
-                  onChange={(e) => setOllamaHost(e.target.value)}
-                />
-              </label>
-            </div>
-          </section>
-
-          <section>
-            <h3 className="text-sm font-semibold mb-2">Embeddings (optional)</h3>
-            <p className="text-xs text-muted-foreground mb-3">
-              Used by <code>semantic_search</code> and the{' '}
-              <code>/lw/embed/build</code> endpoint. Off unless a provider is
-              selected.
-            </p>
-            <div className="grid grid-cols-2 gap-3">
-              <label className="text-sm">
-                <div className="mb-1 text-xs text-muted-foreground">Provider</div>
-                <select
-                  className="w-full rounded border border-border bg-background px-2 py-1"
-                  value={embProvider}
-                  onChange={(e) => setEmbProvider(e.target.value)}
-                >
-                  <option value="">(disabled)</option>
-                  <option value="ollama">Ollama (local)</option>
-                  <option value="openai-compatible">OpenAI-compatible</option>
-                </select>
-              </label>
-              <label className="text-sm">
-                <div className="mb-1 text-xs text-muted-foreground">Model</div>
-                <input
-                  className="w-full rounded border border-border bg-background px-2 py-1 font-mono text-xs"
-                  placeholder={
-                    embProvider === 'ollama'
-                      ? 'nomic-embed-text'
-                      : embProvider === 'openai-compatible'
-                        ? 'text-embedding-3-small'
-                        : ''
-                  }
-                  value={embModel}
-                  onChange={(e) => setEmbModel(e.target.value)}
-                />
-              </label>
-            </div>
-            <div className="mt-3 space-y-2">
-              <label className="block text-sm">
-                <div className="mb-1 text-xs text-muted-foreground">Endpoint</div>
-                <input
-                  className="w-full rounded border border-border bg-background px-2 py-1 font-mono text-xs"
-                  placeholder={
-                    embProvider === 'ollama'
-                      ? 'http://127.0.0.1:11434'
-                      : 'https://api.openai.com/v1'
-                  }
-                  value={embEndpoint}
-                  onChange={(e) => setEmbEndpoint(e.target.value)}
-                />
-              </label>
-              <KeyField
-                label="API key (OpenAI-compatible only)"
-                saved={!!cfg?.embeddings.apiKey}
-                value={embKey}
-                setValue={setEmbKey}
-              />
-            </div>
-          </section>
-
-          {cfg && (
-            <p className="text-[11px] text-muted-foreground">
-              Settings are stored in{' '}
-              <code className="font-mono">{cfg.path}</code> with file mode{' '}
-              <code>0600</code>. Keys are never committed to your Saga repo.
-            </p>
-          )}
-          </TabsContent>
-
-          <TabsContent
-            value="appearance"
-            className="flex-1 overflow-y-auto px-5 py-4 space-y-4 mt-3"
-          >
-            <SkinPicker />
-            <p className="text-[11px] text-muted-foreground">
-              Skins are CSS variable maps written to <code>:root</code>. Your
-              choice is remembered locally in this browser.
-            </p>
-          </TabsContent>
-        </Tabs>
-
-        <div className="flex items-center justify-end gap-2 border-t border-border px-5 py-3">
+        {/* Tab switcher */}
+        <div className="flex border-b border-border/60 px-6 pt-3 bg-muted/10">
           <button
-            className="rounded border border-border px-3 py-1 text-sm hover:bg-muted"
-            onClick={onClose}
-            disabled={busy}
+            type="button"
+            onClick={() => setTab('ai')}
+            className={cn(
+              'relative pb-3 px-4 text-xs font-medium tracking-wide transition-colors',
+              tab === 'ai'
+                ? 'text-primary font-semibold after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-primary'
+                : 'text-muted-foreground hover:text-foreground',
+            )}
           >
-            Cancel
+            AI Engine & Models
           </button>
           <button
-            className="rounded bg-primary px-3 py-1 text-sm text-primary-foreground hover:opacity-90 disabled:opacity-50"
-            onClick={save}
-            disabled={busy}
+            type="button"
+            onClick={() => setTab('appearance')}
+            className={cn(
+              'relative pb-3 px-4 text-xs font-medium tracking-wide transition-colors',
+              tab === 'appearance'
+                ? 'text-primary font-semibold after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-primary'
+                : 'text-muted-foreground hover:text-foreground',
+            )}
           >
-            {busy ? 'Saving…' : 'Save'}
+            Appearance & Themes
+          </button>
+        </div>
+
+        {/* AI Tab */}
+        {tab === 'ai' && (
+          <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6 scrollbar-ember">
+            {cfg && cfg.envOverrides.length > 0 && (
+              <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+                External environment variables are overriding saved settings:{' '}
+                <code className="font-mono text-amber-300">
+                  {cfg.envOverrides.join(', ')}
+                </code>
+              </div>
+            )}
+
+            <section className="space-y-4">
+              <div>
+                <h3 className="text-xs uppercase tracking-wider font-semibold text-primary">
+                  Scribe Model Provider
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Connect any cloud API, local Ollama, or remote OpenAI-compatible server. Available models are discovered automatically.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <label className="block text-xs">
+                  <span className="text-muted-foreground mb-1 block font-medium">
+                    Provider
+                  </span>
+                  <select
+                    className="w-full rounded-lg border border-border bg-background/80 px-3 py-2 text-xs focus:ring-1 focus:ring-primary focus:outline-none transition-colors"
+                    value={chatProvider}
+                    onChange={(e) =>
+                      selectChatProvider(e.target.value as ChatProviderId | '')
+                    }
+                  >
+                    <option value="">(auto-detect / offline)</option>
+                    <optgroup label="Cloud APIs">
+                      {CLOUD_PROVIDERS.map((pid) => (
+                        <option key={pid} value={pid}>
+                          {PROVIDER_UI[pid].label}
+                        </option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="Local & Custom Endpoints">
+                      {LOCAL_PROVIDERS.map((pid) => (
+                        <option key={pid} value={pid}>
+                          {PROVIDER_UI[pid].label}
+                        </option>
+                      ))}
+                    </optgroup>
+                  </select>
+                </label>
+
+                <div className="block text-xs">
+                  <div className="mb-1 flex items-center justify-between gap-2">
+                    <span className="text-muted-foreground font-medium">
+                      Model
+                    </span>
+                    {chatProvider && (
+                      <div className="flex items-center gap-1.5">
+                        <DiscoveryBadge
+                          loading={chatDiscovering}
+                          discovery={chatDiscovery}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setChatRefreshTick((n) => n + 1)}
+                          title="Refresh available models"
+                          className="rounded p-0.5 text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+                        >
+                          <RefreshCw
+                            className={cn(
+                              'h-3 w-3',
+                              chatDiscovering && 'animate-spin',
+                            )}
+                          />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setCustomChatModelMode((prev) => !prev)
+                          }
+                          title="Enter custom model ID manually"
+                          className={cn(
+                            'inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] border transition-colors',
+                            customChatModelMode || !chatModelInList
+                              ? 'border-primary/40 bg-primary/10 text-primary'
+                              : 'border-border/70 text-muted-foreground hover:text-foreground',
+                          )}
+                        >
+                          <Pencil className="h-2.5 w-2.5" />
+                          <span>Custom</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {!chatProvider ? (
+                    <input
+                      className="w-full rounded-lg border border-border bg-background/80 px-3 py-2 font-mono text-xs focus:ring-1 focus:ring-primary focus:outline-none transition-colors"
+                      placeholder="Select a provider or enter model ID"
+                      value={chatModel}
+                      onChange={(e) => {
+                        setChatModel(e.target.value);
+                        draftRef.current.chatModel = e.target.value;
+                        scheduleSave(350);
+                      }}
+                    />
+                  ) : customChatModelMode || !chatModelInList ? (
+                    <input
+                      className="w-full rounded-lg border border-border bg-background/80 px-3 py-2 font-mono text-xs focus:ring-1 focus:ring-primary focus:outline-none transition-colors"
+                      placeholder={
+                        chatDiscovery?.defaultModel ??
+                        activeMeta?.defaultModel ??
+                        'Model ID'
+                      }
+                      value={chatModel}
+                      onChange={(e) => {
+                        setChatModel(e.target.value);
+                        draftRef.current.chatModel = e.target.value;
+                        scheduleSave(350);
+                      }}
+                      onBlur={() => scheduleSave(50)}
+                    />
+                  ) : (
+                    <select
+                      className="w-full rounded-lg border border-border bg-background/80 px-3 py-2 font-mono text-xs focus:ring-1 focus:ring-primary focus:outline-none transition-colors"
+                      value={chatModel}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setChatModel(val);
+                        draftRef.current.chatModel = val;
+                        scheduleSave(80);
+                      }}
+                    >
+                      <option value="">
+                        (default:{' '}
+                        {chatDiscovery?.defaultModel ??
+                          activeMeta?.defaultModel ??
+                          'auto'}
+                        )
+                      </option>
+                      {chatModels.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.id}
+                          {m.recommended ? ' ★' : ''}
+                          {m.description ? ` — ${m.description}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              </div>
+
+              {chatProvider && chatDiscovery?.error && (
+                <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-200 flex items-start justify-between gap-2">
+                  <span>
+                    Model discovery note ({chatDiscovery.resolvedEndpoint}):{' '}
+                    {chatDiscovery.error}. Showing curated defaults.
+                  </span>
+                </div>
+              )}
+
+              {chatProvider === 'ollama' &&
+                chatDiscovery?.connected &&
+                chatDiscovery.models.length === 0 && (
+                  <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-200">
+                    Connected to Ollama at{' '}
+                    <code className="font-mono">
+                      {chatDiscovery.resolvedEndpoint}
+                    </code>
+                    , but no models are installed yet. Run{' '}
+                    <code className="font-mono">ollama pull llama3.1</code> on
+                    that host and click refresh.
+                  </div>
+                )}
+
+              {/* Contextual provider credentials */}
+              {!chatProvider && savedChatProviders.length > 0 && (
+                <div className="rounded-lg border border-border/60 bg-muted/20 p-3 space-y-2">
+                  <div className="text-[11px] text-muted-foreground">
+                    Saved credentials found — pick one to activate explicitly:
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {savedChatProviders.map((pid) => (
+                      <button
+                        key={pid}
+                        type="button"
+                        onClick={() => selectChatProvider(pid)}
+                        className="rounded-md border border-border bg-background/80 px-2.5 py-1 text-[11px] hover:border-primary/50 hover:text-primary transition-colors"
+                      >
+                        {PROVIDER_UI[pid].label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {chatProvider && activeMeta && (
+                <div className="rounded-lg border border-border/60 bg-muted/15 p-4 space-y-3">
+                  {chatProvider === 'ollama' && (
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs text-muted-foreground font-medium">
+                          Ollama Server URL
+                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <PresetPill
+                            label="Local (:11434)"
+                            active={
+                              ollamaHost === '' ||
+                              ollamaHost === 'http://127.0.0.1:11434'
+                            }
+                            onClick={() => {
+                              const next = 'http://127.0.0.1:11434';
+                              setOllamaHost(next);
+                              draftRef.current.ollamaHost = next;
+                              scheduleSave(80);
+                            }}
+                          />
+                          <PresetPill
+                            label="Ollama Cloud (ollama.com)"
+                            active={ollamaHost === 'https://ollama.com'}
+                            onClick={() => {
+                              const next = 'https://ollama.com';
+                              setOllamaHost(next);
+                              draftRef.current.ollamaHost = next;
+                              scheduleSave(80);
+                            }}
+                          />
+                        </div>
+                      </div>
+                      <input
+                        className="w-full rounded-lg border border-border bg-background/80 px-3 py-2 font-mono text-xs focus:ring-1 focus:ring-primary focus:outline-none transition-colors"
+                        placeholder="http://127.0.0.1:11434 (or remote URL / https://ollama.com)"
+                        value={ollamaHost}
+                        onChange={(e) => {
+                          setOllamaHost(e.target.value);
+                          draftRef.current.ollamaHost = e.target.value;
+                          scheduleSave(350);
+                        }}
+                        onBlur={() => scheduleSave(50)}
+                      />
+                    </div>
+                  )}
+
+                  {chatProvider === 'openai-compatible' && (
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs text-muted-foreground font-medium">
+                          Base URL (OpenAI v1 compatible)
+                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <PresetPill
+                            label="LM Studio (:1234)"
+                            active={customBaseUrl === 'http://127.0.0.1:1234/v1'}
+                            onClick={() => {
+                              const next = 'http://127.0.0.1:1234/v1';
+                              setCustomBaseUrl(next);
+                              draftRef.current.customBaseUrl = next;
+                              scheduleSave(80);
+                            }}
+                          />
+                          <PresetPill
+                            label="vLLM (:8000)"
+                            active={customBaseUrl === 'http://127.0.0.1:8000/v1'}
+                            onClick={() => {
+                              const next = 'http://127.0.0.1:8000/v1';
+                              setCustomBaseUrl(next);
+                              draftRef.current.customBaseUrl = next;
+                              scheduleSave(80);
+                            }}
+                          />
+                          <PresetPill
+                            label="llama.cpp (:8080)"
+                            active={customBaseUrl === 'http://127.0.0.1:8080/v1'}
+                            onClick={() => {
+                              const next = 'http://127.0.0.1:8080/v1';
+                              setCustomBaseUrl(next);
+                              draftRef.current.customBaseUrl = next;
+                              scheduleSave(80);
+                            }}
+                          />
+                        </div>
+                      </div>
+                      <input
+                        className="w-full rounded-lg border border-border bg-background/80 px-3 py-2 font-mono text-xs focus:ring-1 focus:ring-primary focus:outline-none transition-colors"
+                        placeholder="http://127.0.0.1:1234/v1"
+                        value={customBaseUrl}
+                        onChange={(e) => {
+                          setCustomBaseUrl(e.target.value);
+                          draftRef.current.customBaseUrl = e.target.value;
+                          scheduleSave(350);
+                        }}
+                        onBlur={() => scheduleSave(50)}
+                      />
+                    </div>
+                  )}
+
+                  <KeyField
+                    label={activeMeta.keyLabel}
+                    placeholder={activeMeta.keyPlaceholder}
+                    saved={!!cfg?.chat[activeMeta.keyField]}
+                    value={keys[activeMeta.keyField] ?? ''}
+                    helpUrl={activeMeta.keyHelpUrl}
+                    helpLabel={activeMeta.keyHelpLabel}
+                    setValue={(v) => updateKeyField(activeMeta.keyField, v)}
+                    onBlur={() => scheduleSave(50)}
+                  />
+
+                  {chatProvider === 'google' && (
+                    <div className="rounded-lg border border-primary/25 bg-primary/5 px-3 py-2.5 text-[11px] text-muted-foreground flex items-start gap-2">
+                      <Info className="h-3.5 w-3.5 text-primary shrink-0 mt-0.5" />
+                      <div className="space-y-1">
+                        <p className="text-foreground/90 font-medium">
+                          Using a Google AI Pro / Google account
+                        </p>
+                        <p>
+                          Google AI Pro subscriptions cover the consumer Gemini web app and do not include a direct OAuth login for third-party desktop apps. You can still use Gemini 2.5 Pro & Flash right here by creating a free API key in{' '}
+                          <a
+                            href="https://aistudio.google.com/apikey"
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-primary underline hover:opacity-80"
+                          >
+                            Google AI Studio
+                          </a>{' '}
+                          with your Google account.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </section>
+
+            <div className="border-t border-border/50 pt-5 space-y-4">
+              <div>
+                <h3 className="text-xs uppercase tracking-wider font-semibold text-primary">
+                  Vector Embeddings (Semantic Search)
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Used by <code>semantic_search</code> to index and retrieve lore context.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <label className="block text-xs">
+                  <span className="text-muted-foreground mb-1 block font-medium">
+                    Provider
+                  </span>
+                  <select
+                    className="w-full rounded-lg border border-border bg-background/80 px-3 py-2 text-xs focus:ring-1 focus:ring-primary focus:outline-none transition-colors"
+                    value={embProvider}
+                    onChange={(e) => {
+                      const next = e.target.value as EmbeddingsProviderId | '';
+                      const prev = draftRef.current.embProvider;
+                      setEmbProvider(next);
+                      draftRef.current.embProvider = next;
+                      if (prev !== next) {
+                        setEmbModel('');
+                        draftRef.current.embModel = '';
+                        setCustomEmbModelMode(false);
+                      }
+                      scheduleSave(80);
+                    }}
+                  >
+                    <option value="">(disabled)</option>
+                    <option value="ollama">Ollama (Local / Remote / Cloud)</option>
+                    <option value="google">Google Gemini</option>
+                    <option value="openai">OpenAI</option>
+                    <option value="openai-compatible">
+                      OpenAI-compatible (Custom Endpoint)
+                    </option>
+                  </select>
+                </label>
+
+                <div className="block text-xs">
+                  <div className="mb-1 flex items-center justify-between gap-2">
+                    <span className="text-muted-foreground font-medium">
+                      Model
+                    </span>
+                    {embProvider && (
+                      <div className="flex items-center gap-1.5">
+                        <DiscoveryBadge
+                          loading={embDiscovering}
+                          discovery={embDiscovery}
+                          count={embModels.length}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setEmbRefreshTick((n) => n + 1)}
+                          title="Refresh embedding models"
+                          className="rounded p-0.5 text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+                        >
+                          <RefreshCw
+                            className={cn(
+                              'h-3 w-3',
+                              embDiscovering && 'animate-spin',
+                            )}
+                          />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setCustomEmbModelMode((prev) => !prev)
+                          }
+                          title="Enter custom embedding model ID manually"
+                          className={cn(
+                            'inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] border transition-colors',
+                            customEmbModelMode || !embModelInList
+                              ? 'border-primary/40 bg-primary/10 text-primary'
+                              : 'border-border/70 text-muted-foreground hover:text-foreground',
+                          )}
+                        >
+                          <Pencil className="h-2.5 w-2.5" />
+                          <span>Custom</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {!embProvider ? (
+                    <input
+                      disabled
+                      className="w-full rounded-lg border border-border bg-background/40 px-3 py-2 font-mono text-xs text-muted-foreground"
+                      placeholder="Disabled"
+                      value=""
+                    />
+                  ) : customEmbModelMode || !embModelInList ? (
+                    <input
+                      className="w-full rounded-lg border border-border bg-background/80 px-3 py-2 font-mono text-xs focus:ring-1 focus:ring-primary focus:outline-none transition-colors"
+                      placeholder={
+                        embDiscovery?.defaultEmbeddingModel ?? 'nomic-embed-text'
+                      }
+                      value={embModel}
+                      onChange={(e) => {
+                        setEmbModel(e.target.value);
+                        draftRef.current.embModel = e.target.value;
+                        scheduleSave(350);
+                      }}
+                      onBlur={() => scheduleSave(50)}
+                    />
+                  ) : (
+                    <select
+                      className="w-full rounded-lg border border-border bg-background/80 px-3 py-2 font-mono text-xs focus:ring-1 focus:ring-primary focus:outline-none transition-colors"
+                      value={embModel}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setEmbModel(val);
+                        draftRef.current.embModel = val;
+                        scheduleSave(80);
+                      }}
+                    >
+                      <option value="">
+                        (default:{' '}
+                        {embDiscovery?.defaultEmbeddingModel ??
+                          (embProvider === 'ollama'
+                            ? 'nomic-embed-text'
+                            : embProvider === 'google'
+                              ? 'gemini-embedding-001'
+                              : 'text-embedding-3-small')}
+                        )
+                      </option>
+                      {embModels.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.id}
+                          {m.recommended ? ' ★' : ''}
+                          {m.description ? ` — ${m.description}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              </div>
+
+              {embProvider && (
+                <div className="rounded-lg border border-border/60 bg-muted/15 p-4 space-y-3">
+                  {embInheritedNote && (
+                    <div className="text-[11px] text-muted-foreground">
+                      {embInheritedNote}
+                    </div>
+                  )}
+
+                  {(embProvider === 'ollama' ||
+                    embProvider === 'openai-compatible') && (
+                    <label className="block text-xs">
+                      <span className="text-muted-foreground mb-1 block font-medium">
+                        Embeddings Endpoint{' '}
+                        <span className="font-normal opacity-75">
+                          (optional override)
+                        </span>
+                      </span>
+                      <input
+                        className="w-full rounded-lg border border-border bg-background/80 px-3 py-2 font-mono text-xs focus:ring-1 focus:ring-primary focus:outline-none transition-colors"
+                        placeholder={
+                          embProvider === 'ollama'
+                            ? ollamaHost || 'http://127.0.0.1:11434'
+                            : customBaseUrl || 'https://api.openai.com/v1'
+                        }
+                        value={embEndpoint}
+                        onChange={(e) => {
+                          setEmbEndpoint(e.target.value);
+                          draftRef.current.embEndpoint = e.target.value;
+                          scheduleSave(350);
+                        }}
+                        onBlur={() => scheduleSave(50)}
+                      />
+                    </label>
+                  )}
+
+                  <KeyField
+                    label="Embeddings API Key (optional override)"
+                    placeholder="Leave blank to reuse provider key above"
+                    saved={!!cfg?.embeddings.apiKey}
+                    value={embKey}
+                    setValue={(v) => {
+                      setEmbKey(v);
+                      draftRef.current.embKey = v;
+                      scheduleSave(350);
+                    }}
+                    onBlur={() => scheduleSave(50)}
+                  />
+                </div>
+              )}
+            </div>
+
+            {cfg && (
+              <div className="rounded-lg bg-muted/20 border border-border/40 p-3 text-[11px] text-muted-foreground">
+                Configurations are securely saved to{' '}
+                <code className="font-mono text-foreground/80">{cfg.path}</code>{' '}
+                (mode <code>0600</code>). Secrets are never committed to git
+                repositories.
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Appearance Tab */}
+        {tab === 'appearance' && (
+          <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5 scrollbar-ember">
+            <div>
+              <div className="flex items-center gap-1.5 text-xs uppercase tracking-wider font-semibold text-primary">
+                <Sparkles className="h-3.5 w-3.5" />
+                <span>Contemporary Themes & Skins</span>
+              </div>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Precision engineering design language. Selecting a theme applies
+                and persists immediately across all workspaces.
+              </p>
+            </div>
+
+            <SkinPicker />
+          </div>
+        )}
+
+        {/* Footer */}
+        <div className="flex items-center justify-between border-t border-border/70 px-6 py-3 bg-muted/20 text-xs text-muted-foreground">
+          <span className="flex items-center gap-1.5">
+            <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+            All preferences auto-saved
+          </span>
+          <button
+            type="button"
+            className="rounded-lg bg-primary/10 border border-primary/30 px-4 py-1.5 text-xs font-medium text-primary hover:bg-primary/20 transition-colors"
+            onClick={handleClose}
+          >
+            Done
           </button>
         </div>
       </div>
@@ -308,94 +1229,202 @@ export function SettingsDialog({ onClose }: Props) {
   );
 }
 
-/**
- * Masked API key input. Shows `••••••••` placeholder when a key is saved,
- * empty when not. Typing anything replaces the saved key; typing a single
- * `-` clears it.
- */
-function KeyField({
+function DiscoveryBadge({
+  loading,
+  discovery,
+  count,
+}: {
+  loading: boolean;
+  discovery: ModelsDiscoveryResponse | null;
+  count?: number;
+}) {
+  if (loading) {
+    return (
+      <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+        <Loader2 className="h-2.5 w-2.5 animate-spin" />
+        <span>Checking…</span>
+      </span>
+    );
+  }
+  if (!discovery) return null;
+  const n = count ?? discovery.models.length;
+  if (discovery.source === 'live' && discovery.connected) {
+    return (
+      <span
+        title={
+          discovery.resolvedEndpoint
+            ? `Live models from ${discovery.resolvedEndpoint}`
+            : undefined
+        }
+        className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.2 text-[10px] text-emerald-300"
+      >
+        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+        <span>
+          Connected · {n} {n === 1 ? 'model' : 'models'}
+        </span>
+      </span>
+    );
+  }
+  return (
+    <span className="rounded-full bg-muted/60 border border-border/70 px-2 py-0.2 text-[10px] text-muted-foreground">
+      Curated list
+    </span>
+  );
+}
+
+function PresetPill({
   label,
-  saved,
-  value,
-  setValue,
+  active,
+  onClick,
 }: {
   label: string;
-  saved: boolean;
-  value: string;
-  setValue: (v: string) => void;
+  active: boolean;
+  onClick: () => void;
 }) {
   return (
-    <label className="block text-sm">
-      <div className="mb-1 flex items-center gap-2 text-xs text-muted-foreground">
-        <span>{label}</span>
-        {saved && (
-          <span className="rounded bg-emerald-500/20 px-1.5 py-0.5 text-[10px] text-emerald-300">
-            saved
-          </span>
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'rounded-full border px-2 py-0.5 text-[10px] transition-colors',
+        active
+          ? 'border-primary/50 bg-primary/15 text-primary font-medium'
+          : 'border-border/70 bg-background/60 text-muted-foreground hover:text-foreground hover:border-border',
+      )}
+    >
+      {label}
+    </button>
+  );
+}
+
+function KeyField({
+  label,
+  placeholder,
+  saved,
+  value,
+  helpUrl,
+  helpLabel,
+  setValue,
+  onBlur,
+}: {
+  label: string;
+  placeholder?: string;
+  saved: boolean;
+  value: string;
+  helpUrl?: string;
+  helpLabel?: string;
+  setValue: (v: string) => void;
+  onBlur?: () => void;
+}) {
+  return (
+    <label className="block text-xs">
+      <div className="mb-1 flex items-center justify-between gap-2 text-muted-foreground font-medium">
+        <div className="flex items-center gap-2">
+          <span>{label}</span>
+          {saved && (
+            <span className="rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.2 text-[10px] text-emerald-300 font-mono">
+              saved
+            </span>
+          )}
+        </div>
+        {helpUrl && (
+          <a
+            href={helpUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 text-[10px] font-normal text-primary hover:underline"
+          >
+            <span>{helpLabel ?? 'Get key'}</span>
+            <ExternalLink className="h-2.5 w-2.5" />
+          </a>
         )}
       </div>
       <input
         type="password"
         autoComplete="off"
         spellCheck={false}
-        className="w-full rounded border border-border bg-background px-2 py-1 font-mono text-xs"
-        placeholder={saved ? '••••••••  (type to replace, `-` to clear)' : 'sk-…'}
+        className="w-full rounded-lg border border-border bg-background/80 px-3 py-2 font-mono text-xs focus:ring-1 focus:ring-primary focus:outline-none transition-colors"
+        placeholder={
+          saved
+            ? '••••••••  (type to update, type `-` to clear)'
+            : (placeholder ?? 'sk-…')
+        }
         value={value}
         onChange={(e) => setValue(e.target.value)}
+        onBlur={onBlur}
       />
     </label>
   );
 }
 
-
 function SkinPicker() {
   const { skin, available, setSkinId } = useSkin();
+
   return (
-    <div>
-      <h3 className="text-sm font-semibold mb-2">Skin</h3>
-      <p className="text-xs text-muted-foreground mb-3">
-        Restyle the entire app. Skins write CSS variables to <code>:root</code>; nothing else changes.
-      </p>
-      <div className="grid grid-cols-1 gap-2">
-        {available.map((s) => {
-          const active = s.id === skin.id;
-          return (
-            <button
-              key={s.id}
-              onClick={() => setSkinId(s.id)}
-              className={cn(
-                'flex items-center gap-3 rounded-md border px-3 py-2 text-left transition-colors',
-                active
-                  ? 'border-primary bg-primary/10'
-                  : 'border-border hover:bg-muted',
-              )}
-            >
-              <SkinSwatch tokens={s.tokens} />
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium">{s.name}</div>
-                <div className="text-[11px] text-muted-foreground truncate">
-                  {s.description}
-                </div>
-              </div>
-              {active && (
-                <span className="rounded bg-primary/20 px-1.5 py-0.5 text-[10px] text-primary">
-                  active
+    <div className="grid grid-cols-1 gap-2.5">
+      {available.map((s) => {
+        const active = s.id === (skin?.id ?? '');
+        return (
+          <button
+            key={s.id}
+            type="button"
+            onClick={() => setSkinId(s.id)}
+            className={cn(
+              'group relative flex items-center gap-4 rounded-xl border p-3.5 text-left transition-all duration-150',
+              active
+                ? 'border-primary/80 bg-primary/10 ring-1 ring-primary/40 shadow-lg'
+                : 'border-border/70 bg-card/60 hover:bg-muted/40 hover:border-border',
+            )}
+          >
+            <SkinSwatch tokens={s.tokens} />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-semibold tracking-tight text-foreground">
+                  {s.name}
                 </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
+                {active && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-primary/20 border border-primary/40 px-2 py-0.5 text-[10px] font-semibold text-primary uppercase tracking-wider">
+                    <Check className="h-2.5 w-2.5" />
+                    Active
+                  </span>
+                )}
+              </div>
+              <div className="text-xs text-muted-foreground mt-0.5 truncate">
+                {s.description}
+              </div>
+            </div>
+          </button>
+        );
+      })}
     </div>
   );
 }
 
-function SkinSwatch({ tokens }: { tokens: { background: string; primary: string; accent: string; foreground: string } }) {
+function SkinSwatch({ tokens }: { tokens?: Partial<SkinTokens> }) {
+  if (!tokens) return null;
   return (
-    <div className="flex h-8 w-12 shrink-0 overflow-hidden rounded border border-border">
-      <div className="flex-1" style={{ background: `hsl(${tokens.background})` }} />
-      <div className="flex-1" style={{ background: `hsl(${tokens.primary})` }} />
-      <div className="flex-1" style={{ background: `hsl(${tokens.accent})` }} />
+    <div className="flex h-9 w-14 shrink-0 overflow-hidden rounded-lg border border-border/80 shadow-inner">
+      <div
+        className="flex-1"
+        style={{
+          background: tokens.background ? `hsl(${tokens.background})` : '#0f172a',
+        }}
+        title="Background"
+      />
+      <div
+        className="flex-1"
+        style={{
+          background: tokens.primary ? `hsl(${tokens.primary})` : '#00e5ff',
+        }}
+        title="Primary Accent"
+      />
+      <div
+        className="flex-1"
+        style={{
+          background: tokens.accent ? `hsl(${tokens.accent})` : '#1e293b',
+        }}
+        title="Secondary Accent"
+      />
     </div>
   );
 }
