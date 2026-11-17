@@ -105,42 +105,38 @@ Provenance for every resolved property is recorded: `own` / `sigil:<id>` / `over
 
 Cycles in `inherits` are validation errors.
 
-## 5. Echoes (the `@type/id` syntax)
+## 5. Echoes & References (Markdown Links and `@type/id` syntax)
 
-In prose, frontmatter strings, and chapter bodies, Echo other entries as:
+In prose, frontmatter strings, and chapter bodies, you can reference other entries using standard Markdown link syntax or inline `@type/id` Echoes:
 
+### Standard Markdown Link Format (Recommended for readability)
+```markdown
+[Aaron of Vellmar](@character/aaron)
+[The King](@character/aaron)
+[Vellmar](@location/vellmar)
+[Battle of Vellmar](@waypoint/battle-of-vellmar)
+[Grukh](@term/grukh)
 ```
+
+Both human readers and AI models immediately recognize `[Display Name](@type/id)` as standard Markdown links while preserving the exact canonical link target.
+
+### Inline Echoes & Display-Text Overrides
+```markdown
 @character/aaron
-@location/vellmar
-@waypoint/battle-of-vellmar
+@character/aaron{the king}
+@location/vellmar{the city gates}
 @term/grukh
 @sigil/northern-slang
 ```
 
-Legacy `@event/` and `@tag/` prefixes are accepted and normalized.
+Legacy `@event/` and `@tag/` prefixes as well as short aliases (`@char-aaron`, `@loc-vellmar`) are accepted and normalized.
 
 Rules:
 
-- Always use the **entry `type`**, not the folder name (`@character/aaron`, not `@characters/aaron`).
-- Echoes are machine-checked; the validator errors on broken refs.
-- Echoes are preserved verbatim during edits — don't flatten them to plain text.
-
-### Display-text overrides
-
-Append `{display text}` to an Echo to override the rendered label
-without changing the link target. Useful when the prose calls a
-character by an alias, a title, or a pronoun:
-
-```
-The @character/aaron{king} stood watch.
-@character/aaron{he} drew his sword.
-A messenger reached @location/vellmar{the gates}.
-```
-
-The reference still resolves to `character/aaron`, so audits, renames,
-usage counts, and broken-ref checks keep working. The override is
-honored by the chapter preview, the assistant pane, and Pandoc/HTML
-exports. An empty `{}` is treated as "use the default name".
+- Always use the **entry `type`** (or shorthand alias), not the folder name (`@character/aaron`, not `@characters/aaron`).
+- References are machine-checked; the validator and MCP tools report broken refs.
+- References are preserved verbatim during edits — don't flatten them to plain text.
+- The reference target resolves to the underlying entity (`character/aaron`), so audits, renames, usage counts, and integrity checks keep working. Overrides are honored in the web editor, chapter preview, and exports.
 
 ## 6. `appears_in` — Tome scope metadata
 

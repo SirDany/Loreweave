@@ -16,8 +16,7 @@
     "start": "node scripts/launch.mjs",
     "dev": "pnpm --filter @loreweave/web dev",
     "dev:web": "pnpm --filter @loreweave/web dev",
-    "desktop": "pnpm --filter @loreweave/desktop dev",
-    "desktop:build": "pnpm build:all && node scripts/stage-desktop-resources.mjs && node scripts/fetch-desktop-node.mjs && pnpm --filter @loreweave/desktop build"
+    "mcp": "pnpm --filter @loreweave/mcp start"
   },
   "devDependencies": {
     "typescript": "6.0.3"

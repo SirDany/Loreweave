@@ -4,6 +4,7 @@ import {
   GitBranch,
   Library,
   Network,
+  ShieldAlert,
   Sparkles,
   Tags,
   Waypoints,
@@ -26,6 +27,7 @@ const ICON_MAP: Record<string, ComponentType<{ className?: string }>> = {
   GitBranch,
   Library,
   Network,
+  ShieldAlert,
   Sparkles,
   Tags,
   Waypoints,
@@ -43,6 +45,7 @@ const BUILTIN_ORDER = [
   'threads',
   'traces',
   'constellation',
+  'integrity',
   'versions',
 ];
 

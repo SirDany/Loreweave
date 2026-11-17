@@ -102,10 +102,7 @@ function sigilCompletions(catalog: RefCatalog) {
   };
 }
 
-// Mirror of `REF_REGEX` in @loreweave/core. Match groups: 1=type, 2=id,
-// 3=optional `{display}` override.
-const REF_RE =
-  /@([a-z][a-z0-9-]*)\/([a-z0-9][a-z0-9-]*)(?:\{([^}\n]*)\})?/g;
+import { REF_REGEX, canonicalType } from "@loreweave/core";
 
 function formatPropValue(value: unknown): string {
   if (value == null) return "—";
@@ -143,10 +140,14 @@ function brokenRefPlugin(catalog: RefCatalog) {
         const b = new RangeSetBuilder<Decoration>();
         for (const { from, to } of view.visibleRanges) {
           const text = view.state.doc.sliceString(from, to);
-          for (const m of text.matchAll(REF_RE)) {
-            const start = from + (m.index ?? 0);
+          const re = new RegExp(REF_REGEX.source, "g");
+          let m: RegExpExecArray | null;
+          while ((m = re.exec(text))) {
+            const start = from + m.index;
             const end = start + m[0].length;
-            const key = `${m[1]}/${m[2]}`;
+            const type = m[1] !== undefined ? canonicalType(m[2]!) : canonicalType(m[5]!);
+            const id = m[1] !== undefined ? m[3]! : m[6]!;
+            const key = `${type}/${id}`;
             b.add(start, end, valid.has(key) ? ok : broken);
           }
         }
@@ -165,13 +166,16 @@ export function loreweaveExtensions(catalog: RefCatalog) {
     const line = view.state.doc.lineAt(pos);
     const text = line.text;
     const rel = pos - line.from;
-    // find a @type/id token that spans `rel`
-    for (const m of text.matchAll(REF_RE)) {
-      const start = m.index ?? 0;
+    const re = new RegExp(REF_REGEX.source, "g");
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(text))) {
+      const start = m.index;
       const end = start + m[0].length;
       if (rel >= start && rel <= end) {
-        const key = `${m[1]}/${m[2]}`;
-        const display = m[3];
+        const type = m[1] !== undefined ? canonicalType(m[2]!) : canonicalType(m[5]!);
+        const id = m[1] !== undefined ? m[3]! : m[6]!;
+        const display = m[1] !== undefined ? m[1] : m[8];
+        const key = `${type}/${id}`;
         const entry = lookup.get(key);
         return {
           pos: line.from + start,

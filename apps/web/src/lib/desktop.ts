@@ -1,10 +1,8 @@
-// Thin shim around the Tauri 2 invoke surface so the web app can call the
-// desktop-only Rust commands (recents, log, updater) when running inside
-// the Tauri shell, and gracefully no-op in plain browser / Pages mode.
-//
-// We talk to the global `window.__TAURI_INTERNALS__.invoke(...)` directly
-// so the web bundle stays free of `@tauri-apps/api` (and the bundle stays
-// small for the GitHub Pages demo).
+/**
+ * Browser-native recent saga manager backed by localStorage.
+ */
+
+const RECENTS_KEY = 'loreweave_recent_sagas';
 
 export interface RecentSaga {
   path: string;
@@ -13,30 +11,11 @@ export interface RecentSaga {
   opened_at: number;
 }
 
-interface TauriBridge {
-  invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T>;
-}
-
-function bridge(): TauriBridge | null {
-  if (typeof window === 'undefined') return null;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const internals = (window as any).__TAURI_INTERNALS__;
-  if (internals && typeof internals.invoke === 'function') {
-    return { invoke: internals.invoke.bind(internals) };
-  }
-  return null;
-}
-
-/** True when running inside the Loreweave desktop shell. */
-export function isDesktop(): boolean {
-  return bridge() !== null;
-}
-
 export async function listRecentSagas(): Promise<RecentSaga[]> {
-  const b = bridge();
-  if (!b) return [];
+  if (typeof window === 'undefined') return [];
   try {
-    return await b.invoke<RecentSaga[]>('list_recent_sagas');
+    const raw = localStorage.getItem(RECENTS_KEY);
+    return raw ? (JSON.parse(raw) as RecentSaga[]) : [];
   } catch {
     return [];
   }
@@ -46,41 +25,26 @@ export async function addRecentSaga(
   path: string,
   title?: string,
 ): Promise<RecentSaga[]> {
-  const b = bridge();
-  if (!b) return [];
+  if (typeof window === 'undefined') return [];
+  const list = await listRecentSagas();
+  const filtered = list.filter((item) => item.path !== path);
+  const updated = [{ path, title, opened_at: Date.now() }, ...filtered].slice(0, 10);
   try {
-    return await b.invoke<RecentSaga[]>('add_recent_saga', { path, title });
+    localStorage.setItem(RECENTS_KEY, JSON.stringify(updated));
   } catch {
-    return [];
+    // ignore
   }
+  return updated;
 }
 
 export async function forgetRecentSaga(path: string): Promise<RecentSaga[]> {
-  const b = bridge();
-  if (!b) return [];
+  if (typeof window === 'undefined') return [];
+  const list = await listRecentSagas();
+  const updated = list.filter((item) => item.path !== path);
   try {
-    return await b.invoke<RecentSaga[]>('forget_recent_saga', { path });
+    localStorage.setItem(RECENTS_KEY, JSON.stringify(updated));
   } catch {
-    return [];
+    // ignore
   }
-}
-
-export async function checkForUpdates(): Promise<string | null> {
-  const b = bridge();
-  if (!b) return null;
-  try {
-    return await b.invoke<string | null>('check_for_updates');
-  } catch {
-    return null;
-  }
-}
-
-export async function openLogFile(): Promise<string | null> {
-  const b = bridge();
-  if (!b) return null;
-  try {
-    return await b.invoke<string>('open_log_file');
-  } catch {
-    return null;
-  }
+  return updated;
 }

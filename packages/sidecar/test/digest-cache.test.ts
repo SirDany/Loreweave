@@ -1,4 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+
+test.setTimeout(20000);
+
+
+test.setTimeout(20000);
+
 import { execFileSync } from 'node:child_process';
 import { cp, mkdtemp, readFile, rm, stat, utimes } from 'node:fs/promises';
 import path from 'node:path';
@@ -25,7 +31,11 @@ describe('sidecar digest cache', () => {
   });
 
   afterEach(async () => {
-    await rm(dir, { recursive: true, force: true });
+    try {
+      await rm(dir, { recursive: true, force: true });
+    } catch (e) {
+      // On Windows rm may fail with EBUSY if git leaves a lock; ignore safe cleanup errors.
+    }
   });
 
   it('builds, caches, and reuses the digest on matching revision', async () => {

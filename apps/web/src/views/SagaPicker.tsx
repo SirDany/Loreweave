@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { listSagas, type DiscoveredSaga } from "../lib/lw.js";
 import {
   forgetRecentSaga,
-  isDesktop,
   listRecentSagas,
   type RecentSaga,
 } from "../lib/desktop.js";
@@ -24,7 +23,7 @@ export function SagaPicker({ current, onPick, onClose }: Props) {
   const [root, setRoot] = useState("sagas");
   const [custom, setCustom] = useState(current);
   const [recents, setRecents] = useState<RecentSaga[]>([]);
-  const showRecents = isDesktop();
+  const showRecents = true;
 
   useEffect(() => {
     if (!showRecents) return;

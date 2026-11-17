@@ -19,6 +19,7 @@ describe('Loom lens catalog', () => {
     expect(ids).toEqual([
       'codex',
       'constellation',
+      'integrity',
       'lexicon',
       'sigils',
       'story',
@@ -34,7 +35,7 @@ describe('Loom lens catalog', () => {
   it('boot is idempotent', () => {
     bootLensCatalog();
     bootLensCatalog();
-    expect(listLensManifests()).toHaveLength(8);
+    expect(listLensManifests()).toHaveLength(9);
   });
 
   it('saga manifest with same id overrides built-in (last write wins)', () => {
@@ -62,7 +63,7 @@ describe('Loom lens catalog', () => {
       filter: { inherits: ['northern-kingdom'] },
       builtin: false,
     });
-    expect(listLensManifests()).toHaveLength(9);
+    expect(listLensManifests()).toHaveLength(10);
     expect(getLensManifest('northern-characters')?.kinds).toEqual([
       'character',
     ]);

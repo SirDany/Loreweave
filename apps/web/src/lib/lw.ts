@@ -209,6 +209,44 @@ export interface Diagnostic {
   line?: number;
 }
 
+export interface AuditLooseEnds {
+  brokenReferences: Array<{
+    raw: string;
+    type: string;
+    id: string;
+    file: string;
+    line: number;
+    sourceType: string;
+  }>;
+  orphanEntries: Array<{
+    type: string;
+    id: string;
+    name: string;
+    file: string;
+    status?: string | null;
+  }>;
+  unlinkedWaypoints: Array<{
+    id: string;
+    name: string;
+    file: string;
+  }>;
+  timelineIssues: Array<{
+    message: string;
+    thread: string;
+    waypoint?: string;
+  }>;
+  totalIssues: number;
+}
+
+export interface AuditPayload {
+  diagnostics: Diagnostic[];
+  looseEnds?: AuditLooseEnds;
+}
+
+export async function auditSaga(sagaRoot: string): Promise<AuditPayload> {
+  return lwJson<AuditPayload>(['audit', sagaRoot, '--json']);
+}
+
 export type TraceKind = 'idea' | 'todo' | 'remark' | 'question' | 'done';
 export type TraceStatus = 'open' | 'resolved' | 'archived';
 

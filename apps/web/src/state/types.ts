@@ -18,6 +18,7 @@ export const BUILTIN_SECTIONS = [
   'threads',
   'traces',
   'constellation',
+  'integrity',
   'versions',
 ] as const;
 

@@ -1,3 +1,4 @@
+import { REF_REGEX, canonicalType } from "@loreweave/core";
 import type { DumpEntry, DumpPayload } from "../lib/lw.js";
 
 interface Props {
@@ -14,21 +15,22 @@ interface Hit {
   snippet: string;
 }
 
-const REF_RE =
-  /@([a-z][a-z0-9-]*)\/([a-z0-9][a-z0-9-]*)(?:\{([^}\n]*)\})?/g;
-
 function scanFor(
   type: string,
   id: string,
   sources: Array<{ key: string; kind: "entry" | "chapter"; label: string; body: string }>,
 ): Hit[] {
-  const needle = `${type}/${id}`;
+  const needle = `${canonicalType(type)}/${id}`;
   const hits: Hit[] = [];
   for (const src of sources) {
     const lines = src.body.split("\n");
     lines.forEach((line, i) => {
-      for (const m of line.matchAll(REF_RE)) {
-        if (`${m[1]}/${m[2]}` === needle) {
+      const re = new RegExp(REF_REGEX.source, "g");
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(line))) {
+        const refType = m[1] !== undefined ? canonicalType(m[2]!) : canonicalType(m[5]!);
+        const refId = m[1] !== undefined ? m[3]! : m[6]!;
+        if (`${refType}/${refId}` === needle) {
           hits.push({
             from: src.label,
             kind: src.kind,
@@ -46,10 +48,11 @@ function scanFor(
 function outboundOf(entry: DumpEntry): Array<{ type: string; id: string; line: number }> {
   const out: Array<{ type: string; id: string; line: number }> = [];
   entry.body.split("\n").forEach((line, i) => {
-    for (const m of line.matchAll(REF_RE)) {
-      const type = m[1];
-      const id = m[2];
-      if (!type || !id) continue;
+    const re = new RegExp(REF_REGEX.source, "g");
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(line))) {
+      const type = m[1] !== undefined ? canonicalType(m[2]!) : canonicalType(m[5]!);
+      const id = m[1] !== undefined ? m[3]! : m[6]!;
       out.push({ type, id, line: i + 1 });
     }
   });

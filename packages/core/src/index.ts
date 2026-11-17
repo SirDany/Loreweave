@@ -7,6 +7,7 @@ export * from "./calendar.js";
 export * from "./timeline.js";
 export * from "./slang.js";
 export * from "./validator.js";
+export * from "./integrity.js";
 export { loadSaga, LoadError } from "./loader.js";
 export {
   KindFrontmatterSchema,

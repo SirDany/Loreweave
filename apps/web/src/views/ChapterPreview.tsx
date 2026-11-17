@@ -1,4 +1,5 @@
 import type React from 'react';
+import { REF_REGEX, canonicalType } from '@loreweave/core';
 import type { DumpChapter, DumpPayload } from '../lib/lw.js';
 
 interface ChapterPreviewProps {
@@ -11,14 +12,10 @@ interface ChapterPreviewProps {
   }) => void;
 }
 
-const refRe =
-  /@([a-z][a-z0-9-]*)\/([a-z0-9][a-z0-9-]*)(?:\{([^}\n]*)\})?/g;
-
 /**
- * Read-only chapter render. Echoes (`@type/id`) become clickable
- * buttons that jump into the corresponding Codex entry; broken
- * echoes render in a rose tint. An optional `{display text}` suffix
- * overrides the rendered label without changing the link target.
+ * Read-only chapter render. References (`[Display](@type/id)` or `@type/id`)
+ * become clickable buttons that jump into the corresponding Codex entry; broken
+ * references render in a rose tint.
  */
 export function ChapterPreview({ chapter, data, onJump }: ChapterPreviewProps) {
   const entryMap = new Map(data.entries.map((e) => [`${e.type}/${e.id}`, e]));
@@ -27,10 +24,14 @@ export function ChapterPreview({ chapter, data, onJump }: ChapterPreviewProps) {
     const out: React.ReactNode[] = [];
     let last = 0;
     let idx = 0;
-    for (const m of line.matchAll(refRe)) {
-      const start = m.index ?? 0;
+    const re = new RegExp(REF_REGEX.source, 'g');
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(line))) {
+      const start = m.index;
       if (start > last) out.push(line.slice(last, start));
-      const [, type, id, display] = m;
+      const type = m[1] !== undefined ? canonicalType(m[2]!) : canonicalType(m[5]!);
+      const id = m[1] !== undefined ? m[3]! : m[6]!;
+      const display = m[1] !== undefined ? m[1] : m[8];
       const key = `${type}/${id}`;
       const hit = entryMap.get(key);
       if (hit) {

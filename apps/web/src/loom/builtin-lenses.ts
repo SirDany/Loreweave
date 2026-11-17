@@ -66,6 +66,14 @@ export const BUILTIN_LENSES: LensManifest[] = [
     builtin: true,
   },
   {
+    id: 'integrity',
+    name: 'Integrity',
+    icon: 'ShieldAlert',
+    renderer: 'integrity',
+    description: 'Scan for loose ends, broken links, and orphan entries.',
+    builtin: true,
+  },
+  {
     id: 'versions',
     name: 'Versions',
     icon: 'GitBranch',

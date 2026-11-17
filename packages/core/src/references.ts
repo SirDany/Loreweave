@@ -24,28 +24,59 @@ export interface Reference {
   line: number;
   /** 1-based column. */
   column: number;
-  /** The raw matched string, e.g. "@character/aaron" or "@character/aaron{the king}". */
+  /** The raw matched string, e.g. "@character/aaron", "[The King](@character/aaron)", or "@character/aaron{the king}". */
   raw: string;
   /**
    * Optional display-text override: the contents of the `{...}` suffix,
-   * if present. Undefined means "use the resolved entity's name".
+   * or the markdown link label `[...]`, if present.
+   * Undefined means "use the resolved entity's name".
    * Empty strings are preserved so callers can detect explicit blanks.
    */
   display?: string;
+  /** Optional section anchor (#heading-slug). */
+  anchor?: string;
 }
 
 /**
- * Canonical Echo regex. Match groups:
- *   1: type prefix
- *   2: id
- *   3: optional display-text override (no braces or newlines inside)
+ * Shorthand alias resolver for common type prefixes.
+ */
+export function canonicalType(rawType: string): string {
+  switch (rawType.toLowerCase()) {
+    case 'char':
+      return 'character';
+    case 'loc':
+      return 'location';
+    case 'wp':
+      return 'waypoint';
+    default:
+      return rawType;
+  }
+}
+
+/**
+ * Format a reference into canonical display/link syntax.
+ * Uses Markdown link style `[Display](@type/id)` when display text is provided,
+ * or bare `@type/id` when omitted.
+ */
+export function formatReference(type: string, id: string, display?: string): string {
+  const normType = canonicalType(type);
+  if (display !== undefined && display !== null && display.length > 0) {
+    return `[${display}](@${normType}/${id})`;
+  }
+  return `@${normType}/${id}`;
+}
+
+/**
+ * Canonical Echo regex supporting both:
+ * 1. Standard Markdown link format: [display text](@type/id) or [display text](@type/id#anchor) or [display](@char-id)
+ * 2. Legacy / inline Echo format: @type/id, @type/id{display}, or @type/id#anchor{display}
  *
  * Exported so the web app and CLI keep their tooling in sync without
  * redefining the pattern. The pattern carries the `g` flag; callers
  * that need a fresh `lastIndex` should `new RegExp(REF_REGEX.source, 'g')`.
  */
 export const REF_REGEX =
-  /@([a-z][a-z0-9-]*)\/([a-z0-9][a-z0-9-]*)(?:\{([^}\n]*)\})?/g;
+  /(?:\[([^\]\n]+)\]\(@([a-z][a-z0-9-]*)[/-]([a-z0-9][a-z0-9-]*)(?:#([a-z0-9-]*))?\))|@([a-z][a-z0-9-]*)\/([a-z0-9][a-z0-9-]*)(?:#([a-z0-9-]*))?(?:\{([^}\n]*)\})?/g;
 
 export function extractReferences(text: string): Reference[] {
   const out: Reference[] = [];
@@ -58,10 +89,31 @@ export function extractReferences(text: string): Reference[] {
     const line = prefix.split("\n").length;
     const lastNL = prefix.lastIndexOf("\n");
     const column = offset - (lastNL + 1) + 1;
+
+    let type: string;
+    let id: string;
+    let display: string | undefined;
+    let anchor: string | undefined;
+
+    if (match[1] !== undefined) {
+      // Branch 1: Markdown link style: [display](@type/id)
+      display = match[1];
+      type = canonicalType(match[2]!);
+      id = match[3]!;
+      anchor = match[4];
+    } else {
+      // Branch 2: Echo style: @type/id or @type/id{display}
+      type = canonicalType(match[5]!);
+      id = match[6]!;
+      anchor = match[7];
+      display = match[8];
+    }
+
     out.push({
-      type: match[1]!,
-      id: match[2]!,
-      display: match[3],
+      type,
+      id,
+      display,
+      anchor,
       offset,
       line,
       column,
@@ -72,23 +124,39 @@ export function extractReferences(text: string): Reference[] {
 }
 
 /**
- * Normalizes "@type/id", "type/id", "@type/id{display}", or
+ * Normalizes "@type/id", "[Display](@type/id)", "type/id", "@type/id{display}", or
  * "@type/id#anchor" to the bare "type/id" form so downstream lookups and
  * renames keep working. Anchor and display-text suffixes are stripped.
  */
 export function normalizeRef(ref: string): string {
-  // Index-math equivalent of `.replace(/^@/, '').replace(/\{[^}]*\}$/, '')`.
-  // Avoids the unbounded `[^}]*` that CodeQL flags as polynomial-redos when
-  // the input comes from raw prose / frontmatter.
-  let s = ref.charCodeAt(0) === 64 /* @ */ ? ref.slice(1) : ref;
-  if (s.length > 0 && s.charCodeAt(s.length - 1) === 125 /* } */) {
+  let s = ref.trim();
+  if (s.startsWith('[') && s.includes('](') && s.endsWith(')')) {
+    const openParen = s.indexOf('](') + 2;
+    s = s.slice(openParen, -1).trim();
+  }
+  if (s.startsWith('@')) s = s.slice(1);
+  if (s.endsWith('}')) {
     const open = s.lastIndexOf('{');
     if (open !== -1) s = s.slice(0, open);
   }
-  // Strip a trailing #anchor (block transclusion). Anchors don't change the
-  // referenced entity, only which slice of its body is rendered.
   const hash = s.indexOf('#');
   if (hash !== -1) s = s.slice(0, hash);
+
+  const slash = s.indexOf('/');
+  if (slash !== -1) {
+    const type = canonicalType(s.slice(0, slash));
+    const id = s.slice(slash + 1);
+    return `${type}/${id}`;
+  }
+  const dash = s.indexOf('-');
+  if (dash !== -1) {
+    const prefix = s.slice(0, dash);
+    if (['character', 'char', 'location', 'loc', 'waypoint', 'wp', 'term', 'sigil', 'concept', 'lore'].includes(prefix.toLowerCase())) {
+      const type = canonicalType(prefix);
+      const id = s.slice(dash + 1);
+      return `${type}/${id}`;
+    }
+  }
   return s;
 }
 

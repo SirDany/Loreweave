@@ -17,6 +17,7 @@ import { ChapterView } from '../views/ChapterView.js';
 import { ConstellationView } from '../views/ConstellationView.js';
 import { EmptyState } from '../views/EmptyState.js';
 import { EntryView } from '../views/EntryView.js';
+import { IntegrityView } from '../views/IntegrityView.js';
 import { ThreadView } from '../views/ThreadView.js';
 import { TracesView } from '../views/TracesView.js';
 import { VersionsPanel } from '../views/VersionsPanel.js';
@@ -188,6 +189,9 @@ export function Workbench({
       {!currentEntry && !currentChapter && section === 'constellation' && (
         <ConstellationView data={data} onJump={onJump} />
       )}
+      {!currentEntry && !currentChapter && section === 'integrity' && (
+        <IntegrityView sagaPath={sagaPath} data={data} onJump={onJump} />
+      )}
       {!currentEntry &&
         !currentChapter &&
         !BUILTIN_SECTIONS.includes(section as (typeof BUILTIN_SECTIONS)[number]) && (
@@ -206,6 +210,7 @@ export function Workbench({
         section !== 'traces' &&
         section !== 'versions' &&
         section !== 'constellation' &&
+        section !== 'integrity' &&
         BUILTIN_SECTIONS.includes(section as (typeof BUILTIN_SECTIONS)[number]) && (
           <EmptyState section={section} diagnostics={data.diagnostics} />
         )}

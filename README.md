@@ -4,19 +4,17 @@
   <img src="docs/assets/loreweave-icon.png" alt="Loreweave" width="160" />
 </p>
 
-**A local-first, agentic book-writing workbench.**
-Your canon lives as plain Markdown and YAML on your disk. A small TypeScript
-core parses and validates it, a CLI (`lw`) gives you ground-truth queries, a
-React web UI gives you a navigable world, and VS Code Copilot agents
-(**Muse**, **Scribe**, **Warden**, **Polisher**, **Archivist**) help you
-ideate, draft, and keep continuity — without ever silently rewriting your
-story.
+**A local-first, agentic storytelling workbench.**
+Your canon lives as plain Markdown and YAML on your disk. An agentic framework
+exposing high-level domain tools over **Model Context Protocol (MCP)**, a TypeScript
+core for graph validation and weave resolution, a CLI (`lw`), and a sleek
+browser-hostable web UI give you and your AI co-writer total clarity across
+characters, locations, timelines, and prose.
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Node](https://img.shields.io/badge/node-%E2%89%A520.10-brightgreen)
 ![pnpm](https://img.shields.io/badge/pnpm-9.12-f69220)
-![Tests](https://img.shields.io/badge/tests-117%20passing-success)
-[![Release](https://img.shields.io/github/v/release/SirDany/Loreweave?label=download)](https://github.com/SirDany/Loreweave/releases/latest)
+![Tests](https://img.shields.io/badge/tests-199%20passing-success)
 
 > **Status:** early but usable end-to-end against the bundled example Saga.
 > APIs, file layout, and agent prompts may still shift before 1.0.
@@ -93,42 +91,30 @@ See [docs/conventions.md](docs/conventions.md) for the full spec.
 
 ## Quickstart
 
-### Download a desktop build (non-developers)
+### 1. Run the MCP Server (for AI Assistants)
 
-Pre-built installers are published to the [Releases page](https://github.com/SirDany/Loreweave/releases/latest)
-on every tagged commit:
-
-| Platform | Asset                            |
-| -------- | -------------------------------- |
-| Windows  | `Loreweave_<version>_x64-setup.exe` (NSIS installer) |
-| Linux    | `loreweave_<version>_amd64.deb` or `Loreweave_<version>_amd64.AppImage` |
-
-Each build is a self-contained Tauri app: a small native window, an
-embedded Node sidecar, and the bundled web UI. **No Node, pnpm, Rust, or
-browser required on the user's machine** — double-click the installer,
-launch it from the Start menu / Applications, and the app opens directly
-on your Saga library.
-
-`main`-branch builds also produce installers as workflow artifacts on
-each push, useful for testing unreleased changes.
-
-### Build from source (developers)
-
-#### Requirements
-
-- **Node.js** `>=20.10`
-- **pnpm** `9.12+` (`corepack enable` or `npm i -g pnpm`)
-- **Git** (recommended — versioning, `lw git …`)
-- **pandoc** (optional — PDF/DOCX/EPUB export)
-
-### Install, build, run
+Loreweave provides a native **Model Context Protocol (MCP)** server over stdio for agents (Claude Desktop, Cursor, Antigravity, VS Code, Roo Code):
 
 ```pwsh
-git clone https://github.com/SirDany/Loreweave.git
-cd loreweave
+pnpm mcp
+```
+
+This exposes high-level domain tools (`loreweave_get_overview`, `loreweave_read_entry`, `loreweave_upsert_entry`, `loreweave_delete_entry`, `loreweave_scan_loose_ends`, `loreweave_cascade_rename`, `loreweave_get_timeline`, etc.), relieving agents of manual file-tree navigation and formatting boilerplate while ensuring referential integrity and audit tracing.
+
+### 2. Run the Web UI (Browser Workbench)
+
+Loreweave includes a sleek, browser-hostable UI with split-view editing, live reference chips, visual timeline explorer, constellation relation map, and an **Integrity & Loose Ends Dashboard**:
+
+```pwsh
 pnpm install
-pnpm build:all       # builds core, cli, sidecar, and the web bundle
-pnpm start           # launches Loreweave at http://127.0.0.1:4729
+pnpm build:all       # builds core, cli, mcp, sidecar, and web bundle
+pnpm start           # launches Loreweave web UI at http://127.0.0.1:4729
+```
+
+For hot-reload UI development:
+
+```pwsh
+pnpm dev             # runs Vite dev server with hot reload
 ```
 
 `pnpm start` runs [scripts/launch.mjs](scripts/launch.mjs): a tiny Node

@@ -51,9 +51,8 @@ export function ConfirmDeleteDialog({
         <h2 className="text-base font-serif">Delete {label}?</h2>
         <p className="text-sm text-muted-foreground">
           This removes <span className="font-mono text-foreground/90">{relPath}</span>{' '}
-          from disk. Other entries that reference it will keep their
-          <span className="font-mono"> @echo</span> intact, but the link will
-          appear broken in the audit until you fix or remove them.
+          from disk. Any remaining references across chapters or entries will automatically
+          be surfaced as loose ends in the <strong className="text-foreground">Integrity</strong> tab for review.
         </p>
         {err && (
           <div className="text-xs text-rose-400 whitespace-pre-wrap">{err}</div>
