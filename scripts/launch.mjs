@@ -15,11 +15,11 @@
  *       - packages/cli/dist/bin.js
  *       - apps/web/dist/
  */
+import { execFile } from 'node:child_process';
+import { createReadStream, promises as fs } from 'node:fs';
 import { createServer } from 'node:http';
-import { promises as fs, createReadStream } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { execFile } from 'node:child_process';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, '..');
@@ -31,17 +31,20 @@ const open = !argv.includes('--no-open');
 // Optional override for desktop bundles where resources live outside the
 // source tree (e.g. installed under Program Files / /usr/lib).
 const rootArg = argv.indexOf('--root');
-const root = rootArg >= 0 ? path.resolve(argv[rootArg + 1]) : repoRoot;
+function normalizeWindowsDriveRoot(p) {
+  if (process.platform === 'win32' && /^[A-Za-z]:$/.test(p)) {
+    return `${p}${path.sep}`;
+  }
+  return p;
+}
+const root =
+  rootArg >= 0
+    ? normalizeWindowsDriveRoot(path.resolve(argv[rootArg + 1]))
+    : repoRoot;
 
 const distDir = path.join(root, 'apps', 'web', 'dist');
 const cliBin = path.join(root, 'packages', 'cli', 'dist', 'bin.js');
-const sidecarEntry = path.join(
-  root,
-  'packages',
-  'sidecar',
-  'dist',
-  'index.js',
-);
+const sidecarEntry = path.join(root, 'packages', 'sidecar', 'dist', 'index.js');
 
 // Ensure prerequisite builds exist before we start.
 for (const required of [distDir, cliBin, sidecarEntry]) {
@@ -123,9 +126,7 @@ function serveFile(abs, res) {
 const server = createServer((req, res) => {
   const pathname = (req.url ?? '').split('?')[0];
   const match = sidecarRoutes
-    .filter(
-      (r) => pathname === r.prefix || pathname.startsWith(r.prefix + '/'),
-    )
+    .filter((r) => pathname === r.prefix || pathname.startsWith(r.prefix + '/'))
     .sort((a, b) => b.prefix.length - a.prefix.length)[0];
   if (match) return match.handler(req, res);
   return serveStatic(req, res);
@@ -140,11 +141,7 @@ server.listen(port, '127.0.0.1', () => {
 function tryOpen(url) {
   const plat = process.platform;
   const cmd =
-    plat === 'win32'
-      ? 'cmd'
-      : plat === 'darwin'
-        ? 'open'
-        : 'xdg-open';
+    plat === 'win32' ? 'cmd' : plat === 'darwin' ? 'open' : 'xdg-open';
   const args = plat === 'win32' ? ['/c', 'start', '', url] : [url];
   try {
     execFile(cmd, args, { windowsHide: true }, () => {});

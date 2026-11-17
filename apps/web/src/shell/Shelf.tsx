@@ -23,6 +23,7 @@ interface ShelfProps {
   // Dialog triggers
   onExport: () => void;
   onImport: () => void;
+  onHarvest: () => void;
   onSearch: () => void;
   onBackups: () => void;
   onSettings: () => void;
@@ -46,6 +47,7 @@ export function Shelf({
   onReload,
   onExport,
   onImport,
+  onHarvest,
   onSearch,
   onBackups,
   onSettings,
@@ -85,6 +87,7 @@ export function Shelf({
           <ActionsMenu
             onExport={onExport}
             onImport={onImport}
+            onHarvest={onHarvest}
             onSearch={onSearch}
             onBackups={onBackups}
             onSettings={onSettings}

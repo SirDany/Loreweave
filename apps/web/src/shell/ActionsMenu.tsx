@@ -7,6 +7,7 @@ import {
   Scale,
   Search,
   Settings,
+  Sprout,
   Upload,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -16,6 +17,7 @@ import { cn } from '../lib/utils.js';
 interface ActionsMenuProps {
   onExport: () => void;
   onImport: () => void;
+  onHarvest: () => void;
   onSearch: () => void;
   onBackups: () => void;
   onSettings: () => void;
@@ -40,6 +42,7 @@ interface MenuItem {
 export function ActionsMenu({
   onExport,
   onImport,
+  onHarvest,
   onSearch,
   onBackups,
   onSettings,
@@ -79,6 +82,7 @@ export function ActionsMenu({
     },
     { icon: Upload, label: 'Export…', onClick: onExport },
     { icon: Inbox, label: 'Import…', onClick: onImport },
+    { icon: Sprout, label: 'Harvest…', onClick: onHarvest },
     { icon: Layers, label: 'Compose lens…', onClick: onComposeLens },
     { icon: Scale, label: 'House rules…', onClick: onRules },
     { icon: Bookmark, label: 'Backups…', onClick: onBackups },

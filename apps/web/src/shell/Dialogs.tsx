@@ -1,8 +1,10 @@
+import { addRecentSaga } from '../lib/desktop.js';
 import type { DumpPayload } from '../lib/lw.js';
 import type { AppState } from '../state/useApp.js';
 import { BackupsDialog } from '../views/BackupsDialog.js';
 import { ComposeLensDialog } from '../views/ComposeLensDialog.js';
 import { ExportDialog } from '../views/ExportDialog.js';
+import { HarvestDialog } from '../views/HarvestDialog.js';
 import { ImportDialog } from '../views/ImportDialog.js';
 import { NewChapterDialog } from '../views/NewChapterDialog.js';
 import { NewEntryDialog, type NewEntryKind } from '../views/NewEntryDialog.js';
@@ -11,7 +13,6 @@ import { RulesDialog } from '../views/RulesDialog.js';
 import { SagaPicker } from '../views/SagaPicker.js';
 import { SearchPanel } from '../views/SearchPanel.js';
 import { SettingsDialog } from '../views/SettingsDialog.js';
-import { addRecentSaga } from '../lib/desktop.js';
 
 interface DialogsProps {
   app: AppState;
@@ -80,6 +81,17 @@ export function Dialogs({ app, data }: DialogsProps) {
             saga.setSagaPath(target);
             setSelection(null);
             closeDialog('importing');
+          }}
+        />
+      )}
+
+      {dialogs.harvesting && (
+        <HarvestDialog
+          sagaPath={saga.sagaPath}
+          onClose={() => closeDialog('harvesting')}
+          onHarvested={() => {
+            void saga.reload();
+            closeDialog('harvesting');
           }}
         />
       )}

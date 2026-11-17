@@ -1,4 +1,4 @@
-import { IS_DEMO, DEMO_SPLASH_DETAIL } from '../lib/env.js';
+import { DEMO_SPLASH_DETAIL, IS_DEMO } from '../lib/env.js';
 import type { AppState } from '../state/useApp.js';
 import { useShortcuts } from '../state/useShortcuts.js';
 import { AssistantPanel } from '../views/AssistantPanel.js';
@@ -85,6 +85,7 @@ export function Shell({ app }: ShellProps) {
           onReload={() => void saga.reload()}
           onExport={() => openDialog('exporting')}
           onImport={() => openDialog('importing')}
+          onHarvest={() => openDialog('harvesting')}
           onSearch={() => openDialog('searching')}
           onBackups={() => openDialog('backups')}
           onSettings={() => openDialog('settings')}
@@ -107,7 +108,12 @@ export function Shell({ app }: ShellProps) {
           onNewCodex={(t) =>
             setPendingNew({
               kind: 'codex',
-              type: t as 'character' | 'location' | 'concept' | 'lore' | 'waypoint',
+              type: t as
+                | 'character'
+                | 'location'
+                | 'concept'
+                | 'lore'
+                | 'waypoint',
             })
           }
           onNewTerm={() => setPendingNew({ kind: 'term' })}
@@ -140,7 +146,9 @@ export function Shell({ app }: ShellProps) {
           sagaPath={saga.sagaPath}
           usagesCount={usagesCount}
           tracesCount={relatedTraces.length}
-          onJumpRef={(type, id) => handleJump({ kind: 'entry', key: `${type}/${id}` })}
+          onJumpRef={(type, id) =>
+            handleJump({ kind: 'entry', key: `${type}/${id}` })
+          }
           usagesContent={
             currentEntry && (
               <UsagesPanel
