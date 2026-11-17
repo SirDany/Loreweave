@@ -72,7 +72,7 @@ export function ResolvedPanel({
     return (
       <aside
         style={{ width: width ? `${width}px` : undefined }}
-        className="w-80 bg-card/40 border-l border-border p-6 text-muted-foreground text-sm"
+        className="w-80 shrink-0 panel-glass flex flex-col overflow-hidden p-6 text-muted-foreground text-sm"
       >
         <div className="label-rune mb-2">Inspector</div>
         <p className="mb-2">
@@ -90,7 +90,7 @@ export function ResolvedPanel({
   return (
     <aside
       style={{ width: width ? `${width}px` : undefined }}
-      className="w-80 bg-card/75 border-l border-border/80 backdrop-blur-md flex flex-col"
+      className="w-80 shrink-0 panel-glass flex flex-col overflow-hidden"
     >
       <div className="px-4 pt-4 pb-3 border-b border-border/80">
         <div className="label-rune">{entry.type}</div>
@@ -271,7 +271,7 @@ function ChapterInspector({
   return (
     <aside
       style={{ width: width ? `${width}px` : undefined }}
-      className="w-80 bg-card/75 border-l border-border/80 backdrop-blur-md flex flex-col"
+      className="w-80 shrink-0 panel-glass flex flex-col overflow-hidden"
     >
       <div className="px-4 pt-4 pb-3 border-b border-border/80">
         <div className="label-rune">chapter · {chapter.tome}</div>

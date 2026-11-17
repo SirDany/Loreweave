@@ -21,11 +21,9 @@ export interface AssistantSeed {
 }
 
 export type DialogId =
-  | 'picking'
   | 'exporting'
   | 'importing'
   | 'searching'
-  | 'backups'
   | 'settings'
   | 'composing'
   | 'rules'
@@ -47,22 +45,23 @@ export type PendingNew =
   | { kind: 'chapter'; tome?: string };
 
 const SCRIBE_OPEN_KEY = 'lw.scribe.open';
+const INSPECTOR_OPEN_KEY = 'lw.inspector.open';
 
-function loadScribeOpen(): boolean {
+function loadBoolPref(key: string, fallback: boolean): boolean {
   try {
-    const val = localStorage.getItem(SCRIBE_OPEN_KEY);
-    // Default: open (true)
+    const val = localStorage.getItem(key);
     if (val === '0' || val === 'false') return false;
-    return true;
+    if (val === '1' || val === 'true') return true;
+    return fallback;
   } catch {
-    return true;
+    return fallback;
   }
 }
 
 /**
  * Consolidated app-level state. Owns the Saga loader, current
  * section + selection (synced with browser history/URL), dialog flags,
- * the Scribe panel state (open by default, auto-persisted), and
+ * the Scribe and Inspector panel states (auto-persisted), and
  * derives the catalog/visibleEntries/currentEntry/currentChapter
  * convenience values used by the Shell.
  */
@@ -77,11 +76,9 @@ export function useApp() {
   } = useUrlState();
 
   const [dialogs, setDialogs] = useState<Record<DialogId, boolean>>({
-    picking: false,
     exporting: false,
     importing: false,
     searching: false,
-    backups: false,
     settings: false,
     composing: false,
     rules: false,
@@ -90,7 +87,12 @@ export function useApp() {
 
   // Scribe chat window open per default, persisted in user preferences
   const [assistantOpen, setAssistantOpen] = useState<boolean>(() =>
-    loadScribeOpen(),
+    loadBoolPref(SCRIBE_OPEN_KEY, true),
+  );
+
+  // Inspector panel open per default, persisted in user preferences
+  const [inspectorOpen, setInspectorOpen] = useState<boolean>(() =>
+    loadBoolPref(INSPECTOR_OPEN_KEY, true),
   );
 
   useEffect(() => {
@@ -100,6 +102,14 @@ export function useApp() {
       /* ignore */
     }
   }, [assistantOpen]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(INSPECTOR_OPEN_KEY, inspectorOpen ? '1' : '0');
+    } catch {
+      /* ignore */
+    }
+  }, [inspectorOpen]);
 
   const [assistantSeed, setAssistantSeed] = useState<AssistantSeed | null>(
     null,
@@ -126,6 +136,13 @@ export function useApp() {
   const closeAssistant = useCallback(() => {
     setAssistantOpen(false);
     setAssistantSeed(null);
+  }, []);
+
+  const toggleInspector = useCallback(() => {
+    setInspectorOpen((v) => !v);
+  }, []);
+  const closeInspector = useCallback(() => {
+    setInspectorOpen(false);
   }, []);
 
   const handleJump = useCallback<Jumper>((loc) => {
@@ -199,6 +216,9 @@ export function useApp() {
     openAssistant,
     toggleAssistant,
     closeAssistant,
+    inspectorOpen,
+    toggleInspector,
+    closeInspector,
     pendingRename,
     setPendingRename,
     pendingNew,

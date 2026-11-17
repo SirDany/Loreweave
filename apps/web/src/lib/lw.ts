@@ -466,6 +466,8 @@ export type EmbeddingsProviderId =
   | 'openai-compatible';
 
 export interface MaskedLoreweaveConfig {
+  skin?: string;
+  sagaRoot?: string;
   chat: {
     provider?: ChatProviderId;
     model?: string;
@@ -493,6 +495,8 @@ export interface MaskedLoreweaveConfig {
 }
 
 export type ConfigPatch = {
+  skin?: string | null;
+  sagaRoot?: string | null;
   chat?: Partial<{
     provider: ChatProviderId | null;
     model: string | null;

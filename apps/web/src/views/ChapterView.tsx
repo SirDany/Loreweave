@@ -84,19 +84,24 @@ export function ChapterView({
   };
 
   const refCount = chapter.chapter.refs.length;
+  const wordCount = draft.trim() ? draft.trim().split(/\s+/).length : 0;
+  const charCount = draft.length;
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-background">
-      <header className="px-6 py-3 border-b border-border/80 bg-card/60 backdrop-blur-md flex items-center gap-4">
+    <div className="flex-1 flex flex-col overflow-hidden animate-panel-enter">
+      <header className="px-4 py-2.5 border-b border-border/80 bg-card/40 backdrop-blur-md flex items-center gap-3">
         <div className="flex-1 min-w-0">
           <div className="font-mono text-[11px] text-muted-foreground truncate">
             {chapter.chapter.relPath}
           </div>
-          <div className="mt-0.5 flex items-center gap-2">
+          <div className="mt-0.5 flex flex-wrap items-center gap-2">
             <span className="font-semibold text-base tracking-tight text-foreground">{chapter.chapter.title}</span>
             <Badge variant="secondary" className="rounded-md">{chapter.tome}</Badge>
             <Badge variant="outline" className="rounded-md">
               {refCount} echo{refCount !== 1 ? 'es' : ''}
+            </Badge>
+            <Badge variant="outline" className="rounded-md font-mono text-[10px]">
+              {wordCount} words · {charCount} chars
             </Badge>
           </div>
         </div>

@@ -64,7 +64,7 @@ export function Workbench({
   const [storyTab, setStoryTab] = useState<'edit' | 'preview'>('edit');
 
   return (
-    <main className="flex-1 flex flex-col overflow-hidden bg-background">
+    <main className="flex-1 flex flex-col panel-glass overflow-hidden">
       {currentEntry && (
         <EntryView
           entry={currentEntry}
@@ -169,6 +169,7 @@ export function Workbench({
           sagaPath={sagaPath}
           tomeLens={tomeLens}
           onReloaded={onSaved}
+          onJump={onJump}
         />
       )}
       {!currentEntry && !currentChapter && section === 'traces' && (
@@ -208,7 +209,12 @@ export function Workbench({
         section !== 'constellation' &&
         section !== 'integrity' &&
         BUILTIN_SECTIONS.includes(section as (typeof BUILTIN_SECTIONS)[number]) && (
-          <EmptyState section={section} diagnostics={data.diagnostics} />
+          <EmptyState
+            section={section}
+            diagnostics={data.diagnostics}
+            data={data}
+            onJump={onJump}
+          />
         )}
     </main>
   );
@@ -264,7 +270,14 @@ function CustomLensSlot({
   const manifest = getLensManifest(section);
   const renderer = manifest ? getLens(manifest.renderer) : undefined;
   if (!manifest || !renderer) {
-    return <EmptyState section={section} diagnostics={data.diagnostics} />;
+    return (
+      <EmptyState
+        section={section}
+        diagnostics={data.diagnostics}
+        data={data}
+        onJump={onJump}
+      />
+    );
   }
   const Renderer = renderer.component;
   const onMove = manifest.editable

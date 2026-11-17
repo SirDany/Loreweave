@@ -79,13 +79,13 @@ export function IntegrityView({ sagaPath, data, onJump }: IntegrityViewProps) {
   );
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-background overflow-hidden">
+    <div className="flex-1 flex flex-col h-full overflow-hidden animate-panel-enter">
       {/* Top Header */}
-      <header className="px-6 py-4 border-b border-border flex items-center justify-between gap-4 flex-wrap bg-card/40">
+      <header className="px-4 py-2.5 border-b border-border/70 flex items-center justify-between gap-3 flex-wrap bg-card/40 backdrop-blur-md">
         <div>
           <div className="flex items-center gap-2">
             <ShieldAlert className="w-5 h-5 text-primary" />
-            <h1 className="text-xl font-semibold text-foreground">Integrity & Loose Ends</h1>
+            <h1 className="text-lg font-semibold text-foreground">Integrity & Loose Ends</h1>
           </div>
           <p className="text-xs text-muted-foreground mt-0.5">
             Audit referential integrity, detect unreferenced canon elements, and resolve loose ends.
@@ -105,7 +105,7 @@ export function IntegrityView({ sagaPath, data, onJump }: IntegrityViewProps) {
       </header>
 
       {/* Metrics Banner */}
-      <div className="px-6 py-3 border-b border-border/60 bg-muted/20 flex gap-4 flex-wrap items-center">
+      <div className="px-4 py-2.5 border-b border-border/60 bg-muted/20 flex gap-3 flex-wrap items-center">
         <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-card border border-border shadow-xs text-xs">
           <span className="text-muted-foreground">Total Loose Ends:</span>
           <span className={`font-semibold ${totalIssues > 0 ? 'text-rose-400' : 'text-emerald-400'}`}>

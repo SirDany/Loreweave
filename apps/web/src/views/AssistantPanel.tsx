@@ -256,7 +256,7 @@ export function AssistantPanel({
   return (
     <aside
       style={{ width: width ? `${width}px` : undefined }}
-      className="w-[420px] shrink-0 flex flex-col border-l border-border/80 bg-card/85 backdrop-blur-md h-full overflow-hidden transition-colors"
+      className="w-[420px] shrink-0 flex flex-col panel-glass h-full overflow-hidden"
     >
       <header className="px-4 py-2.5 border-b border-border/80 bg-muted/15 flex items-center gap-2">
         <span className="h-2 w-2 rounded-full bg-primary animate-pulse shrink-0" />

@@ -2,29 +2,33 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Check,
   ExternalLink,
+  FolderSearch,
   Info,
   Loader2,
   Pencil,
   RefreshCw,
-  Sparkles,
   X,
 } from 'lucide-react';
 import {
+  dump,
   fetchConfig,
   fetchProviderModels,
+  listSagas,
   saveConfigPatch,
   type ChatProviderId,
   type ConfigPatch,
+  type DiscoveredSaga,
   type EmbeddingsProviderId,
   type MaskedLoreweaveConfig,
   type ModelDescriptor,
   type ModelsDiscoveryResponse,
 } from '../lib/lw.js';
+import { playModalClose, playModalOpen } from '../lib/sound.js';
 import { cn } from '../lib/utils.js';
-import { useSkin } from '../theme/SkinProvider.js';
-import { type SkinTokens } from '../theme/skins.js';
 
 interface Props {
+  currentSagaPath?: string;
+  onPickSaga?: (path: string) => void;
   onClose: () => void;
 }
 
@@ -181,15 +185,33 @@ interface DraftState {
   embKey: string;
 }
 
+const DISCOVERY_ROOT_KEY = 'lw.sagaDiscoveryRoot';
+
+function loadStoredDiscoveryRoot(): string {
+  try {
+    const raw = window.localStorage.getItem(DISCOVERY_ROOT_KEY);
+    if (raw && raw.trim()) return raw.trim();
+  } catch {
+    /* ignore */
+  }
+  return 'sagas';
+}
+
 /**
- * User-level AI and appearance settings dialog.
+ * Agentic & Saga Workspace settings dialog.
  * All settings are automatically applied and persisted immediately on change.
  */
-export function SettingsDialog({ onClose }: Props) {
-  const [tab, setTab] = useState<'ai' | 'appearance'>('ai');
+export function SettingsDialog({
+  currentSagaPath,
+  onPickSaga,
+  onClose,
+}: Props) {
   const [cfg, setCfg] = useState<MaskedLoreweaveConfig | null>(null);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [discoveryRootSeed, setDiscoveryRootSeed] = useState<string>(() =>
+    loadStoredDiscoveryRoot(),
+  );
   const debounceTimer = useRef<number | null>(null);
 
   // Chat fields
@@ -237,6 +259,9 @@ export function SettingsDialog({ onClose }: Props) {
     fetchConfig()
       .then((c) => {
         setCfg(c);
+        if (c.sagaRoot && c.sagaRoot.trim()) {
+          setDiscoveryRootSeed(c.sagaRoot.trim());
+        }
         const cp = c.chat.provider ?? '';
         const cm = c.chat.model ?? '';
         const oh = c.chat.ollamaHost ?? '';
@@ -274,6 +299,7 @@ export function SettingsDialog({ onClose }: Props) {
   }, []);
 
   useEffect(() => {
+    playModalOpen();
     return () => {
       if (debounceTimer.current) window.clearTimeout(debounceTimer.current);
     };
@@ -526,6 +552,7 @@ export function SettingsDialog({ onClose }: Props) {
       debounceTimer.current = null;
       void flushSave();
     }
+    playModalClose();
     onClose();
   };
 
@@ -584,20 +611,20 @@ export function SettingsDialog({ onClose }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-center justify-center p-6 animate-fade-in"
+      className="fixed inset-0 z-50 bg-background/45 backdrop-blur-md flex items-center justify-center p-6 animate-fade-in"
       onClick={(e) => {
         if (e.target === e.currentTarget) handleClose();
       }}
     >
       <div
-        className="w-full max-w-2xl rounded-xl border border-border/70 bg-card/95 shadow-2xl backdrop-blur-xl flex flex-col max-h-[85vh] overflow-hidden"
+        className="w-full max-w-2xl rounded-2xl panel-glass bg-card/90 shadow-2xl flex flex-col max-h-[85vh] overflow-hidden animate-modal-pop"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-border/70 px-6 py-4 bg-muted/20">
           <div className="flex items-center gap-3">
             <h2 className="text-base font-semibold tracking-tight text-foreground">
-              Settings & Customization
+              Agentic &amp; Workspace Settings
             </h2>
             {saveStatus === 'saving' && (
               <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[11px] text-primary animate-pulse">
@@ -608,7 +635,7 @@ export function SettingsDialog({ onClose }: Props) {
             {saveStatus === 'saved' && (
               <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] text-emerald-400">
                 <Check className="h-3 w-3" />
-                <span>Saved</span>
+                <span>{statusMessage ?? 'Saved'}</span>
               </span>
             )}
             {saveStatus === 'error' && (
@@ -627,38 +654,19 @@ export function SettingsDialog({ onClose }: Props) {
           </button>
         </div>
 
-        {/* Tab switcher */}
-        <div className="flex border-b border-border/60 px-6 pt-3 bg-muted/10">
-          <button
-            type="button"
-            onClick={() => setTab('ai')}
-            className={cn(
-              'relative pb-3 px-4 text-xs font-medium tracking-wide transition-colors',
-              tab === 'ai'
-                ? 'text-primary font-semibold after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-primary'
-                : 'text-muted-foreground hover:text-foreground',
-            )}
-          >
-            AI Engine & Models
-          </button>
-          <button
-            type="button"
-            onClick={() => setTab('appearance')}
-            className={cn(
-              'relative pb-3 px-4 text-xs font-medium tracking-wide transition-colors',
-              tab === 'appearance'
-                ? 'text-primary font-semibold after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-primary'
-                : 'text-muted-foreground hover:text-foreground',
-            )}
-          >
-            Appearance & Themes
-          </button>
-        </div>
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6 scrollbar-ember">
+          <SagaWorkspaceSection
+            initialRoot={discoveryRootSeed}
+            currentSagaPath={currentSagaPath}
+            onPickSaga={(p) => {
+              onPickSaga?.(p);
+              handleClose();
+            }}
+          />
 
-        {/* AI Tab */}
-        {tab === 'ai' && (
-          <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6 scrollbar-ember">
-            {cfg && cfg.envOverrides.length > 0 && (
+          <hr className="border-border/60" />
+
+          {cfg && cfg.envOverrides.length > 0 && (
               <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
                 External environment variables are overriding saved settings:{' '}
                 <code className="font-mono text-amber-300">
@@ -1190,40 +1198,6 @@ export function SettingsDialog({ onClose }: Props) {
               </div>
             )}
           </div>
-        )}
-
-        {/* Appearance Tab */}
-        {tab === 'appearance' && (
-          <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5 scrollbar-ember">
-            <div>
-              <div className="flex items-center gap-1.5 text-xs uppercase tracking-wider font-semibold text-primary">
-                <Sparkles className="h-3.5 w-3.5" />
-                <span>Contemporary Themes & Skins</span>
-              </div>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Precision engineering design language. Selecting a theme applies
-                and persists immediately across all workspaces.
-              </p>
-            </div>
-
-            <SkinPicker />
-          </div>
-        )}
-
-        {/* Footer */}
-        <div className="flex items-center justify-between border-t border-border/70 px-6 py-3 bg-muted/20 text-xs text-muted-foreground">
-          <span className="flex items-center gap-1.5">
-            <span className="h-1.5 w-1.5 rounded-full bg-primary" />
-            All preferences auto-saved
-          </span>
-          <button
-            type="button"
-            className="rounded-lg bg-primary/10 border border-primary/30 px-4 py-1.5 text-xs font-medium text-primary hover:bg-primary/20 transition-colors"
-            onClick={handleClose}
-          >
-            Done
-          </button>
-        </div>
       </div>
     </div>
   );
@@ -1357,74 +1331,222 @@ function KeyField({
   );
 }
 
-function SkinPicker() {
-  const { skin, available, setSkinId } = useSkin();
+function SagaWorkspaceSection({
+  initialRoot,
+  currentSagaPath,
+  onPickSaga,
+}: {
+  initialRoot: string;
+  currentSagaPath?: string;
+  onPickSaga: (path: string) => void;
+}) {
+  const [sagaRoot, setSagaRoot] = useState(initialRoot);
+  const rootEditedRef = useRef(false);
+  const [scanning, setScanning] = useState(false);
+  const [scanError, setScanError] = useState<string | null>(null);
+  const [discovered, setDiscovered] = useState<DiscoveredSaga[] | null>(null);
+  const [scanSuccessMsg, setScanSuccessMsg] = useState<string | null>(null);
 
-  return (
-    <div className="grid grid-cols-1 gap-2.5">
-      {available.map((s) => {
-        const active = s.id === (skin?.id ?? '');
-        return (
-          <button
-            key={s.id}
-            type="button"
-            onClick={() => setSkinId(s.id)}
-            className={cn(
-              'group relative flex items-center gap-4 rounded-xl border p-3.5 text-left transition-all duration-150',
-              active
-                ? 'border-primary/80 bg-primary/10 ring-1 ring-primary/40 shadow-lg'
-                : 'border-border/70 bg-card/60 hover:bg-muted/40 hover:border-border',
-            )}
-          >
-            <SkinSwatch tokens={s.tokens} />
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-semibold tracking-tight text-foreground">
-                  {s.name}
-                </span>
-                {active && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-primary/20 border border-primary/40 px-2 py-0.5 text-[10px] font-semibold text-primary uppercase tracking-wider">
-                    <Check className="h-2.5 w-2.5" />
-                    Active
-                  </span>
-                )}
-              </div>
-              <div className="text-xs text-muted-foreground mt-0.5 truncate">
-                {s.description}
-              </div>
-            </div>
-          </button>
+  const [directPath, setDirectPath] = useState(currentSagaPath ?? '');
+  const [verifyingDirect, setVerifyingDirect] = useState(false);
+  const [directError, setDirectError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!rootEditedRef.current) {
+      setSagaRoot(initialRoot);
+    }
+  }, [initialRoot]);
+
+  const scanRoot = async () => {
+    const dir = sagaRoot.trim() || 'sagas';
+    setScanning(true);
+    setScanError(null);
+    setScanSuccessMsg(null);
+    try {
+      const list = await listSagas(dir);
+      setDiscovered(list);
+      if (list.length > 0) {
+        try {
+          window.localStorage.setItem(DISCOVERY_ROOT_KEY, dir);
+        } catch {
+          /* ignore */
+        }
+        await saveConfigPatch({ sagaRoot: dir }).catch(() => {});
+        setScanSuccessMsg(
+          `Saved discovery path & found ${list.length} Saga${list.length === 1 ? '' : 's'}.`,
         );
-      })}
-    </div>
-  );
-}
+      } else {
+        setScanSuccessMsg(null);
+        setScanError(
+          `No valid Sagas found under "${dir}". Keep current workspace or choose another directory.`,
+        );
+      }
+    } catch (e) {
+      setDiscovered(null);
+      setScanError(
+        `Could not scan "${dir}": ${(e as Error).message}. Existing workspace stays intact.`,
+      );
+    } finally {
+      setScanning(false);
+    }
+  };
 
-function SkinSwatch({ tokens }: { tokens?: Partial<SkinTokens> }) {
-  if (!tokens) return null;
+  const verifyAndOpenDirect = async () => {
+    const target = directPath.trim();
+    if (!target) return;
+    setVerifyingDirect(true);
+    setDirectError(null);
+    try {
+      await dump(target);
+      onPickSaga(target);
+    } catch (e) {
+      setDirectError(
+        `"${target}" is not a readable Saga (${(e as Error).message}).`,
+      );
+    } finally {
+      setVerifyingDirect(false);
+    }
+  };
+
   return (
-    <div className="flex h-9 w-14 shrink-0 overflow-hidden rounded-lg border border-border/80 shadow-inner">
-      <div
-        className="flex-1"
-        style={{
-          background: tokens.background ? `hsl(${tokens.background})` : '#0f172a',
-        }}
-        title="Background"
-      />
-      <div
-        className="flex-1"
-        style={{
-          background: tokens.primary ? `hsl(${tokens.primary})` : '#00e5ff',
-        }}
-        title="Primary Accent"
-      />
-      <div
-        className="flex-1"
-        style={{
-          background: tokens.accent ? `hsl(${tokens.accent})` : '#1e293b',
-        }}
-        title="Secondary Accent"
-      />
-    </div>
+    <section className="space-y-4">
+      <div>
+        <h3 className="text-xs uppercase tracking-wider font-semibold text-primary flex items-center gap-1.5">
+          <FolderSearch className="h-3.5 w-3.5" />
+          <span>Saga Workspace &amp; Discovery Path</span>
+        </h3>
+        <p className="text-xs text-muted-foreground mt-0.5">
+          Set the folder scanned by the top-left Saga menu or verify and open a custom Saga path directly.
+        </p>
+      </div>
+
+      {/* Discovery root scanner */}
+      <div className="rounded-xl border border-border/70 bg-card/45 p-4 space-y-3">
+        <label className="block text-xs">
+          <span className="text-muted-foreground mb-1 block font-medium">
+            Discovery Directory
+          </span>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={sagaRoot}
+              onChange={(e) => {
+                rootEditedRef.current = true;
+                setSagaRoot(e.target.value);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  void scanRoot();
+                }
+              }}
+              placeholder="sagas or D:\Writing\Sagas"
+              className="flex-1 rounded-lg border border-border bg-background/80 px-3 py-2 font-mono text-xs focus:ring-1 focus:ring-primary focus:outline-none transition-colors"
+            />
+            <button
+              type="button"
+              onClick={() => void scanRoot()}
+              disabled={scanning}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-primary/50 bg-primary/15 px-3.5 py-2 text-xs font-semibold text-primary hover:bg-primary/25 disabled:opacity-50 transition-colors shrink-0"
+            >
+              {scanning ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <RefreshCw className="h-3.5 w-3.5" />
+              )}
+              <span>{scanning ? 'Scanning…' : 'Scan & Verify'}</span>
+            </button>
+          </div>
+        </label>
+
+        {scanSuccessMsg && (
+          <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-[11px] text-emerald-300">
+            {scanSuccessMsg}
+          </div>
+        )}
+
+        {scanError && (
+          <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-200">
+            {scanError}
+          </div>
+        )}
+
+        {discovered && discovered.length > 0 && (
+          <div className="space-y-1.5 pt-1">
+            <div className="label-rune">Detected Sagas</div>
+            <ul className="space-y-1.5 max-h-40 overflow-auto scrollbar-ember">
+              {discovered.map((s) => {
+                const active = s.path === currentSagaPath;
+                return (
+                  <li
+                    key={s.path}
+                    className={cn(
+                      'flex items-center justify-between gap-3 rounded-lg border px-3 py-2 text-xs',
+                      active
+                        ? 'active-theme-pill text-foreground'
+                        : 'border-border/60 bg-background/50',
+                    )}
+                  >
+                    <div className="min-w-0">
+                      <div className="font-medium truncate">
+                        {s.title ?? s.id}
+                      </div>
+                      <div className="font-mono text-[10px] text-muted-foreground truncate">
+                        {s.path}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => onPickSaga(s.path)}
+                      disabled={active}
+                      className="shrink-0 rounded-lg border border-primary/40 bg-primary/15 px-2.5 py-1 text-[11px] font-medium text-primary hover:bg-primary/25 disabled:opacity-50"
+                    >
+                      {active ? 'Active' : 'Load Saga'}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
+
+        {/* Direct path verifier */}
+        <label className="block text-xs pt-2 border-t border-border/50">
+          <span className="text-muted-foreground mb-1 block font-medium">
+            Custom Single Saga Path
+          </span>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={directPath}
+              onChange={(e) => setDirectPath(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  void verifyAndOpenDirect();
+                }
+              }}
+              placeholder="C:\path\to\my-saga or sagas/example-saga"
+              className="flex-1 rounded-lg border border-border bg-background/80 px-3 py-2 font-mono text-xs focus:ring-1 focus:ring-primary focus:outline-none transition-colors"
+            />
+            <button
+              type="button"
+              onClick={() => void verifyAndOpenDirect()}
+              disabled={!directPath.trim() || verifyingDirect}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border/80 bg-background/70 px-3.5 py-2 text-xs font-medium text-foreground hover:border-primary/50 hover:text-primary disabled:opacity-40 transition-colors shrink-0"
+            >
+              {verifyingDirect && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              <span>Verify &amp; Open</span>
+            </button>
+          </div>
+        </label>
+
+        {directError && (
+          <div className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[11px] text-rose-300">
+            {directError}
+          </div>
+        )}
+      </div>
+    </section>
   );
 }

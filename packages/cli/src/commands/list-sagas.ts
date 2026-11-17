@@ -45,14 +45,24 @@ export async function listSagasCmd(
   opts: ListSagasOpts,
 ): Promise<void> {
   const abs = path.resolve(root);
+  const found: FoundSaga[] = [];
+
+  const selfMeta = await readSagaMeta(abs);
+  if (selfMeta) {
+    found.push(selfMeta);
+  }
+
   let entries: import("node:fs").Dirent[] = [];
   try {
     entries = await fs.readdir(abs, { withFileTypes: true });
   } catch (e) {
+    if (opts.json) {
+      console.log(JSON.stringify(found, null, 2));
+      return;
+    }
     console.error(pc.red(`cannot read ${abs}: ${(e as Error).message}`));
     process.exit(1);
   }
-  const found: FoundSaga[] = [];
   for (const e of entries) {
     if (!e.isDirectory() || e.name.startsWith(".")) continue;
     const meta = await readSagaMeta(path.join(abs, e.name));

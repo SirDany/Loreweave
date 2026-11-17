@@ -1,7 +1,6 @@
 import { addRecentSaga } from '../lib/desktop';
 import type { DumpPayload } from '../lib/lw.js';
 import type { AppState } from '../state/useApp.js';
-import { BackupsDialog } from '../views/BackupsDialog.js';
 import { ComposeLensDialog } from '../views/ComposeLensDialog.js';
 import { ExportDialog } from '../views/ExportDialog.js';
 import { HarvestDialog } from '../views/HarvestDialog.js';
@@ -10,7 +9,6 @@ import { NewChapterDialog } from '../views/NewChapterDialog.js';
 import { NewEntryDialog, type NewEntryKind } from '../views/NewEntryDialog.js';
 import { RenameDialog } from '../views/RenameDialog.js';
 import { RulesDialog } from '../views/RulesDialog.js';
-import { SagaPicker } from '../views/SagaPicker.js';
 import { SearchPanel } from '../views/SearchPanel.js';
 import { SettingsDialog } from '../views/SettingsDialog.js';
 
@@ -39,19 +37,6 @@ export function Dialogs({ app, data }: DialogsProps) {
 
   return (
     <>
-      {dialogs.picking && (
-        <SagaPicker
-          current={saga.sagaPath}
-          onPick={(p) => {
-            saga.setSagaPath(p);
-            setSelection(null);
-            closeDialog('picking');
-            void addRecentSaga(p, data?.saga?.title ?? undefined);
-          }}
-          onClose={() => closeDialog('picking')}
-        />
-      )}
-
       {pendingRename && (
         <RenameDialog
           sagaPath={saga.sagaPath}
@@ -107,19 +92,16 @@ export function Dialogs({ app, data }: DialogsProps) {
         />
       )}
 
-      {dialogs.backups && (
-        <BackupsDialog
-          sagaPath={saga.sagaPath}
-          onClose={() => closeDialog('backups')}
-          onRestored={() => {
-            void saga.reload();
-            closeDialog('backups');
-          }}
-        />
-      )}
-
       {dialogs.settings && (
-        <SettingsDialog onClose={() => closeDialog('settings')} />
+        <SettingsDialog
+          currentSagaPath={saga.sagaPath}
+          onPickSaga={(p) => {
+            saga.setSagaPath(p);
+            setSelection(null);
+            void addRecentSaga(p, data?.saga?.title ?? undefined);
+          }}
+          onClose={() => closeDialog('settings')}
+        />
       )}
 
       {dialogs.rules && (

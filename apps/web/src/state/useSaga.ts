@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   dump,
   fetchDigest,
@@ -11,7 +11,7 @@ import {
 } from "../lib/lw.js";
 import { registerLensManifest } from "../loom/registry.js";
 
-const DEFAULT_SAGA = "sagas/example-saga";
+export const DEFAULT_SAGA = "sagas/example-saga";
 const STORAGE_KEY = "loreweave.sagaPath";
 
 export interface SagaState {
@@ -29,10 +29,14 @@ export interface SagaState {
   kinds: KindInfo[];
   loading: boolean;
   error: string | null;
+  /** Non-fatal error when attempting to switch to an invalid saga path. */
+  switchError: string | null;
+  clearSwitchError: () => void;
   tomeLens: string | null;
   setTomeLens: (t: string | null) => void;
   reload: () => Promise<void>;
   setSagaPath: (p: string) => void;
+  resetToDefaultSaga: () => void;
 }
 
 function readInitialPath(initial: string): string {
@@ -49,45 +53,71 @@ export function useSaga(initialPath: string = DEFAULT_SAGA): SagaState {
   const [sagaPath, setSagaPathState] = useState<string>(() =>
     readInitialPath(initialPath),
   );
+  const lastValidPathRef = useRef<string>(DEFAULT_SAGA);
   const [data, setData] = useState<DumpPayload | null>(null);
   const [digest, setDigest] = useState<CanonDigestPayload | null>(null);
   const [kinds, setKinds] = useState<KindInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [switchError, setSwitchError] = useState<string | null>(null);
   const [tomeLens, setTomeLens] = useState<string | null>(null);
 
+  const clearSwitchError = useCallback(() => setSwitchError(null), []);
+
+  // Only update state here; localStorage is updated once `dump()` succeeds so
+  // an invalid directory path can never lock the app across reloads.
   const setSagaPath = useCallback((p: string) => {
-    setSagaPathState(p);
+    const trimmed = p.trim();
+    if (!trimmed) return;
+    setSwitchError(null);
+    setSagaPathState(trimmed);
+    setTomeLens(null);
+    setDigest(null);
+    setKinds([]);
+  }, []);
+
+  const resetToDefaultSaga = useCallback(() => {
+    setSwitchError(null);
+    setError(null);
+    lastValidPathRef.current = DEFAULT_SAGA;
     try {
-      window.localStorage.setItem(STORAGE_KEY, p);
+      window.localStorage.removeItem(STORAGE_KEY);
     } catch {
-      // best effort
+      /* ignore */
     }
+    setSagaPathState(DEFAULT_SAGA);
     setTomeLens(null);
     setDigest(null);
     setKinds([]);
   }, []);
 
   const reload = useCallback(async () => {
+    const targetPath = sagaPath;
     setLoading(true);
     setError(null);
     try {
-      const payload = await dump(sagaPath);
+      const payload = await dump(targetPath);
       setData(payload);
+      lastValidPathRef.current = targetPath;
+      try {
+        window.localStorage.setItem(STORAGE_KEY, targetPath);
+      } catch {
+        // best effort
+      }
       // Digest + kinds are optimizations — never block the reload on them.
-      fetchDigest(sagaPath).then(
+      fetchDigest(targetPath).then(
         (d) => setDigest(d),
         () => {
           /* endpoint unavailable (e.g. Tauri build w/o sidecar); ignore. */
         },
       );
-      fetchKinds(sagaPath).then(
+      fetchKinds(targetPath).then(
         (k) => setKinds(k),
         () => {
           /* CLI unavailable; ignore. */
         },
       );
-      fetchLenses(sagaPath).then(
+      fetchLenses(targetPath).then(
         (list: LensManifestPayload[]) => {
           for (const m of list) {
             registerLensManifest({
@@ -101,7 +131,28 @@ export function useSaga(initialPath: string = DEFAULT_SAGA): SagaState {
         },
       );
     } catch (e) {
-      setError((e as Error).message);
+      const msg = (e as Error).message;
+      if (targetPath !== DEFAULT_SAGA) {
+        const fallback =
+          lastValidPathRef.current && lastValidPathRef.current !== targetPath
+            ? lastValidPathRef.current
+            : DEFAULT_SAGA;
+        try {
+          if (fallback === DEFAULT_SAGA) {
+            window.localStorage.removeItem(STORAGE_KEY);
+          } else {
+            window.localStorage.setItem(STORAGE_KEY, fallback);
+          }
+        } catch {
+          /* ignore */
+        }
+        setSwitchError(
+          `Could not open Saga at "${targetPath}" (${msg}). Kept "${fallback}".`,
+        );
+        setSagaPathState(fallback);
+      } else {
+        setError(msg);
+      }
     } finally {
       setLoading(false);
     }
@@ -173,9 +224,12 @@ export function useSaga(initialPath: string = DEFAULT_SAGA): SagaState {
     kinds,
     loading,
     error,
+    switchError,
+    clearSwitchError,
     tomeLens,
     setTomeLens,
     reload,
     setSagaPath,
+    resetToDefaultSaga,
   };
 }

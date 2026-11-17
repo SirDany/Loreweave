@@ -42,8 +42,8 @@ export function TracesView({
   };
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-background">
-      <header className="px-6 py-3 border-b border-border/80 bg-card/60 backdrop-blur-md flex items-center gap-3">
+    <div className="flex-1 flex flex-col overflow-hidden animate-panel-enter">
+      <header className="px-4 py-2.5 border-b border-border/80 bg-card/40 backdrop-blur-md flex items-center gap-3">
         <div className="flex items-center gap-2">
           <Sparkles className="h-4 w-4 text-primary" />
           <span className="font-semibold text-base tracking-tight text-foreground">Traces</span>
@@ -56,7 +56,7 @@ export function TracesView({
               className={cn(
                 'rounded-lg border px-2.5 py-1 capitalize font-medium text-xs transition-colors',
                 filter === f
-                  ? 'border-primary/60 bg-primary/20 text-primary shadow-sm'
+                  ? 'active-theme-pill font-semibold'
                   : 'border-border/80 bg-background/60 hover:bg-muted text-muted-foreground hover:text-foreground',
               )}
             >
@@ -69,7 +69,7 @@ export function TracesView({
           + New trace
         </Button>
       </header>
-      <div className="flex-1 overflow-auto scrollbar-ember p-6">
+      <div className="flex-1 overflow-auto scrollbar-ember p-4">
         <TracesList
           traces={filtered}
           onJump={(target) => {

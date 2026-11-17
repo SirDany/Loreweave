@@ -303,9 +303,9 @@ export function VersionsPanel({ sagaPath, onChanged, openAssistant }: Props) {
   }
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden text-xs bg-background">
+    <div className="flex-1 flex flex-col overflow-hidden text-xs animate-panel-enter">
       {/* Top Bar: Storyline & Sync Status */}
-      <header className="px-6 py-4 border-b border-border/70 flex items-center justify-between gap-4 bg-card/60 backdrop-blur-md">
+      <header className="px-6 py-4 border-b border-border/70 flex items-center justify-between gap-4 bg-card/40 backdrop-blur-md">
         <div className="flex items-center gap-3 min-w-0">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 border border-primary/30 text-primary">
             <GitBranchIcon className="h-4 w-4" />

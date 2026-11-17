@@ -216,4 +216,30 @@ describe('config module', () => {
     );
     await expect(loadConfig()).rejects.toThrow(/failed to read/);
   });
+
+  it('patchConfig persists skin alongside chat/embeddings and maskConfig exposes it', async () => {
+    await saveConfig({
+      chat: { provider: 'openai', openaiApiKey: 'sk-test' },
+    });
+    const patched = await patchConfig({ skin: 'ember' });
+    expect(patched.skin).toBe('ember');
+    expect(patched.chat?.provider).toBe('openai');
+    expect(maskConfig(await loadConfig()).skin).toBe('ember');
+
+    const updatedChatOnly = await patchConfig({
+      chat: { model: 'gpt-4o-mini' },
+    });
+    expect(updatedChatOnly.skin).toBe('ember');
+    expect(updatedChatOnly.chat?.model).toBe('gpt-4o-mini');
+
+    const cleared = await patchConfig({ skin: null });
+    expect(cleared.skin).toBeUndefined();
+
+    const withRoot = await patchConfig({ sagaRoot: 'D:/Writing/Sagas' });
+    expect(withRoot.sagaRoot).toBe('D:/Writing/Sagas');
+    expect(maskConfig(await loadConfig()).sagaRoot).toBe('D:/Writing/Sagas');
+
+    const clearedRoot = await patchConfig({ sagaRoot: null });
+    expect(clearedRoot.sagaRoot).toBeUndefined();
+  });
 });

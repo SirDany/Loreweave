@@ -114,7 +114,12 @@ async function serveStatic(req, res) {
 function serveFile(abs, res) {
   const ext = path.extname(abs).toLowerCase();
   res.setHeader('content-type', MIME[ext] ?? 'application/octet-stream');
-  res.setHeader('cache-control', 'no-cache');
+  res.setHeader(
+    'cache-control',
+    'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+  );
+  res.setHeader('pragma', 'no-cache');
+  res.setHeader('expires', '0');
   const stream = createReadStream(abs);
   stream.on('error', () => {
     res.statusCode = 500;

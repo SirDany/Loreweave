@@ -63,12 +63,16 @@ export interface EmbeddingsConfig {
 }
 
 export interface LoreweaveConfig {
+  skin?: string;
+  sagaRoot?: string;
   chat?: ChatConfig;
   embeddings?: EmbeddingsConfig;
 }
 
 /** Safe-for-UI view: API keys replaced with `true`/`false` booleans. */
 export interface MaskedConfig {
+  skin?: string;
+  sagaRoot?: string;
   chat: {
     provider?: ChatProvider;
     model?: string;
@@ -183,15 +187,33 @@ export async function saveConfig(cfg: LoreweaveConfig): Promise<void> {
  */
 export async function patchConfig(
   patch: Partial<{
+    skin: string | null;
+    sagaRoot: string | null;
     chat: Partial<Record<keyof ChatConfig, string | null>>;
     embeddings: Partial<Record<keyof EmbeddingsConfig, string | null>>;
   }>,
 ): Promise<LoreweaveConfig> {
   const current = await loadConfig();
   const next: LoreweaveConfig = {
+    skin: current.skin,
+    sagaRoot: current.sagaRoot,
     chat: { ...current.chat },
     embeddings: { ...current.embeddings },
   };
+  if (patch.skin === null || patch.skin === '') {
+    delete next.skin;
+  } else if (typeof patch.skin === 'string') {
+    const trimmed = patch.skin.trim();
+    if (!trimmed) delete next.skin;
+    else next.skin = trimmed;
+  }
+  if (patch.sagaRoot === null || patch.sagaRoot === '') {
+    delete next.sagaRoot;
+  } else if (typeof patch.sagaRoot === 'string') {
+    const trimmed = patch.sagaRoot.trim();
+    if (!trimmed) delete next.sagaRoot;
+    else next.sagaRoot = trimmed;
+  }
   if (patch.chat) {
     for (const [k, v] of Object.entries(patch.chat)) {
       const key = k as keyof ChatConfig;
@@ -226,6 +248,8 @@ export function maskConfig(cfg: LoreweaveConfig): MaskedConfig {
     if (isExternalEnvOverride(name)) envOverrides.push(name);
   }
   return {
+    skin: cfg.skin,
+    sagaRoot: cfg.sagaRoot,
     chat: {
       provider: cfg.chat?.provider,
       model: cfg.chat?.model,
@@ -303,6 +327,14 @@ export async function applyConfigToEnv(): Promise<void> {
 
 function sanitize(cfg: LoreweaveConfig): LoreweaveConfig {
   const out: LoreweaveConfig = {};
+  if (typeof cfg.skin === 'string') {
+    const trimmed = cfg.skin.trim();
+    if (trimmed) out.skin = trimmed;
+  }
+  if (typeof cfg.sagaRoot === 'string') {
+    const trimmed = cfg.sagaRoot.trim();
+    if (trimmed) out.sagaRoot = trimmed;
+  }
   if (cfg.chat && typeof cfg.chat === 'object') {
     const c: ChatConfig = {};
     if (
