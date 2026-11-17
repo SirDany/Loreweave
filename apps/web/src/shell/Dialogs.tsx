@@ -1,4 +1,4 @@
-import { addRecentSaga } from '../lib/desktop.js';
+import { addRecentSaga } from '../lib/desktop';
 import type { DumpPayload } from '../lib/lw.js';
 import type { AppState } from '../state/useApp.js';
 import { BackupsDialog } from '../views/BackupsDialog.js';

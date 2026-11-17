@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { isDesktop } from '../lib/desktop.js';
+
 
 interface Props {
   sagaPath: string;
@@ -18,54 +18,26 @@ export function HarvestDialog({ sagaPath, onClose, onHarvested }: Props) {
   const [result, setResult] = useState<string | null>(null);
 
   const selectFiles = async () => {
-    if (!isDesktop()) {
-      // Use HTML5 file input for web version
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.multiple = true;
-      input.accept =
-        '.txt,.md,.markdown,.rst,.html,.htm,.json,.yaml,.yml,.pdf,.docx';
-      input.onchange = (e) => {
-        const files = (e.target as HTMLInputElement).files;
-        if (files) {
-          const paths = Array.from(files).map((f) => f.name);
-          setFiles(paths);
-          setErr(null);
-        }
-      };
-      input.click();
-      return;
-    }
-    try {
-      // Use Tauri dialog through the bridge
-      const selected = await (window as any).__TAURI_INTERNALS__.invoke(
-        'select_files',
-      );
-      setFiles(selected);
-      setErr(null);
-    } catch (e) {
-      setErr((e as Error).message);
-    }
+    // Use HTML5 file input for web version
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.multiple = true;
+    input.accept =
+      '.txt,.md,.markdown,.rst,.html,.htm,.json,.yaml,.yml,.pdf,.docx';
+    input.onchange = (e) => {
+      const files = (e.target as HTMLInputElement).files;
+      if (files) {
+        const paths = Array.from(files).map((f) => f.name);
+        setFiles(paths);
+        setErr(null);
+      }
+    };
+    input.click();
   };
 
   const selectFolder = async () => {
-    if (!isDesktop()) {
-      setErr(
-        'Folder selection is only available in the desktop app. Use file selection instead.',
-      );
-      return;
-    }
-    try {
-      const selected = await (window as any).__TAURI_INTERNALS__.invoke(
-        'select_folder',
-      );
-      if (selected) {
-        setFiles([selected]);
-        setErr(null);
-      }
-    } catch (e) {
-      setErr((e as Error).message);
-    }
+    // Folder selection is not supported in the web build.
+    setErr('Folder selection is unavailable in the web version. Please select individual files.');
   };
 
   const doHarvest = async () => {
