@@ -112,3 +112,6 @@
     color: hsl(var(--muted-foreground));
   }
 }
+
+/* Hide the (now‑unused) model selector dropdown */
+.model-selector { display: none !important; }
