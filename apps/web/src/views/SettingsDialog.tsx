@@ -35,7 +35,6 @@ export function SettingsDialog({ onClose }: Props) {
   const [busy, setBusy] = useState(false);
 
   // Chat fields
-  const [chatProvider, setChatProvider] = useState<string>('');
   const [chatModel, setChatModel] = useState<string>('');
   const [anthropicKey, setAnthropicKey] = useState<string>('');
   const [openaiKey, setOpenaiKey] = useState<string>('');
@@ -162,19 +161,7 @@ export function SettingsDialog({ onClose }: Props) {
               <code>@archivist</code>.
             </p>
             <div className="grid grid-cols-2 gap-3">
-              <label className="text-sm">
-                <div className="mb-1 text-xs text-muted-foreground">Provider</div>
-                <select
-                  className="w-full rounded border border-border bg-background px-2 py-1"
-                  value={chatProvider}
-                  onChange={(e) => setChatProvider(e.target.value)}
-                >
-                  <option value="">(none)</option>
-                  <option value="anthropic">Anthropic</option>
-                  <option value="openai">OpenAI</option>
-                  <option value="ollama">Ollama (local)</option>
-                </select>
-              </label>
+  
               <label className="text-sm">
                 <div className="mb-1 text-xs text-muted-foreground">Model</div>
                 <input
