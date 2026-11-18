@@ -1439,6 +1439,13 @@ export function registerSidecar(
 
   // --- /lw (raw CLI exec) --------------------------------------------------
   host.use('/lw', async (req, res) => {
+    const pathname = (req.url ?? '').split('?')[0] ?? '';
+    const subPath = pathname.replace(/^\/lw\b/, '');
+    if (subPath && subPath !== '/') {
+      res.statusCode = 404;
+      res.end(`Unknown sidecar endpoint: /lw${subPath}`);
+      return;
+    }
     if (req.method !== 'POST') {
       res.statusCode = 405;
       res.end('method not allowed');

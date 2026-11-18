@@ -119,7 +119,12 @@ export async function deleteSaga(sagaRoot: string): Promise<void> {
     body: JSON.stringify({ sagaRoot }),
   });
   if (!res.ok) {
-    throw new Error(`/lw/saga-delete ${res.status}: ${await res.text()}`);
+    const text = await res.text();
+    if (res.status === 404 || text.includes('args must be an array')) {
+      await lwDelete(sagaRoot, '.', { recursive: true });
+      return;
+    }
+    throw new Error(`/lw/saga-delete ${res.status}: ${text}`);
   }
 }
 
