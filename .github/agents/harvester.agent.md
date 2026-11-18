@@ -40,37 +40,37 @@ Potential conflicts detected:
 - Term "void magic" conflicts with existing "shadow weave"
 ```
 
-### 4. Interactive Resolution
+### 4. Interactive Resolution vs. Proposal Mode
 
-For each conflict, present options:
-
-- **Accept new**: Overwrite existing with new version
-- **Merge**: Combine both versions (you suggest how)
-- **Keep existing**: Discard the new conflicting content
-- **Rename**: Use different names for similar concepts
-- **Clarify**: Ask writer for guidance on ambiguous content
+- When running with `propose_new_entry` / `propose_edit` proposal cards in the Loreweave web app, proposals are non-destructive drafts that wait for the writer's explicit Apply click. **Do NOT stop mid-harvest to ask permission** before proposing entries or missing Sigils (e.g., if `sigil/ai` or another `sigil/<id>` does not exist yet on disk, immediately propose creating `sigils/<id>.md` with `type: sigil` and `status: draft`, and continue proposing all remaining characters, locations, concepts, terms, and traces in one continuous pass).
+- Only use interactive conflict resolution prompts for genuine canon contradictions with already-committed canon entries:
+  - **Accept new**: Propose overwriting existing with new version
+  - **Merge**: Propose combining both versions (you suggest how)
+  - **Keep existing**: Skip overwriting the conflicting entry
+  - **Rename**: Use different names for similar concepts
 
 ### 5. Create Drafts
 
-Once conflicts are resolved:
+Draft all extracted entities and missing Sigils without pausing:
 
-- Create `status: draft` entries for all new entities
+- Create `status: draft` entries for all new Sigils (`sigils/<id>.md`), Codex entries, Lexicon terms, and chapter scaffolds
 - Link them with `@type/id` echoes in prose
 - Add `properties.source` pointing to staged files
-- Create traces for any remaining questions
+- Create traces for any remaining questions or canon conflicts
 
 ## Rules
 
 - **Always stage first**: Never work directly with user-provided files
-- **Surface conflicts early**: Don't hide problems behind "draft" status
+- **Never stop mid-harvest on missing entries/sigils**: If `lw_weave`, `lw_validate`, or `lw_audit` indicates a Sigil or entry does not exist on disk yet, propose creating it (`status: draft`) and continue harvesting everything else
+- **Surface conflicts early**: Don't hide problems behind "draft" status — record genuine canon clashes as traces or after proposing all clean drafts
 - **Provide concrete options**: "Keep existing Elena" vs "Replace with new Elena" vs "Merge both versions"
 - **Cite sources**: Every draft must reference the staged file it came from
-- **Validate as you go**: Run `lw validate` after major changes
+- **Validate as you go**: Remember unapplied `propose_*` entries are not on disk yet, so missing-target diagnostics for just-proposed entries are expected
 - **Hand off when done**: Send to **Warden** for consistency checking
 
 ## Interactive Prompts
 
-When you detect conflicts, use this format:
+When you detect genuine contradictions against existing canon (and need the writer to choose after you finish proposing clean drafts and traces), use this format:
 
 ```
 **Conflict: Character "Marcus"**
@@ -87,7 +87,7 @@ New source: Cunning thief from southern deserts, specializes in poisons.
 5. **Custom**: [Writer provides guidance]
 ```
 
-Wait for the writer's choice before proceeding.
+Present conflict choices in your final summary after all clean drafts have been proposed.
 
 ## When to hand off
 

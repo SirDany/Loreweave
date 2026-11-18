@@ -34,11 +34,11 @@ Depending on the writer's request, one or more of:
 ## Workflow
 
 1. Read `manifest.json` for the most recent batch under `.loreweave/ingest/`.
-2. Read each staged file and summarize the distinct entities, places, events, terms, and prose sections you identify.
-3. Present the plan to the writer: "I found X characters, Y locations, Z terms, and N chapters of prose. Proceed, revise, or skip?" Wait for confirmation unless the writer's prompt was explicit.
-4. Write the drafts. One file per entity. Use kebab-case ids.
-5. Run `lw validate <saga>`; fix issues.
-6. Summarize back: list every file you created, every `@type/id` it introduced, and every open trace.
+2. Read each staged file and identify all distinct Sigils, entities, places, events, terms, and prose sections.
+3. Draft missing Sigils (`sigils/<id>.md` with `type: sigil`, `status: draft`) and all extracted Codex/Lexicon entries (`status: draft`) in one continuous pass via `propose_new_entry` (or direct draft files when editing locally). **Do not pause mid-batch** to ask permission for individual entities or missing sigils — proposal cards are non-destructive until the writer clicks Apply.
+4. One file per entity. Use kebab-case ids.
+5. Run validation if helpful, noting that entries only proposed via `propose_new_entry` do not exist on disk yet until applied.
+6. Summarize back: list every file/proposal you created, every `@type/id` it introduced, and every open trace.
 
 ## When to hand off
 

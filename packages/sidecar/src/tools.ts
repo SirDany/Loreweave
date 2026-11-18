@@ -62,7 +62,7 @@ const sagaRootSchema = z.string().min(1).describe(
 );
 const refSchema = z
   .string()
-  .regex(/^[a-z]+\/[a-zA-Z0-9._\-]+$/)
+  .regex(/^@?[a-z]+\/[a-zA-Z0-9._\-]+$/)
   .describe('Loreweave reference like "character/aaron" or "term/grukh".');
 
 export const toolSchemas = {
@@ -463,6 +463,22 @@ export async function runTool(
   const sagaRoot = resolveSagaRoot(ctx, sagaRootRel);
 
   try {
+    const normalizeRef = (raw: unknown): string =>
+      String(raw ?? '').trim().replace(/^@+/, '');
+
+    const diagnosticResult = (r: { code: number; stdout: string; stderr: string }) => {
+      const parsed = tryJson(r.stdout);
+      if (
+        parsed &&
+        typeof parsed === 'object' &&
+        !Array.isArray(parsed) &&
+        'diagnostics' in parsed
+      ) {
+        return { ok: true, data: parsed };
+      }
+      return { ok: r.code === 0, data: parsed, error: r.stderr || undefined };
+    };
+
     switch (name) {
       case 'lw_validate': {
         const r = await execCli(
@@ -472,23 +488,36 @@ export async function runTool(
           20_000,
           signal,
         );
-        return { ok: r.code === 0, data: tryJson(r.stdout), error: r.stderr || undefined };
+        return diagnosticResult(r);
       }
       case 'lw_weave': {
+        const ref = normalizeRef(args.ref);
         const r = await execCli(
           ctx.cliBin,
           ctx.repoRoot,
-          ['weave', sagaRootRel, args.ref as string, '--json'],
+          ['weave', sagaRootRel, ref, '--json'],
           20_000,
           signal,
         );
+        if (r.code !== 0 && /not found/i.test(r.stderr || r.stdout)) {
+          return {
+            ok: true,
+            data: {
+              exists: false,
+              ref,
+              message:
+                'Entry does not exist on disk yet (or is an unapplied proposal). If this is a missing sigil or entry needed by your harvest/edits, call propose_new_entry (with status: draft) to create it and continue your work without stopping.',
+            },
+          };
+        }
         return { ok: r.code === 0, data: tryJson(r.stdout), error: r.stderr || undefined };
       }
       case 'lw_echoes': {
+        const ref = normalizeRef(args.ref);
         const r = await execCli(
           ctx.cliBin,
           ctx.repoRoot,
-          ['echoes', sagaRootRel, args.ref as string, '--json'],
+          ['echoes', sagaRootRel, ref, '--json'],
           20_000,
           signal,
         );
@@ -524,7 +553,7 @@ export async function runTool(
         const cli = ['audit', sagaRootRel, '--json'];
         if (args.tome) cli.push('--tome', args.tome as string);
         const r = await execCli(ctx.cliBin, ctx.repoRoot, cli, 30_000, signal);
-        return { ok: r.code === 0, data: tryJson(r.stdout), error: r.stderr || undefined };
+        return diagnosticResult(r);
       }
       case 'lw_list_entries': {
         const r = await execCli(
@@ -541,7 +570,27 @@ export async function runTool(
         if (typeof parsed === 'string') {
           return { ok: false, error: 'dump returned non-JSON' };
         }
-        const typeFilter = args.type as string | undefined;
+        const typeAliases: Record<string, string | undefined> = {
+          all: undefined,
+          '*': undefined,
+          any: undefined,
+          '': undefined,
+          characters: 'character',
+          locations: 'location',
+          concepts: 'concept',
+          lores: 'lore',
+          waypoints: 'waypoint',
+          events: 'waypoint',
+          event: 'waypoint',
+          terms: 'term',
+          lexicon: 'term',
+          sigils: 'sigil',
+          tags: 'sigil',
+          tag: 'sigil',
+        };
+        const rawType = typeof args.type === 'string' ? args.type.trim().toLowerCase() : '';
+        const typeFilter =
+          rawType in typeAliases ? typeAliases[rawType] : rawType || undefined;
         const rows = parsed.entries
           .filter((e) => !typeFilter || e.type === typeFilter)
           .map((e) => ({ type: e.type, id: e.id, name: e.name }));

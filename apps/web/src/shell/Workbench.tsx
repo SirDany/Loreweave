@@ -64,7 +64,7 @@ export function Workbench({
   const [storyTab, setStoryTab] = useState<'edit' | 'preview'>('edit');
 
   return (
-    <main className="flex-1 flex flex-col panel-glass overflow-hidden">
+    <main className="flex-1 min-w-0 min-h-0 h-full flex flex-col panel-glass overflow-hidden">
       {currentEntry && (
         <EntryView
           entry={currentEntry}

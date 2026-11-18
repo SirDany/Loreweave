@@ -268,4 +268,30 @@ describe('sidecar /lw/digest', () => {
     expect(data.content.startsWith('---\nid: new-ai\ntype: character\n')).toBe(true);
     expect(data.content).not.toContain('```markdown');
   });
+
+  it('runTool lw_list_entries handles all/plural aliases and lw_weave returns exists: false on missing sigils', async () => {
+    const toolCtx = {
+      repoRoot: dir,
+      cliBin,
+      defaultSagaRoot: saga,
+      safeJoin: (root: string, rel: string) => path.resolve(root, rel),
+    };
+
+    const allRes = await runTool('lw_list_entries', { sagaRoot: saga, type: 'all' }, toolCtx);
+    expect(allRes.ok).toBe(true);
+    const allRows = allRes.data as Array<{ type: string; id: string; name: string }>;
+    expect(allRows.length).toBeGreaterThan(0);
+
+    const charRes = await runTool('lw_list_entries', { sagaRoot: saga, type: 'characters' }, toolCtx);
+    expect(charRes.ok).toBe(true);
+    const charRows = charRes.data as Array<{ type: string; id: string; name: string }>;
+    expect(charRows.length).toBeGreaterThan(0);
+    expect(charRows.every((r) => r.type === 'character')).toBe(true);
+
+    const weaveRes = await runTool('lw_weave', { sagaRoot: saga, ref: '@sigil/nonexistent' }, toolCtx);
+    expect(weaveRes.ok).toBe(true);
+    const weaveData = weaveRes.data as { exists: boolean; ref: string; message: string };
+    expect(weaveData.exists).toBe(false);
+    expect(weaveData.ref).toBe('sigil/nonexistent');
+  });
 });

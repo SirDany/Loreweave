@@ -42,8 +42,8 @@ export function CodexPane({ cursorRef, digest, onJump }: Props) {
     );
   }
   return (
-    <div className="flex h-full flex-col overflow-hidden">
-      <div className="border-b border-border bg-card/40 px-4 py-2">
+    <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
+      <div className="shrink-0 border-b border-border bg-card/40 px-4 py-2">
         <button
           className="font-serif text-base hover:underline"
           onClick={() => onJump?.(entry.type, entry.id)}
@@ -65,7 +65,7 @@ export function CodexPane({ cursorRef, digest, onJump }: Props) {
           </span>
         )}
       </div>
-      <div className="flex-1 overflow-auto px-4 py-3 text-sm">
+      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden break-words px-4 py-3 text-sm">
         {entry.aliases && entry.aliases.length > 0 && (
           <div className="mb-2 text-xs text-muted-foreground">
             a.k.a. {entry.aliases.join(', ')}

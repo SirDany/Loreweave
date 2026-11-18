@@ -273,9 +273,9 @@ export function AssistantPanel({
   return (
     <aside
       style={{ width: width ? `${width}px` : undefined }}
-      className="w-[420px] shrink-0 flex flex-col panel-glass h-full overflow-hidden"
+      className="w-[420px] shrink-0 flex flex-col panel-glass h-full min-h-0 max-h-full overflow-hidden"
     >
-      <header className="px-4 py-2.5 border-b border-border/80 bg-muted/15 flex items-center gap-2">
+      <header className="shrink-0 px-4 py-2.5 border-b border-border/80 bg-muted/15 flex items-center gap-2">
         <span className="h-2 w-2 rounded-full bg-primary animate-pulse shrink-0" />
         <span className="font-semibold text-xs tracking-tight text-foreground">Scribe</span>
         {onOpenAiSettings && aiPill ? (
@@ -377,7 +377,7 @@ export function AssistantPanel({
       {/* Messages */}
       <div
         ref={scrollRef}
-        className="flex-1 overflow-auto scrollbar-ember px-4 py-3 space-y-4"
+        className="flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden scrollbar-ember px-4 py-3 space-y-4"
       >
         {chat.messages.length === 0 && (
           <div className="text-sm text-muted-foreground italic space-y-2">
@@ -461,7 +461,7 @@ export function AssistantPanel({
       </div>
 
       {/* Composer */}
-      <div className="border-t border-border/80 bg-background/70 backdrop-blur-md p-3 space-y-2">
+      <div className="shrink-0 border-t border-border/80 bg-background/70 backdrop-blur-md p-3 space-y-2">
         {/* Quick Scribe Intent Chips */}
         <div className="flex flex-wrap items-center gap-1.5 pb-0.5">
           <button
@@ -687,7 +687,7 @@ function MessageBubble({
   return (
     <div
       className={cn(
-        'rounded-md px-3 py-2 text-sm',
+        'min-w-0 overflow-hidden break-words rounded-md px-3 py-2 text-sm',
         isUser
           ? 'bg-accent/50 border border-accent text-foreground ml-6'
           : 'bg-background border border-border text-foreground mr-6',
@@ -737,7 +737,7 @@ function ToolCallChip({ call }: { call: ChatToolCall }) {
   const [open, setOpen] = useState(false);
   const ok = call.result?.ok;
   return (
-    <div className="rounded-md border border-border bg-muted/30 text-[11px]">
+    <div className="min-w-0 max-w-full overflow-hidden rounded-md border border-border bg-muted/30 text-[11px]">
       <button
         onClick={() => setOpen((v) => !v)}
         className="flex w-full items-center gap-1.5 px-2 py-1 text-left"
@@ -767,14 +767,14 @@ function ToolCallChip({ call }: { call: ChatToolCall }) {
         <div className="border-t border-border px-2 py-1 space-y-1">
           <div>
             <div className="label-rune">args</div>
-            <pre className="whitespace-pre-wrap break-words font-mono text-[10px] text-muted-foreground">
+            <pre className="overflow-x-hidden whitespace-pre-wrap break-all font-mono text-[10px] text-muted-foreground">
               {JSON.stringify(call.args, null, 2)}
             </pre>
           </div>
           {call.result && (
             <div>
               <div className="label-rune">result</div>
-              <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-words font-mono text-[10px] text-muted-foreground">
+              <pre className="max-h-48 overflow-y-auto overflow-x-hidden whitespace-pre-wrap break-all font-mono text-[10px] text-muted-foreground">
                 {call.result.error
                   ? call.result.error
                   : JSON.stringify(call.result.data, null, 2)}
@@ -803,7 +803,7 @@ function PendingActionCard({
   return (
     <div
       className={cn(
-        'rounded-md border-2 p-3 space-y-2',
+        'min-w-0 overflow-hidden rounded-md border-2 p-3 space-y-2',
         stale
           ? 'border-amber-500/60 bg-amber-500/5'
           : applied
@@ -831,7 +831,7 @@ function PendingActionCard({
           </Badge>
         )}
       </div>
-      <div className="font-mono text-[11px] text-foreground/80">
+      <div className="break-all font-mono text-[11px] text-foreground/80">
         {action.relPath}
       </div>
       {action.rationale && (
@@ -849,9 +849,9 @@ function PendingActionCard({
           File saved, but auto-commit failed: {action.commitError}
         </div>
       )}
-      <div className="max-h-60 overflow-auto rounded border border-border bg-background font-mono text-[10px] leading-relaxed">
+      <div className="max-h-60 overflow-y-auto overflow-x-hidden rounded border border-border bg-background font-mono text-[10px] leading-relaxed">
         {action.diff ? (
-          <pre className="p-2">
+          <pre className="p-2 whitespace-pre-wrap break-words">
             {action.diff.split('\n').map((line, i) => {
               let cls = 'text-foreground/90';
               if (line.startsWith('+++') || line.startsWith('---'))
@@ -921,7 +921,7 @@ function PendingActionCard({
 function MarkdownContent({ text }: { text: string }) {
   const blocks = useMemo(() => splitBlocks(text), [text]);
   return (
-    <div className="space-y-2 leading-relaxed">
+    <div className="min-w-0 break-words space-y-2 leading-relaxed">
       {blocks.map((b, i) => renderBlock(b, i))}
     </div>
   );
@@ -1019,7 +1019,7 @@ function renderBlock(b: Block, key: number): JSX.Element {
       return (
         <pre
           key={key}
-          className="max-h-60 overflow-auto rounded-md border border-border bg-background px-2 py-1 font-mono text-[11px] leading-snug"
+          className="max-h-60 overflow-y-auto overflow-x-hidden whitespace-pre-wrap break-words rounded-md border border-border bg-background px-2 py-1 font-mono text-[11px] leading-snug"
         >
           {b.text}
         </pre>
@@ -1069,7 +1069,7 @@ function renderInline(text: string): (JSX.Element | string)[] {
     if (m.index > last) tokens.push(text.slice(last, m.index));
     if (m[1] != null) {
       tokens.push(
-        <code key={i++} className="rounded bg-muted/60 px-1 font-mono text-[11px]">
+        <code key={i++} className="break-all rounded bg-muted/60 px-1 font-mono text-[11px]">
           {m[1]}
         </code>,
       );
@@ -1106,7 +1106,7 @@ function renderInline(text: string): (JSX.Element | string)[] {
         <span
           key={i++}
           title={`@${m[6]}/${m[7]}`}
-          className="rounded bg-primary/15 px-1 font-mono text-[11px] text-primary"
+          className="break-all rounded bg-primary/15 px-1 font-mono text-[11px] text-primary"
         >
           {label}
         </span>,

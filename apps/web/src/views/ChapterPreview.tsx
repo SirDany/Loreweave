@@ -93,7 +93,7 @@ export function ChapterPreview({ chapter, data, onJump }: ChapterPreviewProps) {
   });
 
   return (
-    <div className="flex-1 overflow-auto scrollbar-ember bg-parchment-grain">
+    <div className="flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden break-words scrollbar-ember bg-parchment-grain">
       <article className="mx-auto max-w-2xl px-10 py-12 font-serif text-[1.05rem] text-foreground/90 animate-fade-in">
         <header className="mb-8">
           <div className="label-rune">Chapter</div>

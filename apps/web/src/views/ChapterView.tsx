@@ -88,8 +88,8 @@ export function ChapterView({
   const charCount = draft.length;
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden animate-panel-enter">
-      <header className="px-4 py-2.5 border-b border-border/80 bg-card/40 backdrop-blur-md flex items-center gap-3">
+    <div className="flex-1 min-h-0 min-w-0 flex flex-col overflow-hidden animate-panel-enter">
+      <header className="shrink-0 flex-wrap px-4 py-2.5 border-b border-border/80 bg-card/40 backdrop-blur-md flex items-center gap-3">
         <div className="flex-1 min-w-0">
           <div className="font-mono text-[11px] text-muted-foreground truncate">
             {chapter.chapter.relPath}
@@ -172,8 +172,8 @@ export function ChapterView({
           </Button>
         </div>
       </header>
-      <div className="flex flex-1 overflow-hidden">
-        <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="flex flex-1 min-h-0 min-w-0 overflow-hidden">
+        <div className="flex flex-1 min-h-0 min-w-0 flex-col overflow-hidden">
           <Editor
             value={draft}
             catalog={catalog}
@@ -188,7 +188,7 @@ export function ChapterView({
           />
         </div>
         {paneOpen && (
-          <aside className="w-80 shrink-0 border-l border-border bg-card/30">
+          <aside className="w-80 shrink-0 min-h-0 border-l border-border bg-card/30 overflow-hidden flex flex-col">
             <CodexPane
               cursorRef={cursorRef}
               digest={digest}

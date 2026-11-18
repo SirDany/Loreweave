@@ -70,8 +70,8 @@ export function EntryView({
   };
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden animate-panel-enter">
-      <header className="px-4 py-2.5 border-b border-border/80 bg-card/40 backdrop-blur-md flex items-center gap-3">
+    <div className="flex-1 min-h-0 min-w-0 flex flex-col overflow-hidden animate-panel-enter">
+      <header className="shrink-0 flex-wrap px-4 py-2.5 border-b border-border/80 bg-card/40 backdrop-blur-md flex items-center gap-3">
         <div className="flex-1 min-w-0">
           <div className="font-mono text-[11px] text-muted-foreground truncate">
             {entry.relPath}
@@ -136,7 +136,7 @@ export function EntryView({
           </Button>
         </div>
       </header>
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 min-h-0 min-w-0 overflow-hidden">
         <Editor value={draft} catalog={catalog} onChange={setDraft} />
       </div>
       {editing && (

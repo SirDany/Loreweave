@@ -91,9 +91,9 @@ export function ResolvedPanel({
   return (
     <aside
       style={{ width: width ? `${width}px` : undefined }}
-      className="w-80 shrink-0 panel-glass flex flex-col overflow-hidden"
+      className="w-80 shrink-0 min-h-0 h-full panel-glass flex flex-col overflow-hidden"
     >
-      <div className="px-4 pt-4 pb-3 border-b border-border/80">
+      <div className="shrink-0 px-4 pt-4 pb-3 border-b border-border/80">
         <div className="label-rune">{entry.type}</div>
         <div className="mt-1 font-semibold text-base tracking-tight text-foreground">{entry.name}</div>
         <div className="font-mono text-[11px] text-muted-foreground">
@@ -105,7 +105,7 @@ export function ResolvedPanel({
           </div>
         )}
       </div>
-      <nav className="flex text-xs border-b border-border/80 bg-muted/15 p-1 gap-1">
+      <nav className="shrink-0 flex text-xs border-b border-border/80 bg-muted/15 p-1 gap-1">
         <TabButton
           active={tab === "resolved"}
           onClick={() => setTab("resolved")}
@@ -127,7 +127,7 @@ export function ResolvedPanel({
           label="Diff"
         />
       </nav>
-      <div className="flex-1 overflow-auto scrollbar-ember p-4">
+      <div className="flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden break-words scrollbar-ember p-4">
         {tab === "resolved" && (
           <ResolvedTab entry={entry} keys={keys} />
         )}
@@ -171,7 +171,7 @@ function DiffTab({ entry, sagaPath }: { entry: DumpEntry; sagaPath?: string }) {
     );
   if (!patch || !patch.trim())
     return <div className="text-xs text-muted-foreground">no changes against HEAD</div>;
-  return <pre className="text-[11px] font-mono whitespace-pre-wrap">{colorize(patch)}</pre>;
+  return <pre className="text-[11px] font-mono whitespace-pre-wrap break-words">{colorize(patch)}</pre>;
 }
 
 function colorize(patch: string): ReactNode[] {
@@ -301,9 +301,9 @@ function ChapterInspector({
   return (
     <aside
       style={{ width: width ? `${width}px` : undefined }}
-      className="w-80 shrink-0 panel-glass flex flex-col overflow-hidden"
+      className="w-80 shrink-0 min-h-0 h-full panel-glass flex flex-col overflow-hidden"
     >
-      <div className="px-4 pt-4 pb-3 border-b border-border/80">
+      <div className="shrink-0 px-4 pt-4 pb-3 border-b border-border/80">
         <div className="label-rune">chapter · {chapter.tome}</div>
         <div className="mt-1 font-semibold text-base tracking-tight text-foreground">{c.title}</div>
         <div className="font-mono text-[11px] text-muted-foreground truncate">
@@ -315,7 +315,7 @@ function ChapterInspector({
           </span>
         )}
       </div>
-      <div className="flex-1 overflow-auto scrollbar-ember p-4 space-y-4 text-sm">
+      <div className="flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden break-words scrollbar-ember p-4 space-y-4 text-sm">
         {povList.length > 0 && (
           <div>
             <div className="label-rune mb-1">POV</div>

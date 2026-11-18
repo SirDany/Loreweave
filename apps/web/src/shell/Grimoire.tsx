@@ -344,7 +344,7 @@ export function Grimoire({
       {!collapsed && (
         <nav
           style={{ width: width ? `${width}px` : undefined }}
-          className="w-80 shrink-0 flex flex-col panel-glass overflow-hidden"
+          className="w-80 shrink-0 min-h-0 h-full flex flex-col panel-glass overflow-hidden"
         >
           {/* Compact Top Section Switch Trigger + Collapse */}
           <div className="shrink-0 px-3 py-2 border-b border-border/60 flex items-center justify-between gap-2 bg-card/30">
@@ -390,7 +390,7 @@ export function Grimoire({
           </div>
 
           {/* 100% Dedicated Section Directory & Actions */}
-          <div className="flex-1 overflow-auto scrollbar-ember px-3 py-2.5">
+          <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden scrollbar-ember px-3 py-2.5">
             <SectionList
               section={section}
               data={data}

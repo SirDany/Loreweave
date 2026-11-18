@@ -83,6 +83,10 @@ const modernEditorTheme = EditorView.theme({
     color: "hsl(var(--foreground))",
     height: "100%",
   },
+  ".cm-scroller": {
+    overflowX: "hidden",
+    overflowY: "auto",
+  },
   ".cm-content": {
     fontFamily:
       "Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
@@ -90,6 +94,8 @@ const modernEditorTheme = EditorView.theme({
     lineHeight: "1.75",
     padding: "1.25rem 1.5rem",
     caretColor: "hsl(var(--primary))",
+    overflowWrap: "anywhere",
+    wordBreak: "break-word",
   },
   ".cm-gutters": {
     backgroundColor: "transparent",
@@ -132,6 +138,7 @@ export function Editor({ value, catalog, readOnly, onChange, onAskAssistant, onR
       extensions: [
         lineNumbers(),
         history(),
+        EditorView.lineWrapping,
         keymap.of([
           // Markdown formatting shortcuts take precedence so Ctrl+B / Ctrl+I
           // don't fall through to the default keymap's selection commands.
@@ -230,11 +237,11 @@ export function Editor({ value, catalog, readOnly, onChange, onAskAssistant, onR
   }, [value]);
 
   return (
-    <div className="flex h-full flex-col overflow-hidden">
+    <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
       {!readOnly && !hideToolbar && (
         <MarkdownToolbar viewRef={view} />
       )}
-      <div ref={host} className="relative flex-1 overflow-auto">
+      <div ref={host} className="relative flex-1 min-h-0 min-w-0 overflow-hidden">
         {anchor && onAskAssistant && (
           <div
             className="absolute z-40 flex items-center gap-1 rounded-lg border border-border/80 bg-popover/95 backdrop-blur-md px-2 py-1 shadow-xl ring-1 ring-primary/25"
