@@ -32,6 +32,8 @@ interface GrimoireProps {
   onNewSigil?: () => void;
   onNewChapter?: () => void;
   width?: number;
+  collapsed?: boolean;
+  onToggleCollapsed?: () => void;
 }
 
 const COLLAPSED_STORAGE_KEY = 'lw.grimoire.collapsed';
@@ -65,23 +67,31 @@ export function Grimoire({
   onNewSigil,
   onNewChapter,
   width,
+  collapsed: controlledCollapsed,
+  onToggleCollapsed,
 }: GrimoireProps) {
   const sections = getSections();
   const [wheelOpen, setWheelOpen] = useState(false);
   const [hoveredSection, setHoveredSection] = useState<Section | null>(null);
-  const [collapsed, setCollapsed] = useState<boolean>(() => loadCollapsed());
+  const [internalCollapsed, setInternalCollapsed] = useState<boolean>(() => loadCollapsed());
+  const isControlled = typeof controlledCollapsed === 'boolean';
+  const collapsed = isControlled ? controlledCollapsed : internalCollapsed;
   const closeTimerRef = useRef<number | null>(null);
 
   const toggleCollapsed = () => {
-    setCollapsed((prev) => {
-      const next = !prev;
-      try {
-        window.localStorage.setItem(COLLAPSED_STORAGE_KEY, next ? '1' : '0');
-      } catch {
-        /* ignore */
-      }
-      return next;
-    });
+    if (onToggleCollapsed) {
+      onToggleCollapsed();
+    } else {
+      setInternalCollapsed((prev) => {
+        const next = !prev;
+        try {
+          window.localStorage.setItem(COLLAPSED_STORAGE_KEY, next ? '1' : '0');
+        } catch {
+          /* ignore */
+        }
+        return next;
+      });
+    }
   };
 
   useEffect(() => {
@@ -150,6 +160,20 @@ export function Grimoire({
     });
   }, [sections]);
 
+  const collapsedExpandButton = collapsed ? (
+    <div className="fixed left-0 top-[62px] z-[55] select-none">
+      <button
+        type="button"
+        onClick={toggleCollapsed}
+        aria-label="Expand directory sidebar (Ctrl+B)"
+        title="Expand directory sidebar (Ctrl+B)"
+        className="group flex h-11 w-9 items-center justify-center rounded-r-xl popover-glass border-l-0 text-muted-foreground hover:text-primary hover:w-11 transition-all duration-200 shadow-md interactive-lift"
+      >
+        <PanelLeftOpen className="h-4 w-4 transition-transform duration-200 group-hover:scale-110" />
+      </button>
+    </div>
+  ) : null;
+
   const radialDock = (
     <div
       className="fixed left-0 top-1/2 -translate-y-1/2 z-[60] select-none"
@@ -172,18 +196,6 @@ export function Grimoire({
             <ActiveIcon className="h-4 w-4 text-primary transition-transform duration-300 group-hover:scale-110" />
             <ChevronRight className="h-3 w-3 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all" />
           </button>
-
-          {collapsed && (
-            <button
-              type="button"
-              onClick={toggleCollapsed}
-              aria-label="Expand contextual sidebar"
-              title="Show section directory sidebar"
-              className="flex h-8 w-8 items-center justify-center rounded-r-xl popover-glass border-l-0 text-muted-foreground hover:text-primary interactive-lift"
-            >
-              <PanelLeftOpen className="h-3.5 w-3.5" />
-            </button>
-          )}
         </div>
       ) : (
         <div
@@ -269,6 +281,22 @@ export function Grimoire({
                 {inspectedCount} items
               </div>
             )}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleCollapsed();
+              }}
+              className="pointer-events-auto mt-1 flex items-center gap-1.5 text-[10px] text-muted-foreground hover:text-primary transition-colors text-left"
+              title={collapsed ? 'Expand directory sidebar (Ctrl+B)' : 'Collapse directory sidebar (Ctrl+B)'}
+            >
+              {collapsed ? (
+                <PanelLeftOpen className="h-3 w-3 shrink-0" />
+              ) : (
+                <PanelLeftClose className="h-3 w-3 shrink-0" />
+              )}
+              <span className="truncate">{collapsed ? 'Show sidebar' : 'Hide sidebar'}</span>
+            </button>
           </div>
 
           {/* Radial Arc Menu Items */}
@@ -337,6 +365,11 @@ export function Grimoire({
 
   return (
     <>
+      {/* Standalone Sidebar Expand Button when Collapsed (positioned at top-left, independent of the radial menu) */}
+      {typeof document !== 'undefined' && collapsedExpandButton
+        ? createPortal(collapsedExpandButton, document.body)
+        : collapsedExpandButton}
+
       {/* Left-Edge Half-Circle Radial Slide-Out Grimoire (portaled above panels & header) */}
       {typeof document !== 'undefined' ? createPortal(radialDock, document.body) : radialDock}
 

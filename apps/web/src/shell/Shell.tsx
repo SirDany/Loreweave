@@ -7,6 +7,8 @@ import {
   FolderCog,
   Layers,
   Palette,
+  PanelLeftClose,
+  PanelLeftOpen,
   PanelRight,
   Plus,
   Search,
@@ -16,7 +18,7 @@ import {
   VolumeX,
   X,
 } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AmbientBackground } from '../components/AmbientBackground.js';
 import { Badge } from '../components/ui/badge.js';
 import { addRecentSaga } from '../lib/desktop.js';
@@ -125,9 +127,30 @@ export function Shell({ app }: ShellProps) {
     growOnRight: false,
   });
 
+  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
+    try {
+      return window.localStorage.getItem('lw.grimoire.collapsed') === '1';
+    } catch {
+      return false;
+    }
+  });
+
+  const toggleSidebar = useCallback(() => {
+    setSidebarCollapsed((prev) => {
+      const next = !prev;
+      try {
+        window.localStorage.setItem('lw.grimoire.collapsed', next ? '1' : '0');
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  }, []);
+
   useShortcuts({
     onSearch: () => openDialog('searching'),
     onToggleAssistant: toggleAssistant,
+    onToggleSidebar: toggleSidebar,
   });
 
   const { skin } = useSkin();
@@ -259,8 +282,30 @@ export function Shell({ app }: ShellProps) {
 
       {/* Floating Command Deck Header */}
       <header className="relative z-40 mx-1.5 mt-1.5 h-11 header-glass px-3 flex items-center justify-between gap-2.5 shrink-0 select-none">
-        {/* Left: Scalable Saga Switcher, Tome Lens Switcher & View/Lens Breadcrumb */}
+        {/* Left: Sidebar Toggle, Scalable Saga Switcher, Tome Lens Switcher & View/Lens Breadcrumb */}
         <div className="flex items-center gap-1.5 min-w-0 shrink-0">
+          <button
+            type="button"
+            onClick={toggleSidebar}
+            className={cn(
+              'p-1.5 rounded-xl border transition-all duration-200 interactive-lift',
+              sidebarCollapsed
+                ? 'border-border/70 bg-background/50 text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                : 'border-primary/40 bg-primary/10 text-primary hover:bg-primary/20',
+            )}
+            title={
+              sidebarCollapsed
+                ? 'Expand directory sidebar (Ctrl+B)'
+                : 'Collapse directory sidebar (Ctrl+B)'
+            }
+            aria-label="Toggle directory sidebar"
+          >
+            {sidebarCollapsed ? (
+              <PanelLeftOpen className="h-3.5 w-3.5" />
+            ) : (
+              <PanelLeftClose className="h-3.5 w-3.5" />
+            )}
+          </button>
           <SagaSwitcherMenu
             data={data}
             currentSagaPath={saga.sagaPath}
@@ -420,14 +465,18 @@ export function Shell({ app }: ShellProps) {
             setPendingNew({ kind: 'chapter', tome: saga.tomeLens ?? undefined })
           }
           width={grimoireResize.width}
+          collapsed={sidebarCollapsed}
+          onToggleCollapsed={toggleSidebar}
         />
 
-        {/* Resize handle between Grimoire and Workbench */}
-        <div
-          onMouseDown={grimoireResize.handleMouseDown}
-          className="resize-handle-pro"
-          title="Drag to resize Grimoire"
-        />
+        {/* Resize handle between Grimoire and Workbench — only shown when sidebar is open */}
+        {!sidebarCollapsed && (
+          <div
+            onMouseDown={grimoireResize.handleMouseDown}
+            className="resize-handle-pro"
+            title="Drag to resize Grimoire"
+          />
+        )}
 
         <Workbench
           section={section}
