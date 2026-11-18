@@ -77,7 +77,13 @@ export async function gitStatus(sagaPath: string): Promise<GitStatus> {
     runGit(repoRoot, ["rev-parse", "--verify", "MERGE_HEAD"]),
   ]);
 
-  const branch = branchR.code === 0 ? branchR.stdout.trim() : null;
+  let branch: string | null = branchR.code === 0 ? branchR.stdout.trim() : null;
+  if (!branch) {
+    const symR = await runGit(repoRoot, ["symbolic-ref", "--short", "HEAD"]);
+    if (symR.code === 0 && symR.stdout.trim()) {
+      branch = symR.stdout.trim();
+    }
+  }
   const head = headR.code === 0 ? headR.stdout.trim() : "";
   const upstream = upstreamR.code === 0 ? upstreamR.stdout.trim() : null;
   const inMerge = mergeHeadR.code === 0;
@@ -142,6 +148,13 @@ export async function gitBranches(sagaPath: string, all = false): Promise<GitBra
       head: (sha ?? "").trim(),
     });
   }
+  if (out.length === 0) {
+    const symR = await runGit(repoRoot, ["symbolic-ref", "--short", "HEAD"]);
+    const sym = symR.code === 0 ? symR.stdout.trim() : "";
+    if (sym) {
+      out.push({ name: sym, current: true, remote: false, head: "" });
+    }
+  }
   return out;
 }
 
@@ -187,7 +200,11 @@ export async function gitCommit(
 ): Promise<{ sha: string; subject: string }> {
   if (!message.trim()) throw new Error("commit message cannot be empty");
   const repoRoot = await ensureRepo(sagaPath);
-  const stage = await runGit(repoRoot, opts.all ? ["add", "-A"] : ["add", sagaPath]);
+  const relTarget = path.relative(repoRoot, path.resolve(sagaPath)) || ".";
+  const stage = await runGit(
+    repoRoot,
+    opts.all ? ["add", "-A"] : ["add", "-A", "--", relTarget],
+  );
   if (stage.code !== 0) throw new Error(stage.stderr.trim() || "git add failed");
   const r = await runGit(repoRoot, ["commit", "-m", message]);
   if (r.code !== 0) {
@@ -239,10 +256,42 @@ export async function gitBranchDelete(
 
 export async function gitInit(sagaPath: string): Promise<string> {
   const abs = path.resolve(sagaPath);
-  await fs.mkdir(abs, { recursive: true });
-  const r = await runGit(abs, ["init"]);
-  if (r.code !== 0) throw new Error(r.stderr.trim() || "git init failed");
-  return r.stdout.trim();
+  const st = await fs.stat(abs).catch(() => null);
+  if (!st || !st.isDirectory()) {
+    throw new Error(`Saga directory does not exist: ${abs}`);
+  }
+  let r = await runGit(abs, ["init", "-b", "main"]);
+  if (r.code !== 0) {
+    r = await runGit(abs, ["init"]);
+    if (r.code !== 0) throw new Error(r.stderr.trim() || "git init failed");
+    await runGit(abs, ["symbolic-ref", "HEAD", "refs/heads/main"]);
+  }
+  const hasHead = await runGit(abs, ["rev-parse", "--verify", "HEAD"]);
+  if (hasHead.code !== 0) {
+    const stage = await runGit(abs, ["add", "-A"]);
+    if (stage.code === 0) {
+      let commit = await runGit(abs, [
+        "commit",
+        "--allow-empty",
+        "-m",
+        "Initialize Saga timeline",
+      ]);
+      if (commit.code !== 0) {
+        commit = await runGit(abs, [
+          "-c",
+          "user.name=Loreweave",
+          "-c",
+          "user.email=scribe@loreweave.local",
+          "commit",
+          "--allow-empty",
+          "-m",
+          "Initialize Saga timeline",
+        ]);
+      }
+      void commit;
+    }
+  }
+  return r.stdout.trim() || "Initialized Saga git timeline on branch main";
 }
 
 export interface GitRemote {

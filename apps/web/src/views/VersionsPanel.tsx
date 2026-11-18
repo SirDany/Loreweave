@@ -194,12 +194,32 @@ export function VersionsPanel({ sagaPath, onChanged, openAssistant }: Props) {
     }
   };
 
-  const currentBranchName = status?.branch ?? 'main';
+  const activeLocalBranch =
+    status?.branch ??
+    branches.find((b) => b.current && !b.remote)?.name ??
+    null;
+  const currentBranchName =
+    activeLocalBranch ?? (status?.head ? `detached@${status.head}` : 'main');
   const isCurrentPrivate = privateBranches.has(currentBranchName);
   const isDefaultBranch =
     currentBranchName === 'main' ||
     currentBranchName === 'master' ||
     currentBranchName === 'trunk';
+
+  const localBranches = (() => {
+    const list = branches.filter((b) => !b.remote);
+    if (list.length === 0 && activeLocalBranch) {
+      return [
+        {
+          name: activeLocalBranch,
+          current: true,
+          remote: false,
+          head: status?.head ?? '',
+        },
+      ];
+    }
+    return list;
+  })();
 
   // 1-Click Cloud Sync
   const handleSync = async () => {
@@ -311,10 +331,13 @@ export function VersionsPanel({ sagaPath, onChanged, openAssistant }: Props) {
             <GitBranchIcon className="h-4 w-4" />
           </div>
           <div className="min-w-0">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="font-semibold text-sm text-foreground truncate">
                 {isDefaultBranch ? 'Main Storyline' : currentBranchName}
               </span>
+              <code className="rounded border border-border/70 bg-background/60 px-1.5 py-0.5 font-mono text-[11px] text-primary">
+                {currentBranchName}
+              </code>
               {isDefaultBranch && (
                 <span className="rounded bg-primary/20 px-1.5 py-0.5 text-[10px] font-semibold text-primary uppercase tracking-wider">
                   Canon
@@ -332,8 +355,18 @@ export function VersionsPanel({ sagaPath, onChanged, openAssistant }: Props) {
                 </span>
               )}
             </div>
-            <div className="text-[11px] text-muted-foreground flex items-center gap-2 mt-0.5">
+            <div className="text-[11px] text-muted-foreground flex items-center gap-2 mt-0.5 flex-wrap">
               <span>{log.length} recorded revision checkpoints</span>
+              {status?.head && (
+                <code className="font-mono text-muted-foreground/80">
+                  @{status.head}
+                </code>
+              )}
+              {remotes[0]?.name && (
+                <span>
+                  remote: <code className="font-mono">{remotes[0].name}</code>
+                </span>
+              )}
               {status && (status.ahead > 0 || status.behind > 0) && (
                 <span className="text-primary font-medium">
                   ({status.ahead > 0 ? `${status.ahead} local to sync` : ''}
@@ -477,9 +510,7 @@ export function VersionsPanel({ sagaPath, onChanged, openAssistant }: Props) {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {branches
-              .filter((b) => !b.remote)
-              .map((b) => {
+            {localBranches.map((b) => {
                 const isDefault = b.name === 'main' || b.name === 'master';
                 const isPriv = privateBranches.has(b.name);
                 const isActive = b.current;
@@ -496,10 +527,18 @@ export function VersionsPanel({ sagaPath, onChanged, openAssistant }: Props) {
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-semibold text-sm text-foreground truncate">
                             {isDefault ? 'Main Storyline (Canon)' : b.name}
                           </span>
+                          <code className="rounded border border-border/60 bg-background/50 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+                            {b.name}
+                          </code>
+                          {b.head && (
+                            <code className="font-mono text-[10px] text-muted-foreground/70">
+                              {b.head}
+                            </code>
+                          )}
                           {isActive && (
                             <span className="inline-flex items-center gap-1 rounded-full bg-primary/20 border border-primary/40 px-2 py-0.2 text-[9px] font-bold text-primary uppercase">
                               Active
