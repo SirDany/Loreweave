@@ -1146,6 +1146,7 @@ export function registerSidecar(
           | { type: string; [k: string]: unknown }
         >;
         usage: Promise<unknown>;
+        totalUsage?: Promise<unknown>;
       };
 
       pushLog({
@@ -1173,7 +1174,8 @@ export function registerSidecar(
         }
       }
       try {
-        const usage = await result.usage;
+        const rawUsage = await (result.totalUsage ?? result.usage);
+        const usage = normalizeStreamUsage(rawUsage);
         if (usage) send('usage', usage);
         pushLog({
           type: 'assistant',
@@ -1442,5 +1444,62 @@ export function registerSidecar(
       }
       sseClients.clear();
     },
+  };
+}
+
+/**
+ * Normalizes AI SDK v5/v6 LanguageModelUsage payloads (`inputTokens` /
+ * `outputTokens` / `*TokenDetails`) and legacy `promptTokens` / `completionTokens`
+ * shapes into a unified usage summary containing both field conventions.
+ */
+function normalizeStreamUsage(rawUsage: unknown): Record<string, number> | null {
+  if (!rawUsage || typeof rawUsage !== 'object') return null;
+  const u = rawUsage as Record<string, unknown>;
+  const inputDetails =
+    u.inputTokenDetails && typeof u.inputTokenDetails === 'object'
+      ? (u.inputTokenDetails as Record<string, unknown>)
+      : {};
+  const outputDetails =
+    u.outputTokenDetails && typeof u.outputTokenDetails === 'object'
+      ? (u.outputTokenDetails as Record<string, unknown>)
+      : {};
+
+  const promptTokens =
+    typeof u.inputTokens === 'number'
+      ? u.inputTokens
+      : typeof u.promptTokens === 'number'
+        ? u.promptTokens
+        : 0;
+  const completionTokens =
+    typeof u.outputTokens === 'number'
+      ? u.outputTokens
+      : typeof u.completionTokens === 'number'
+        ? u.completionTokens
+        : 0;
+  const totalTokens =
+    typeof u.totalTokens === 'number'
+      ? u.totalTokens
+      : promptTokens + completionTokens;
+  const cachedInputTokens =
+    typeof inputDetails.cacheReadTokens === 'number'
+      ? inputDetails.cacheReadTokens
+      : typeof u.cachedInputTokens === 'number'
+        ? u.cachedInputTokens
+        : undefined;
+  const reasoningTokens =
+    typeof outputDetails.reasoningTokens === 'number'
+      ? outputDetails.reasoningTokens
+      : typeof u.reasoningTokens === 'number'
+        ? u.reasoningTokens
+        : undefined;
+
+  return {
+    promptTokens,
+    completionTokens,
+    totalTokens,
+    inputTokens: promptTokens,
+    outputTokens: completionTokens,
+    ...(cachedInputTokens !== undefined ? { cachedInputTokens } : {}),
+    ...(reasoningTokens !== undefined ? { reasoningTokens } : {}),
   };
 }

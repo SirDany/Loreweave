@@ -5,6 +5,7 @@ import {
   ChevronDown,
   ChevronRight,
   Clipboard,
+  ExternalLink,
   Gauge,
   Loader2,
   RotateCcw,
@@ -27,12 +28,15 @@ import {
 } from '../lib/lw.js';
 import { cn } from '../lib/utils.js';
 import {
+  clearUsageHistory,
   useChat,
   type ApprovalPolicy,
   type ChatContextAttachment,
   type ChatMessage,
   type ChatToolCall,
   type PendingAction,
+  type UsageSummary,
+  type UsageWindowStats,
 } from '../state/useChat.js';
 
 interface Props {
@@ -83,6 +87,8 @@ function inferActiveAiLabel(cfg: MaskedLoreweaveConfig | null): {
   configured: boolean;
   label: string;
   title: string;
+  provider?: ChatProviderId;
+  model?: string;
 } {
   if (!cfg) {
     return {
@@ -132,6 +138,8 @@ function inferActiveAiLabel(cfg: MaskedLoreweaveConfig | null): {
     configured: true,
     label: modelLabel,
     title: `Active AI: ${modelLabel} — click to change in AI Settings`,
+    provider: detectedProvider,
+    model: c.model,
   };
 }
 
@@ -182,6 +190,7 @@ export function AssistantPanel({
     if (initialContext !== undefined) setAttachment(initialContext);
   }, [initialContext]);
   const [showingSettings, setShowingSettings] = useState(false);
+  const [showingUsage, setShowingUsage] = useState(false);
   const [aiCfg, setAiCfg] = useState<
     MaskedLoreweaveConfig | null | 'unavailable'
   >(null);
@@ -284,20 +293,31 @@ export function AssistantPanel({
         ) : (
           <span className="flex-1" />
         )}
-        {tokenTotal > 0 && (
-          <span
-            title={`Prompt ${chat.usageTotal.promptTokens ?? 0} / completion ${chat.usageTotal.completionTokens ?? 0}`}
-            className="inline-flex items-center gap-1 rounded border border-border bg-muted/40 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground mr-1"
-          >
-            <Gauge className="h-3 w-3" />
-            {formatTokens(tokenTotal)}
-          </span>
-        )}
+        <button
+          type="button"
+          onClick={() => {
+            setShowingUsage((v) => !v);
+            setShowingSettings(false);
+          }}
+          title={`Thread: ${(chat.usageTotal.promptTokens ?? 0).toLocaleString()} in / ${(chat.usageTotal.completionTokens ?? 0).toLocaleString()} out · Click for usage & rate limits`}
+          className={cn(
+            'inline-flex items-center gap-1 rounded border px-1.5 py-0.5 font-mono text-[10px] mr-1 transition-colors',
+            showingUsage
+              ? 'border-primary/50 bg-primary/15 text-primary'
+              : 'border-border bg-muted/40 text-muted-foreground hover:border-primary/40 hover:text-foreground',
+          )}
+        >
+          <Gauge className="h-3 w-3" />
+          <span>{formatTokens(tokenTotal)}</span>
+        </button>
         <Button
           variant="ghost"
           size="sm"
           className="h-7 px-2 text-muted-foreground hover:text-foreground"
-          onClick={() => setShowingSettings((v) => !v)}
+          onClick={() => {
+            setShowingSettings((v) => !v);
+            setShowingUsage(false);
+          }}
           title="Scribe settings"
         >
           <Settings className="h-3.5 w-3.5" />
@@ -339,6 +359,16 @@ export function AssistantPanel({
           autoCommit={autoCommit}
           onAutoCommitChange={setAutoCommit}
           onClose={() => setShowingSettings(false)}
+        />
+      )}
+
+      {showingUsage && (
+        <UsagePanel
+          usageTotal={chat.usageTotal}
+          usageWindow={chat.usageWindow}
+          provider={aiPill?.provider}
+          model={aiPill?.model}
+          onClose={() => setShowingUsage(false)}
         />
       )}
 
@@ -638,6 +668,14 @@ function MessageBubble({
         <span className="label-rune flex-1">
           {isUser ? 'You' : 'Scribe'}
         </span>
+        {!isUser && message.usage && (message.usage.totalTokens ?? 0) > 0 && (
+          <span
+            title={`Input: ${(message.usage.promptTokens ?? 0).toLocaleString()} · Output: ${(message.usage.completionTokens ?? 0).toLocaleString()} · Total: ${(message.usage.totalTokens ?? 0).toLocaleString()} tokens`}
+            className="font-mono text-[10px] text-muted-foreground/85"
+          >
+            {formatTokens(message.usage.totalTokens ?? 0)} ({formatCompactCount(message.usage.promptTokens ?? 0)} in · {formatCompactCount(message.usage.completionTokens ?? 0)} out)
+          </span>
+        )}
         {onRetry && (
           <button
             onClick={onRetry}
@@ -1055,4 +1093,258 @@ function formatTokens(n: number): string {
   if (n < 1000) return `${n} tok`;
   if (n < 10_000) return `${(n / 1000).toFixed(1)}k tok`;
   return `${Math.round(n / 1000)}k tok`;
+}
+
+function formatCompactCount(n: number): string {
+  if (n < 1000) return String(n);
+  if (n < 10_000) return `${(n / 1000).toFixed(1)}k`;
+  if (n < 1_000_000) return `${Math.round(n / 1000)}k`;
+  return `${(n / 1_000_000).toFixed(n % 1_000_000 === 0 ? 0 : 1)}M`;
+}
+
+type GeminiTier = 'free' | 'tier1';
+
+function getGeminiReferenceLimits(model: string | undefined, tier: GeminiTier) {
+  const isPro = !!model?.toLowerCase().includes('pro');
+  if (tier === 'tier1') {
+    return isPro
+      ? { label: 'Gemini Pro · Tier 1', rpm: 150, tpm: 2_000_000, rpd: 1_000 }
+      : { label: 'Gemini Flash · Tier 1', rpm: 1_000, tpm: 4_000_000, rpd: 10_000 };
+  }
+  return isPro
+    ? { label: 'Gemini Pro · Free Tier', rpm: 5, tpm: 250_000, rpd: 100 }
+    : { label: 'Gemini Flash · Free Tier', rpm: 15, tpm: 250_000, rpd: 500 };
+}
+
+function UsageBar({
+  label,
+  value,
+  max,
+  formatVal,
+}: {
+  label: string;
+  value: number;
+  max?: number;
+  formatVal?: (n: number) => string;
+}) {
+  const fmt = formatVal ?? ((n: number) => n.toLocaleString());
+  const pct = max && max > 0 ? Math.min(100, Math.round((value / max) * 100)) : 0;
+  const barCls =
+    pct >= 85
+      ? 'bg-rose-500'
+      : pct >= 60
+        ? 'bg-amber-400'
+        : 'bg-primary';
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between text-[11px]">
+        <span className="text-muted-foreground">{label}</span>
+        <span className="font-mono text-foreground">
+          {fmt(value)}
+          {max ? (
+            <span className="text-muted-foreground"> / {fmt(max)}</span>
+          ) : null}
+        </span>
+      </div>
+      {max ? (
+        <div className="h-1.5 w-full overflow-hidden rounded-full bg-background/70 border border-border/50">
+          <div
+            className={cn('h-full rounded-full transition-all duration-300', barCls)}
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function UsagePanel({
+  usageTotal,
+  usageWindow,
+  provider,
+  model,
+  onClose,
+}: {
+  usageTotal: UsageSummary;
+  usageWindow: UsageWindowStats;
+  provider?: ChatProviderId;
+  model?: string;
+  onClose: () => void;
+}) {
+  const [tier, setTier] = useState<GeminiTier>(() => {
+    try {
+      return window.localStorage.getItem('lw.chat.geminiTier') === 'tier1'
+        ? 'tier1'
+        : 'free';
+    } catch {
+      return 'free';
+    }
+  });
+
+  const pickTier = (next: GeminiTier) => {
+    setTier(next);
+    try {
+      window.localStorage.setItem('lw.chat.geminiTier', next);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const showGeminiCaps = provider === 'google' || !provider;
+  const refLimits = showGeminiCaps
+    ? getGeminiReferenceLimits(model, tier)
+    : null;
+
+  return (
+    <div className="border-b border-border/80 bg-popover/95 backdrop-blur-md px-4 py-3 space-y-3 max-h-[65vh] overflow-y-auto scrollbar-ember animate-fade-in">
+      <div className="flex items-center gap-2">
+        <Gauge className="h-3.5 w-3.5 text-primary" />
+        <span className="label-rune flex-1">AI Usage &amp; Rate Limits</span>
+        <button
+          type="button"
+          onClick={onClose}
+          className="text-muted-foreground hover:text-foreground"
+          aria-label="Close usage panel"
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      </div>
+
+      {/* Current Thread Token Breakdown */}
+      <div className="rounded-lg border border-border/70 bg-card/50 p-2.5 space-y-1.5">
+        <div className="flex items-center justify-between text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">
+          <span>Current Thread</span>
+          <span className="font-mono">
+            {(usageTotal.turns ?? 0)} {(usageTotal.turns ?? 0) === 1 ? 'turn' : 'turns'}
+          </span>
+        </div>
+        <div className="grid grid-cols-3 gap-2 text-xs">
+          <div className="rounded border border-border/50 bg-background/50 px-2 py-1">
+            <div className="text-[10px] text-muted-foreground">Input</div>
+            <div className="font-mono font-semibold text-foreground">
+              {(usageTotal.promptTokens ?? 0).toLocaleString()}
+            </div>
+          </div>
+          <div className="rounded border border-border/50 bg-background/50 px-2 py-1">
+            <div className="text-[10px] text-muted-foreground">Output</div>
+            <div className="font-mono font-semibold text-foreground">
+              {(usageTotal.completionTokens ?? 0).toLocaleString()}
+            </div>
+          </div>
+          <div className="rounded border border-border/50 bg-background/50 px-2 py-1">
+            <div className="text-[10px] text-muted-foreground">Total</div>
+            <div className="font-mono font-semibold text-primary">
+              {(usageTotal.totalTokens ?? 0).toLocaleString()}
+            </div>
+          </div>
+        </div>
+        {((usageTotal.cachedInputTokens ?? 0) > 0 ||
+          (usageTotal.reasoningTokens ?? 0) > 0) && (
+          <div className="flex flex-wrap gap-3 pt-0.5 text-[10px] font-mono text-muted-foreground">
+            {(usageTotal.cachedInputTokens ?? 0) > 0 && (
+              <span>
+                Cached read: {usageTotal.cachedInputTokens!.toLocaleString()}
+              </span>
+            )}
+            {(usageTotal.reasoningTokens ?? 0) > 0 && (
+              <span>
+                Reasoning: {usageTotal.reasoningTokens!.toLocaleString()}
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Live Rolling Window Telemetry (RPM / TPM / RPD) */}
+      <div className="rounded-lg border border-border/70 bg-card/50 p-2.5 space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">
+            Live Telemetry (Local)
+          </span>
+          {showGeminiCaps && (
+            <div className="inline-flex rounded-md border border-border/70 bg-background/60 p-0.5 text-[10px]">
+              <button
+                type="button"
+                onClick={() => pickTier('free')}
+                className={cn(
+                  'rounded px-1.5 py-0.5 font-medium transition-colors',
+                  tier === 'free'
+                    ? 'bg-primary/20 text-primary'
+                    : 'text-muted-foreground hover:text-foreground',
+                )}
+              >
+                Free Tier
+              </button>
+              <button
+                type="button"
+                onClick={() => pickTier('tier1')}
+                className={cn(
+                  'rounded px-1.5 py-0.5 font-medium transition-colors',
+                  tier === 'tier1'
+                    ? 'bg-primary/20 text-primary'
+                    : 'text-muted-foreground hover:text-foreground',
+                )}
+              >
+                Tier 1
+              </button>
+            </div>
+          )}
+        </div>
+
+        <UsageBar
+          label="Requests / min (60s)"
+          value={usageWindow.rpm}
+          max={refLimits?.rpm}
+        />
+        <UsageBar
+          label="Tokens / min (60s)"
+          value={usageWindow.tpm}
+          max={refLimits?.tpm}
+          formatVal={formatCompactCount}
+        />
+        <UsageBar
+          label="Requests today"
+          value={usageWindow.rpd}
+          max={refLimits?.rpd}
+        />
+        <UsageBar
+          label={`Tokens today (${formatCompactCount(usageWindow.promptTokensToday)} in · ${formatCompactCount(usageWindow.completionTokensToday)} out)`}
+          value={usageWindow.tokensToday}
+          formatVal={formatCompactCount}
+        />
+
+        {refLimits && (
+          <div className="text-[10px] text-muted-foreground font-mono">
+            Reference caps: {refLimits.label} ({refLimits.rpm} RPM · {formatCompactCount(refLimits.tpm)} TPM · {refLimits.rpd} RPD)
+          </div>
+        )}
+      </div>
+
+      {/* Explanation + Actions */}
+      <p className="text-[11px] leading-relaxed text-muted-foreground">
+        Google AI Studio API keys use{' '}
+        <strong className="text-foreground/90">Gemini Developer API</strong>{' '}
+        limits, separate from Antigravity extension &amp; Google AI Pro consumer quotas.
+      </p>
+
+      <div className="flex items-center justify-between gap-2 pt-0.5">
+        <a
+          href="https://aistudio.google.com/usage"
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
+        >
+          <span>Open AI Studio Usage</span>
+          <ExternalLink className="h-3 w-3" />
+        </a>
+        <button
+          type="button"
+          onClick={() => clearUsageHistory()}
+          className="text-[11px] text-muted-foreground hover:text-foreground underline-offset-2 hover:underline"
+        >
+          Reset stats
+        </button>
+      </div>
+    </div>
+  );
 }

@@ -11,6 +11,8 @@ export interface ChatMessage {
   toolCalls?: ChatToolCall[];
   /** Handoff recommendations emitted during this turn. */
   handoffs?: Array<{ to: string; instructions: string }>;
+  /** Token usage reported for this assistant turn. */
+  usage?: UsageSummary;
 }
 
 export interface ChatToolCall {
@@ -70,6 +72,27 @@ export interface UsageSummary {
   promptTokens?: number;
   completionTokens?: number;
   totalTokens?: number;
+  inputTokens?: number;
+  outputTokens?: number;
+  cachedInputTokens?: number;
+  reasoningTokens?: number;
+  turns?: number;
+}
+
+export interface UsageLogEntry {
+  ts: number;
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+}
+
+export interface UsageWindowStats {
+  rpm: number;
+  tpm: number;
+  rpd: number;
+  tokensToday: number;
+  promptTokensToday: number;
+  completionTokensToday: number;
 }
 
 interface UseChatOptions {
@@ -92,6 +115,87 @@ let idCounter = 0;
 const nextId = () => `${Date.now().toString(36)}-${(idCounter++).toString(36)}`;
 
 const THREADS_KEY = (sagaRoot: string) => `lw.chat.threads.${sagaRoot}`;
+const USAGE_LOG_KEY = 'lw.chat.usageLog.v1';
+const DAY_MS = 24 * 60 * 60 * 1000;
+const MINUTE_MS = 60 * 1000;
+
+function loadUsageLog(now = Date.now()): UsageLogEntry[] {
+  try {
+    const raw = localStorage.getItem(USAGE_LOG_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    const cutoff = now - DAY_MS;
+    return parsed.filter(
+      (e): e is UsageLogEntry =>
+        !!e &&
+        typeof e === 'object' &&
+        typeof (e as UsageLogEntry).ts === 'number' &&
+        (e as UsageLogEntry).ts >= cutoff &&
+        typeof (e as UsageLogEntry).totalTokens === 'number',
+    );
+  } catch {
+    return [];
+  }
+}
+
+function appendUsageLog(entry: UsageLogEntry): void {
+  try {
+    const next = [...loadUsageLog(entry.ts), entry];
+    localStorage.setItem(USAGE_LOG_KEY, JSON.stringify(next));
+  } catch {
+    /* ignore */
+  }
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('lw-usage-updated'));
+  }
+}
+
+export function computeUsageWindow(now = Date.now()): UsageWindowStats {
+  const entries = loadUsageLog(now);
+  const minuteCutoff = now - MINUTE_MS;
+  const startOfToday = new Date(now).setHours(0, 0, 0, 0);
+
+  let rpm = 0;
+  let tpm = 0;
+  let rpd = 0;
+  let tokensToday = 0;
+  let promptTokensToday = 0;
+  let completionTokensToday = 0;
+
+  for (const e of entries) {
+    if (e.ts >= minuteCutoff) {
+      rpm += 1;
+      tpm += e.totalTokens;
+    }
+    if (e.ts >= startOfToday) {
+      rpd += 1;
+      tokensToday += e.totalTokens;
+      promptTokensToday += e.promptTokens;
+      completionTokensToday += e.completionTokens;
+    }
+  }
+
+  return {
+    rpm,
+    tpm,
+    rpd,
+    tokensToday,
+    promptTokensToday,
+    completionTokensToday,
+  };
+}
+
+export function clearUsageHistory(): void {
+  try {
+    localStorage.removeItem(USAGE_LOG_KEY);
+  } catch {
+    /* ignore */
+  }
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('lw-usage-updated'));
+  }
+}
 
 function loadThreads(sagaRoot: string): Record<string, PersistedThread> {
   try {
@@ -151,7 +255,21 @@ export function useChat({ sagaRoot, approvalPolicy: _policy = 'writes-approval',
   );
   const [streaming, setStreaming] = useState(false);
   const [streamError, setStreamError] = useState<string | null>(null);
+  const [usageWindow, setUsageWindow] = useState<UsageWindowStats>(() =>
+    computeUsageWindow(),
+  );
   const abortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    const refresh = () => setUsageWindow(computeUsageWindow());
+    if (typeof window === 'undefined') return;
+    window.addEventListener('lw-usage-updated', refresh);
+    const interval = window.setInterval(refresh, 5000);
+    return () => {
+      window.removeEventListener('lw-usage-updated', refresh);
+      window.clearInterval(interval);
+    };
+  }, []);
   const lastUserMessageRef = useRef<{
     content: string;
     context?: ChatContextAttachment;
@@ -406,18 +524,51 @@ export function useChat({ sagaRoot, approvalPolicy: _policy = 'writes-approval',
           if (event === 'usage') {
             const u = safeParse<UsageSummary>(data);
             if (!u) return;
+            const prompt = u.promptTokens ?? u.inputTokens ?? 0;
+            const completion = u.completionTokens ?? u.outputTokens ?? 0;
+            const total = u.totalTokens ?? prompt + completion;
+            const cached = u.cachedInputTokens;
+            const reasoning = u.reasoningTokens;
+            const turnUsage: UsageSummary = {
+              promptTokens: prompt,
+              completionTokens: completion,
+              totalTokens: total,
+              ...(cached !== undefined ? { cachedInputTokens: cached } : {}),
+              ...(reasoning !== undefined ? { reasoningTokens: reasoning } : {}),
+            };
             updateThread((t) => ({
               ...t,
+              messages: t.messages.map((m) =>
+                m.id === assistantId ? { ...m, usage: turnUsage } : m,
+              ),
               usageTotal: {
-                promptTokens:
-                  (t.usageTotal.promptTokens ?? 0) + (u.promptTokens ?? 0),
+                promptTokens: (t.usageTotal.promptTokens ?? 0) + prompt,
                 completionTokens:
-                  (t.usageTotal.completionTokens ?? 0) +
-                  (u.completionTokens ?? 0),
-                totalTokens:
-                  (t.usageTotal.totalTokens ?? 0) + (u.totalTokens ?? 0),
+                  (t.usageTotal.completionTokens ?? 0) + completion,
+                totalTokens: (t.usageTotal.totalTokens ?? 0) + total,
+                ...(cached !== undefined ||
+                t.usageTotal.cachedInputTokens !== undefined
+                  ? {
+                      cachedInputTokens:
+                        (t.usageTotal.cachedInputTokens ?? 0) + (cached ?? 0),
+                    }
+                  : {}),
+                ...(reasoning !== undefined ||
+                t.usageTotal.reasoningTokens !== undefined
+                  ? {
+                      reasoningTokens:
+                        (t.usageTotal.reasoningTokens ?? 0) + (reasoning ?? 0),
+                    }
+                  : {}),
+                turns: (t.usageTotal.turns ?? 0) + 1,
               },
             }));
+            appendUsageLog({
+              ts: Date.now(),
+              promptTokens: prompt,
+              completionTokens: completion,
+              totalTokens: total,
+            });
             return;
           }
           if (event === 'error') {
@@ -659,6 +810,7 @@ export function useChat({ sagaRoot, approvalPolicy: _policy = 'writes-approval',
     messages: currentThread.messages,
     pending: currentThread.pending,
     usageTotal: currentThread.usageTotal,
+    usageWindow,
     streaming,
     streamError,
     send,

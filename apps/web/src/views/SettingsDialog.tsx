@@ -4,12 +4,18 @@ import {
   Check,
   ExternalLink,
   FolderSearch,
+  Gauge,
   Info,
   Loader2,
   Pencil,
   RefreshCw,
   X,
 } from 'lucide-react';
+import {
+  clearUsageHistory,
+  computeUsageWindow,
+  type UsageWindowStats,
+} from '../state/useChat.js';
 import {
   dump,
   fetchConfig,
@@ -976,12 +982,12 @@ export function SettingsDialog({
                   {chatProvider === 'google' && (
                     <div className="rounded-lg border border-primary/25 bg-primary/5 px-3 py-2.5 text-[11px] text-muted-foreground flex items-start gap-2">
                       <Info className="h-3.5 w-3.5 text-primary shrink-0 mt-0.5" />
-                      <div className="space-y-1">
+                      <div className="space-y-1.5">
                         <p className="text-foreground/90 font-medium">
-                          Using a Google AI Pro / Google account
+                          Google AI Studio API Key vs. Google AI Pro &amp; Antigravity Quota
                         </p>
                         <p>
-                          Google AI Pro subscriptions cover the consumer Gemini web app and do not include a direct OAuth login for third-party desktop apps. You can still use Gemini 2.5 Pro & Flash right here by creating a free API key in{' '}
+                          An API key created in{' '}
                           <a
                             href="https://aistudio.google.com/apikey"
                             target="_blank"
@@ -990,11 +996,24 @@ export function SettingsDialog({
                           >
                             Google AI Studio
                           </a>{' '}
-                          with your Google account.
+                          uses <strong className="text-foreground/90">Gemini Developer API</strong> rate limits (<strong>Free Tier</strong> RPM/TPM/RPD unless you link a Google Cloud Billing account for <strong>Tier 1</strong>). Those quotas are separate from consumer Google AI Pro web limits and from the Antigravity IDE extension seat quota.
+                        </p>
+                        <p>
+                          <a
+                            href="https://aistudio.google.com/usage"
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 text-primary underline hover:opacity-80"
+                          >
+                            <span>Check live API project usage &amp; rate limits in Google AI Studio</span>
+                            <ExternalLink className="h-2.5 w-2.5" />
+                          </a>
                         </p>
                       </div>
                     </div>
                   )}
+
+                  <LocalUsageSummaryCard />
                 </div>
               )}
             </section>
@@ -1206,6 +1225,58 @@ export function SettingsDialog({
   return typeof document !== 'undefined'
     ? createPortal(modal, document.body)
     : modal;
+}
+
+function LocalUsageSummaryCard() {
+  const [stats, setStats] = useState<UsageWindowStats>(() => computeUsageWindow());
+
+  useEffect(() => {
+    const refresh = () => setStats(computeUsageWindow());
+    window.addEventListener('lw-usage-updated', refresh);
+    return () => window.removeEventListener('lw-usage-updated', refresh);
+  }, []);
+
+  return (
+    <div className="rounded-lg border border-border/60 bg-background/40 px-3 py-2.5 text-[11px] space-y-1.5">
+      <div className="flex items-center justify-between gap-2">
+        <span className="inline-flex items-center gap-1.5 font-medium text-foreground/90">
+          <Gauge className="h-3.5 w-3.5 text-primary" />
+          <span>Local AI Usage Today</span>
+        </span>
+        <button
+          type="button"
+          onClick={() => clearUsageHistory()}
+          className="text-[10px] text-muted-foreground hover:text-foreground hover:underline"
+        >
+          Reset
+        </button>
+      </div>
+      <div className="grid grid-cols-4 gap-2 font-mono text-[10px]">
+        <div>
+          <span className="text-muted-foreground block">Turns</span>
+          <span className="text-foreground font-semibold">{stats.rpd}</span>
+        </div>
+        <div>
+          <span className="text-muted-foreground block">Input</span>
+          <span className="text-foreground font-semibold">
+            {stats.promptTokensToday.toLocaleString()}
+          </span>
+        </div>
+        <div>
+          <span className="text-muted-foreground block">Output</span>
+          <span className="text-foreground font-semibold">
+            {stats.completionTokensToday.toLocaleString()}
+          </span>
+        </div>
+        <div>
+          <span className="text-muted-foreground block">Total</span>
+          <span className="text-primary font-semibold">
+            {stats.tokensToday.toLocaleString()}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function DiscoveryBadge({
