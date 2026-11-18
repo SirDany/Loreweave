@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { lwDelete } from '../lib/lw.js';
 
 interface Props {
@@ -39,15 +40,15 @@ export function ConfirmDeleteDialog({
       setBusy(false);
     }
   };
-  return (
+  const modal = (
     <div
-      className="fixed inset-0 bg-black/60 flex items-center justify-center z-50"
+      className="fixed inset-0 bg-black/75 backdrop-blur-md flex items-center justify-center z-[100] p-4 animate-fade-in"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
       <div
-        className="bg-card border border-border rounded shadow-xl w-[28rem] max-w-full p-4 space-y-3"
+        className="bg-card/95 border border-border/80 rounded-2xl shadow-2xl w-[28rem] max-w-full p-5 space-y-3 backdrop-blur-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <h2 className="text-base font-serif">Delete {label}?</h2>
@@ -77,4 +78,8 @@ export function ConfirmDeleteDialog({
       </div>
     </div>
   );
+
+  return typeof document !== 'undefined'
+    ? createPortal(modal, document.body)
+    : modal;
 }

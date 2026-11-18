@@ -206,7 +206,7 @@ export function Shell({ app }: ShellProps) {
       )}
 
       {/* Floating Command Deck Header */}
-      <header className="relative z-30 mx-1.5 mt-1.5 h-11 header-glass px-3 flex items-center justify-between gap-2.5 shrink-0 select-none">
+      <header className="relative z-40 mx-1.5 mt-1.5 h-11 header-glass px-3 flex items-center justify-between gap-2.5 shrink-0 select-none">
         {/* Left: Top-Left Saga Switcher Dropdown + Section Breadcrumb + Live Telemetry */}
         <div className="flex items-center gap-2 min-w-0 shrink-0">
           <SagaSwitcherMenu
@@ -447,9 +447,9 @@ export function Shell({ app }: ShellProps) {
             />
           </>
         )}
-
-        <Dialogs app={app} data={data} />
       </div>
+
+      <Dialogs app={app} data={data} />
     </div>
   );
 }
@@ -575,7 +575,7 @@ function SagaSwitcherMenu({
       {open && (
         <div
           role="menu"
-          className="absolute left-0 top-full mt-2 w-80 rounded-2xl panel-glass p-3.5 shadow-2xl z-50 animate-modal-pop space-y-3.5"
+          className="absolute left-0 top-full mt-2 w-80 rounded-2xl popover-glass p-3.5 shadow-2xl z-[70] animate-modal-pop space-y-3.5"
         >
           {/* Detected Sagas */}
           <div>
@@ -700,8 +700,7 @@ function SagaSwitcherMenu({
 }
 
 function ThemeDropdownMenu() {
-  const { skin, available, setSkinId, patterns, patternOverride, setPatternOverride } =
-    useSkin();
+  const { skin, available, setSkinId } = useSkin();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -755,7 +754,7 @@ function ThemeDropdownMenu() {
       {open && (
         <div
           role="menu"
-          className="absolute right-0 top-full mt-2 w-80 rounded-2xl panel-glass p-2.5 shadow-2xl z-50 animate-modal-pop space-y-2.5"
+          className="absolute right-0 top-full mt-2 w-80 rounded-2xl popover-glass p-2.5 shadow-2xl z-[70] animate-modal-pop space-y-2.5"
         >
           <div className="space-y-1">
             <div className="px-1.5 py-0.5 label-rune">Theme Archetype</div>
@@ -812,47 +811,6 @@ function ThemeDropdownMenu() {
                 </button>
               );
             })}
-          </div>
-
-          <div className="pt-2 border-t border-border/70 space-y-1.5 px-1">
-            <div className="flex items-center justify-between">
-              <span className="label-rune">Background Pattern</span>
-              <span className="font-mono text-[10px] text-muted-foreground">
-                {patternOverride ? 'Custom' : 'Auto'}
-              </span>
-            </div>
-            <div className="flex flex-wrap gap-1">
-              <button
-                type="button"
-                onClick={() => setPatternOverride(null)}
-                className={cn(
-                  'rounded-lg border px-2 py-1 text-[10px] font-medium transition-colors',
-                  patternOverride === null
-                    ? 'active-theme-pill font-semibold'
-                    : 'border-border/70 bg-background/45 text-muted-foreground hover:text-foreground',
-                )}
-              >
-                Auto
-              </button>
-              {patterns.map((p) => {
-                const isSelected = patternOverride === p.id;
-                return (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => setPatternOverride(p.id)}
-                    className={cn(
-                      'rounded-lg border px-2 py-1 text-[10px] font-medium transition-colors',
-                      isSelected
-                        ? 'active-theme-pill font-semibold'
-                        : 'border-border/70 bg-background/45 text-muted-foreground hover:text-foreground',
-                    )}
-                  >
-                    {p.name}
-                  </button>
-                );
-              })}
-            </div>
           </div>
         </div>
       )}

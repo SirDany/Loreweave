@@ -13,7 +13,7 @@ import {
   Strikethrough,
 } from "lucide-react";
 import { EditorState, Compartment } from "@codemirror/state";
-import { EditorView, keymap, lineNumbers } from "@codemirror/view";
+import { EditorView, keymap, lineNumbers, tooltips } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { markdown } from "@codemirror/lang-markdown";
 import { syntaxHighlighting, defaultHighlightStyle } from "@codemirror/language";
@@ -144,6 +144,10 @@ export function Editor({ value, catalog, readOnly, onChange, onAskAssistant, onR
         modernEditorTheme,
         EditorView.editable.of(!readOnly),
         EditorState.readOnly.of(!!readOnly),
+        tooltips({
+          parent: typeof document !== "undefined" ? document.body : undefined,
+          position: "fixed",
+        }),
         lwCompartment.current.of(loreweaveExtensions(catalog)),
         EditorView.updateListener.of((u) => {
           if (u.docChanged && onChange) onChange(u.state.doc.toString());
@@ -175,9 +179,13 @@ export function Editor({ value, catalog, readOnly, onChange, onAskAssistant, onR
       const hostRect = hostEl.getBoundingClientRect();
       const startLine = v.state.doc.lineAt(sel.from).number;
       const endLine = v.state.doc.lineAt(sel.to).number;
+      const aboveTop = fromCoords.top - hostRect.top - 40;
+      const top = aboveTop < 4 ? fromCoords.bottom - hostRect.top + 6 : aboveTop;
+      const maxLeft = Math.max(8, hostRect.width - 340);
+      const left = Math.min(Math.max(8, fromCoords.left - hostRect.left), maxLeft);
       setAnchor({
-        top: fromCoords.top - hostRect.top - 36,
-        left: Math.max(8, fromCoords.left - hostRect.left),
+        top,
+        left,
         text,
         lines: [startLine, endLine],
       });
@@ -229,7 +237,7 @@ export function Editor({ value, catalog, readOnly, onChange, onAskAssistant, onR
       <div ref={host} className="relative flex-1 overflow-auto">
         {anchor && onAskAssistant && (
           <div
-            className="absolute z-20 flex items-center gap-1 rounded-lg border border-border/80 bg-card/95 backdrop-blur-md px-2 py-1 shadow-xl ring-1 ring-primary/25"
+            className="absolute z-40 flex items-center gap-1 rounded-lg border border-border/80 bg-popover/95 backdrop-blur-md px-2 py-1 shadow-xl ring-1 ring-primary/25"
             style={{ top: Math.max(4, anchor.top), left: anchor.left }}
             onMouseDown={(e) => e.preventDefault()}
           >

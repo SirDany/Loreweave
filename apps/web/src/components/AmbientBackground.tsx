@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { buildPatternDataUrl } from '../theme/skins.js';
 import { useSkin } from '../theme/SkinProvider.js';
 
 interface ParticleSpec {
@@ -50,19 +51,22 @@ export function AmbientBackground() {
   const isLight = skin.tokens.scheme === 'light';
   const motion = pattern.motion;
 
-  const encodedPattern = useMemo(() => encodeURIComponent(pattern.svg), [pattern.svg]);
+  const patternUrl = useMemo(
+    () => buildPatternDataUrl(pattern.svg, skin.tokens.primary),
+    [pattern.svg, skin.tokens.primary],
+  );
 
   const backdropStyle = useMemo(() => {
     if (motion === 'pastel-breeze') {
-      return `radial-gradient(ellipse 80% 60% at 15% 10%, hsl(var(--primary) / 0.1), transparent 60%), radial-gradient(ellipse 70% 55% at 88% 88%, hsl(var(--ring) / 0.1), transparent 62%), hsl(var(--background))`;
+      return `radial-gradient(ellipse 85% 65% at 15% 10%, hsl(var(--primary) / 0.16), transparent 62%), radial-gradient(ellipse 75% 60% at 88% 88%, hsl(var(--ring) / 0.15), transparent 64%), hsl(var(--background))`;
     }
     if (motion === 'punk-shards') {
-      return `radial-gradient(circle at 82% 16%, hsl(var(--ring) / 0.14), transparent 45%), radial-gradient(circle at 12% 88%, hsl(var(--primary) / 0.12), transparent 45%), hsl(var(--background))`;
+      return `radial-gradient(circle at 82% 16%, hsl(var(--ring) / 0.22), transparent 50%), radial-gradient(circle at 12% 88%, hsl(var(--primary) / 0.18), transparent 50%), hsl(var(--background))`;
     }
     if (motion === 'deco-shimmer') {
-      return `radial-gradient(ellipse 75% 65% at 50% 45%, hsl(var(--primary) / 0.12), transparent 68%), radial-gradient(circle at 50% 110%, hsl(var(--ring) / 0.14), transparent 60%), hsl(var(--background))`;
+      return `radial-gradient(ellipse 80% 70% at 50% 45%, hsl(var(--primary) / 0.2), transparent 70%), radial-gradient(circle at 50% 105%, hsl(var(--ring) / 0.22), transparent 62%), hsl(var(--background))`;
     }
-    return `radial-gradient(ellipse 85% 65% at 50% -10%, hsl(var(--primary) / ${isLight ? '0.18' : '0.24'}), transparent 65%), radial-gradient(ellipse 75% 55% at 85% 110%, hsl(var(--ring) / ${isLight ? '0.15' : '0.22'}), transparent 62%), radial-gradient(ellipse 60% 45% at 10% 90%, hsl(var(--accent) / ${isLight ? '0.24' : '0.26'}), transparent 60%), hsl(var(--background))`;
+    return `radial-gradient(ellipse 90% 70% at 50% -10%, hsl(var(--primary) / ${isLight ? '0.22' : '0.32'}), transparent 68%), radial-gradient(ellipse 80% 60% at 85% 110%, hsl(var(--ring) / ${isLight ? '0.18' : '0.28'}), transparent 65%), radial-gradient(ellipse 65% 50% at 10% 90%, hsl(var(--accent) / ${isLight ? '0.26' : '0.32'}), transparent 62%), hsl(var(--background))`;
   }, [motion, isLight]);
 
   return (
@@ -78,35 +82,34 @@ export function AmbientBackground() {
       <div
         className="absolute inset-0 transition-opacity duration-500"
         style={{
-          color: 'hsl(var(--primary))',
           opacity: pattern.opacity,
-          backgroundImage: `url("data:image/svg+xml,${encodedPattern}")`,
+          backgroundImage: patternUrl,
           backgroundSize: pattern.size,
           maskImage:
             motion === 'pastel-breeze' || motion === 'punk-shards'
               ? undefined
-              : 'radial-gradient(ellipse 84% 78% at 50% 48%, rgba(0,0,0,0.95) 25%, rgba(0,0,0,0.2) 78%, transparent 100%)',
+              : 'radial-gradient(ellipse 110% 105% at 50% 50%, rgba(0,0,0,1) 55%, rgba(0,0,0,0.65) 100%)',
           WebkitMaskImage:
             motion === 'pastel-breeze' || motion === 'punk-shards'
               ? undefined
-              : 'radial-gradient(ellipse 84% 78% at 50% 48%, rgba(0,0,0,0.95) 25%, rgba(0,0,0,0.2) 78%, transparent 100%)',
+              : 'radial-gradient(ellipse 110% 105% at 50% 50%, rgba(0,0,0,1) 55%, rgba(0,0,0,0.65) 100%)',
         }}
       />
 
       {/* Archetype Motion 1: Aurora Stars (Cosmic Glass) */}
       {motion === 'aurora-stars' && (
         <>
-          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/60 to-transparent" />
+          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/70 to-transparent" />
           <div
-            className="animate-aurora-slow absolute -top-36 -left-24 h-[34rem] w-[34rem] rounded-full blur-3xl transition-colors duration-700"
+            className="animate-aurora-slow absolute -top-36 -left-24 h-[36rem] w-[36rem] rounded-full blur-3xl transition-colors duration-700"
             style={{
-              background: `radial-gradient(circle, hsl(var(--primary) / 0.25) 0%, transparent 70%)`,
+              background: `radial-gradient(circle, hsl(var(--primary) / 0.36) 0%, transparent 72%)`,
             }}
           />
           <div
-            className="animate-aurora-reverse absolute -bottom-40 -right-24 h-[38rem] w-[38rem] rounded-full blur-3xl transition-colors duration-700"
+            className="animate-aurora-reverse absolute -bottom-40 -right-24 h-[40rem] w-[40rem] rounded-full blur-3xl transition-colors duration-700"
             style={{
-              background: `radial-gradient(circle, hsl(var(--ring) / 0.24) 0%, hsl(var(--accent) / 0.32) 45%, transparent 72%)`,
+              background: `radial-gradient(circle, hsl(var(--ring) / 0.32) 0%, hsl(var(--accent) / 0.4) 45%, transparent 74%)`,
             }}
           />
           {PARTICLES.map((p) => (
@@ -119,7 +122,7 @@ export function AmbientBackground() {
                 width: `${p.size}px`,
                 height: `${p.size}px`,
                 backgroundColor: `hsl(var(--primary))`,
-                boxShadow: `0 0 ${p.size * 3}px hsl(var(--primary) / 0.75)`,
+                boxShadow: `0 0 ${p.size * 3.5}px hsl(var(--primary) / 0.85)`,
                 animationDelay: p.delay,
                 animationDuration: p.duration,
               }}
@@ -131,12 +134,12 @@ export function AmbientBackground() {
       {/* Archetype Motion 2: Cyber Scan (Sci-Fi HUD) */}
       {motion === 'cyber-scan' && (
         <>
-          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/80 to-transparent" />
+          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/90 to-transparent" />
           <div
-            className="animate-scan-sweep absolute inset-x-0 h-20 pointer-events-none"
+            className="animate-scan-sweep absolute inset-x-0 h-24 pointer-events-none"
             style={{
               background:
-                'linear-gradient(180deg, transparent 0%, hsl(var(--primary) / 0.14) 50%, hsl(var(--ring) / 0.18) 98%, hsl(var(--primary) / 0.55) 100%)',
+                'linear-gradient(180deg, transparent 0%, hsl(var(--primary) / 0.2) 50%, hsl(var(--ring) / 0.24) 98%, hsl(var(--primary) / 0.65) 100%)',
             }}
           />
           {PARTICLES.map((p) => (
@@ -149,7 +152,7 @@ export function AmbientBackground() {
                 width: `${p.size + 1}px`,
                 height: `${p.size + 1}px`,
                 backgroundColor: p.id % 3 === 0 ? `hsl(var(--ring))` : `hsl(var(--primary))`,
-                boxShadow: `0 0 ${p.size * 2.5}px hsl(var(--primary) / 0.75)`,
+                boxShadow: `0 0 ${p.size * 3}px hsl(var(--primary) / 0.85)`,
                 animationDelay: p.delay,
                 animationDuration: p.duration,
               }}
@@ -164,7 +167,7 @@ export function AmbientBackground() {
           {BOTANICAL_LEAVES.map((leaf) => (
             <div
               key={leaf.id}
-              className="animate-petal-breeze absolute rounded-full border border-primary/15"
+              className="animate-petal-breeze absolute rounded-full border border-primary/25"
               style={{
                 left: leaf.left,
                 top: leaf.top,
@@ -172,13 +175,13 @@ export function AmbientBackground() {
                 height: `${leaf.size}px`,
                 background:
                   leaf.id % 2 === 0
-                    ? 'radial-gradient(circle, hsl(var(--primary) / 0.08) 0%, transparent 72%)'
-                    : 'radial-gradient(circle, hsl(var(--ring) / 0.08) 0%, transparent 72%)',
+                    ? 'radial-gradient(circle, hsl(var(--primary) / 0.14) 0%, transparent 72%)'
+                    : 'radial-gradient(circle, hsl(var(--ring) / 0.14) 0%, transparent 72%)',
                 animationDelay: leaf.delay,
               }}
             />
           ))}
-          <div className="absolute inset-3 rounded-2xl border border-primary/10 pointer-events-none" />
+          <div className="absolute inset-3 rounded-2xl border border-primary/20 pointer-events-none" />
         </>
       )}
 
@@ -186,10 +189,10 @@ export function AmbientBackground() {
       {motion === 'punk-shards' && (
         <>
           <div
-            className="absolute -top-10 -right-12 h-44 w-72 rotate-6 border-2 border-primary/45 bg-ring/10"
+            className="absolute -top-10 -right-12 h-48 w-80 rotate-6 border-2 border-primary/60 bg-ring/18"
           />
           <div
-            className="absolute -bottom-12 -left-10 h-40 w-64 -rotate-3 border-2 border-ring/45 bg-primary/10"
+            className="absolute -bottom-12 -left-10 h-44 w-72 -rotate-3 border-2 border-ring/60 bg-primary/18"
           />
           {SHARD_GLYPHS.map((shard) => (
             <span
@@ -199,7 +202,7 @@ export function AmbientBackground() {
                 left: shard.left,
                 top: shard.top,
                 fontSize: `${shard.size}px`,
-                color: shard.id % 2 === 0 ? `hsl(var(--ring) / 0.45)` : `hsl(var(--primary) / 0.45)`,
+                color: shard.id % 2 === 0 ? `hsl(var(--ring) / 0.58)` : `hsl(var(--primary) / 0.58)`,
                 animationDelay: shard.delay,
                 animationDuration: shard.duration,
               }}
@@ -215,26 +218,26 @@ export function AmbientBackground() {
         <>
           <svg
             viewBox="0 0 600 600"
-            className="animate-spin-slow absolute left-1/2 top-1/2 h-[680px] w-[680px] -translate-x-1/2 -translate-y-1/2 opacity-[0.12]"
+            className="animate-spin-slow absolute left-1/2 top-1/2 h-[720px] w-[720px] -translate-x-1/2 -translate-y-1/2 opacity-[0.24]"
             style={{ color: `hsl(var(--primary))` }}
           >
-            <circle cx="300" cy="300" r="260" fill="none" stroke="currentColor" strokeWidth="1" />
-            <circle cx="300" cy="300" r="220" fill="none" stroke="currentColor" strokeWidth="0.75" strokeDasharray="4 8" />
+            <circle cx="300" cy="300" r="260" fill="none" stroke="currentColor" strokeWidth="1.15" />
+            <circle cx="300" cy="300" r="220" fill="none" stroke="currentColor" strokeWidth="0.9" strokeDasharray="4 8" />
             <polygon
               points="300,30 340,260 570,300 340,340 300,570 260,340 30,300 260,260"
               fill="none"
               stroke="currentColor"
-              strokeWidth="1"
+              strokeWidth="1.15"
             />
             <polygon
               points="110,110 300,245 490,110 355,300 490,490 300,355 110,490 245,300"
               fill="none"
               stroke="currentColor"
-              strokeWidth="0.75"
+              strokeWidth="0.9"
             />
           </svg>
-          <div className="absolute inset-4 border border-primary/20 pointer-events-none" />
-          <div className="absolute inset-6 border border-primary/10 pointer-events-none" />
+          <div className="absolute inset-4 border border-primary/30 pointer-events-none" />
+          <div className="absolute inset-6 border border-primary/18 pointer-events-none" />
         </>
       )}
 

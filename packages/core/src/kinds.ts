@@ -83,7 +83,7 @@ export const KindFrontmatterSchema = z.object({
    * to `<id>/`. Built-in Kinds map to `codex/`, `lexicon/`, `sigils/`.
    */
   storage: z.string().optional(),
-  properties: z.record(KindFieldSchema).optional(),
+  properties: z.record(z.string(), KindFieldSchema).optional(),
   display: KindDisplaySchema.optional(),
   description: z.string().optional(),
 });

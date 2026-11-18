@@ -79,11 +79,11 @@ export function createLoreweaveMcpServer(): McpServer {
         .describe('Kind of canon entry.'),
       name: z.string().describe('Human readable name (e.g. "Aaron of Vellmar", "Northern Slang").'),
       id: z.string().optional().describe('Optional kebab-case ID (auto-derived from name if omitted).'),
-      properties: z.record(z.unknown()).optional().describe('Arbitrary key-value properties (e.g. age, appearance, role).'),
+      properties: z.record(z.string(), z.unknown()).optional().describe('Arbitrary key-value properties (e.g. age, appearance, role).'),
       aliases: z.array(z.string()).optional().describe('Alternative names or aliases.'),
       tags: z.array(z.string()).optional().describe('Sigil IDs labelling this entry.'),
       inherits: z.array(z.string()).optional().describe('Sigil IDs this entry inherits properties from.'),
-      overrides: z.record(z.unknown()).optional().describe('Properties that override inherited values.'),
+      overrides: z.record(z.string(), z.unknown()).optional().describe('Properties that override inherited values.'),
       speaks: z.array(z.string()).optional().describe('For characters: Slang-group Sigil IDs this character speaks.'),
       spoken_here: z.array(z.string()).optional().describe('For locations: Slang-group Sigil IDs spoken here.'),
       definition: z.string().optional().describe('For terms: Glossary definition.'),
@@ -217,7 +217,7 @@ export function createLoreweaveMcpServer(): McpServer {
       chapter: z.string().describe('Chapter slug (e.g. "01-arrival").'),
       body: z.string().describe('Full markdown prose for the chapter.'),
       meta: z
-        .record(z.unknown())
+        .record(z.string(), z.unknown())
         .optional()
         .describe('Optional updated metadata (title, ordinal, pov, linked_events).'),
       sagaRoot: z.string().optional().describe('Optional saga directory root.'),

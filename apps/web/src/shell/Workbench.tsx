@@ -181,7 +181,11 @@ export function Workbench({
         />
       )}
       {!currentEntry && !currentChapter && section === 'versions' && (
-        <VersionsPanel sagaPath={sagaPath} onChanged={onSaved} />
+        <VersionsPanel
+          sagaPath={sagaPath}
+          onChanged={onSaved}
+          openAssistant={openAssistant}
+        />
       )}
       {!currentEntry && !currentChapter && section === 'constellation' && (
         <ConstellationView data={data} onJump={onJump} />

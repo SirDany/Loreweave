@@ -73,15 +73,15 @@ export interface Skin {
 
 // ---------- Injectable Background Pattern Registry -------------------------
 
-const CONSTELLATION_MESH_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 56 56" fill="none"><path d="M28 0L56 28L28 56L0 28Z" stroke="currentColor" stroke-opacity="0.22" stroke-width="0.75"/><circle cx="28" cy="28" r="1.4" fill="currentColor" fill-opacity="0.55"/><circle cx="0" cy="0" r="1" fill="currentColor" fill-opacity="0.45"/><circle cx="56" cy="0" r="1" fill="currentColor" fill-opacity="0.45"/><circle cx="0" cy="56" r="1" fill="currentColor" fill-opacity="0.45"/><circle cx="56" cy="56" r="1" fill="currentColor" fill-opacity="0.45"/></svg>`;
+const CONSTELLATION_MESH_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 56 56" fill="none"><path d="M28 0L56 28L28 56L0 28Z" stroke="currentColor" stroke-opacity="0.28" stroke-width="0.85"/><path d="M0 0L56 56M56 0L0 56" stroke="currentColor" stroke-opacity="0.12" stroke-width="0.6"/><circle cx="28" cy="28" r="1.6" fill="currentColor" fill-opacity="0.65"/><circle cx="0" cy="0" r="1.1" fill="currentColor" fill-opacity="0.5"/><circle cx="56" cy="0" r="1.1" fill="currentColor" fill-opacity="0.5"/><circle cx="0" cy="56" r="1.1" fill="currentColor" fill-opacity="0.5"/><circle cx="56" cy="56" r="1.1" fill="currentColor" fill-opacity="0.5"/></svg>`;
 
-const CIRCUIT_GRID_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48" fill="none"><path d="M48 0H0v48" stroke="currentColor" stroke-opacity="0.24" stroke-width="0.75"/><path d="M24 0v6M24 42v6M0 24h6M42 24h6" stroke="currentColor" stroke-opacity="0.35" stroke-width="0.9"/><rect x="46" y="46" width="2" height="2" fill="currentColor" fill-opacity="0.5"/></svg>`;
+const CIRCUIT_GRID_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48" fill="none"><path d="M48 0H0v48" stroke="currentColor" stroke-opacity="0.28" stroke-width="0.85"/><path d="M24 0v7M24 41v7M0 24h7M41 24h7" stroke="currentColor" stroke-opacity="0.42" stroke-width="1"/><circle cx="24" cy="24" r="1.3" stroke="currentColor" stroke-opacity="0.26" stroke-width="0.8"/><rect x="45" y="45" width="3" height="3" fill="currentColor" fill-opacity="0.55"/></svg>`;
 
-const PAPER_BOTANICAL_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none"><path d="M0 32C16 16 16 48 32 32C48 16 48 48 64 32" stroke="currentColor" stroke-opacity="0.22" stroke-width="1"/><path d="M32 0C16 16 48 16 32 32C16 48 48 48 32 64" stroke="currentColor" stroke-opacity="0.14" stroke-width="0.8"/><circle cx="16" cy="16" r="1.2" fill="currentColor" fill-opacity="0.28"/><circle cx="48" cy="48" r="1.2" fill="currentColor" fill-opacity="0.28"/></svg>`;
+const PAPER_BOTANICAL_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none"><path d="M0 32C16 16 16 48 32 32C48 16 48 48 64 32" stroke="currentColor" stroke-opacity="0.28" stroke-width="1.1"/><path d="M32 0C16 16 48 16 32 32C16 48 48 48 32 64" stroke="currentColor" stroke-opacity="0.2" stroke-width="0.9"/><circle cx="16" cy="16" r="1.4" fill="currentColor" fill-opacity="0.36"/><circle cx="48" cy="48" r="1.4" fill="currentColor" fill-opacity="0.36"/></svg>`;
 
-const HALFTONE_PUNK_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28" fill="none"><circle cx="7" cy="7" r="1.8" fill="currentColor" fill-opacity="0.4"/><circle cx="21" cy="21" r="1.4" fill="currentColor" fill-opacity="0.3"/><path d="M20 4L24 8M4 20L8 24" stroke="currentColor" stroke-opacity="0.32" stroke-width="1.3"/></svg>`;
+const HALFTONE_PUNK_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28" fill="none"><circle cx="7" cy="7" r="2" fill="currentColor" fill-opacity="0.44"/><circle cx="21" cy="21" r="1.5" fill="currentColor" fill-opacity="0.34"/><path d="M19 3L25 9M3 19L9 25" stroke="currentColor" stroke-opacity="0.36" stroke-width="1.5"/></svg>`;
 
-const DECO_LATTICE_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="52" height="52" viewBox="0 0 52 52" fill="none"><path d="M26 2L50 26L26 50L2 26Z" stroke="currentColor" stroke-opacity="0.28" stroke-width="0.8"/><path d="M26 11L41 26L26 41L11 26Z" stroke="currentColor" stroke-opacity="0.18" stroke-width="0.7"/><path d="M26 0V52M0 26H52" stroke="currentColor" stroke-opacity="0.1" stroke-width="0.6"/></svg>`;
+const DECO_LATTICE_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="52" height="52" viewBox="0 0 52 52" fill="none"><path d="M26 2L50 26L26 50L2 26Z" stroke="currentColor" stroke-opacity="0.34" stroke-width="0.9"/><path d="M26 11L41 26L26 41L11 26Z" stroke="currentColor" stroke-opacity="0.24" stroke-width="0.8"/><path d="M26 0V52M0 26H52" stroke="currentColor" stroke-opacity="0.16" stroke-width="0.7"/></svg>`;
 
 export const BUILTIN_PATTERNS: readonly BackgroundPatternSpec[] = [
   {
@@ -89,7 +89,7 @@ export const BUILTIN_PATTERNS: readonly BackgroundPatternSpec[] = [
     name: 'Sacred Mesh',
     svg: CONSTELLATION_MESH_SVG,
     size: '56px 56px',
-    opacity: 0.25,
+    opacity: 0.48,
     motion: 'aurora-stars',
     hudReticles: false,
   },
@@ -98,7 +98,7 @@ export const BUILTIN_PATTERNS: readonly BackgroundPatternSpec[] = [
     name: 'Telemetry Grid',
     svg: CIRCUIT_GRID_SVG,
     size: '48px 48px',
-    opacity: 0.28,
+    opacity: 0.45,
     motion: 'cyber-scan',
     hudReticles: true,
   },
@@ -107,7 +107,7 @@ export const BUILTIN_PATTERNS: readonly BackgroundPatternSpec[] = [
     name: 'Linen & Leaf',
     svg: PAPER_BOTANICAL_SVG,
     size: '64px 64px',
-    opacity: 0.24,
+    opacity: 0.46,
     motion: 'pastel-breeze',
     hudReticles: false,
   },
@@ -116,7 +116,7 @@ export const BUILTIN_PATTERNS: readonly BackgroundPatternSpec[] = [
     name: 'Zine Halftone',
     svg: HALFTONE_PUNK_SVG,
     size: '28px 28px',
-    opacity: 0.24,
+    opacity: 0.44,
     motion: 'punk-shards',
     hudReticles: false,
   },
@@ -125,7 +125,7 @@ export const BUILTIN_PATTERNS: readonly BackgroundPatternSpec[] = [
     name: 'Deco Filigree',
     svg: DECO_LATTICE_SVG,
     size: '52px 52px',
-    opacity: 0.22,
+    opacity: 0.46,
     motion: 'deco-shimmer',
     hudReticles: false,
   },
@@ -145,6 +145,16 @@ export function getBackgroundPatterns(): readonly BackgroundPatternSpec[] {
 
 export function getBackgroundPattern(id: string): BackgroundPatternSpec {
   return patternRegistry.get(id) ?? BUILTIN_PATTERNS[0]!;
+}
+
+export function buildPatternDataUrl(svg: string, hslTriplet: string): string {
+  const parts = hslTriplet.trim().split(/\s+/);
+  const color =
+    parts.length >= 3
+      ? `hsl(${parts[0]}, ${parts[1]}, ${parts[2]})`
+      : `hsl(${hslTriplet})`;
+  const coloredSvg = svg.replaceAll('currentColor', color);
+  return `url("data:image/svg+xml,${encodeURIComponent(coloredSvg)}")`;
 }
 
 // ---------- Built-in Archetype Skins ---------------------------------------
@@ -182,9 +192,9 @@ export const AVL_ETHEREAL: Skin = {
     ring: '192 95% 56%',
     radius: '1.05rem',
     panelGradient:
-      'linear-gradient(165deg, hsl(250 48% 14% / 0.8) 0%, hsl(235 52% 9% / 0.88) 100%)',
+      'linear-gradient(155deg, rgba(24, 15, 48, 0.62) 0%, rgba(11, 7, 24, 0.70) 100%)',
     headerGradient:
-      'linear-gradient(90deg, hsl(255 50% 15% / 0.88) 0%, hsl(225 55% 13% / 0.88) 50%, hsl(275 48% 15% / 0.88) 100%)',
+      'linear-gradient(180deg, rgba(20, 12, 42, 0.78) 0%, rgba(10, 6, 22, 0.68) 100%)',
     accentGradient:
       'linear-gradient(135deg, hsl(192 95% 52% / 0.28) 0%, hsl(265 92% 65% / 0.28) 55%, hsl(320 85% 60% / 0.2) 100%)',
     borderGlow: 'hsl(265 92% 68% / 0.35)',
@@ -234,9 +244,9 @@ export const CYBER_DARK: Skin = {
     ring: '310 96% 62%',
     radius: '0.25rem',
     panelGradient:
-      'linear-gradient(160deg, hsl(214 58% 12% / 0.9) 0%, hsl(218 65% 7% / 0.94) 100%)',
+      'linear-gradient(155deg, rgba(16, 20, 32, 0.64) 0%, rgba(8, 10, 18, 0.72) 100%)',
     headerGradient:
-      'linear-gradient(90deg, hsl(214 60% 12% / 0.94) 0%, hsl(200 65% 14% / 0.92) 50%, hsl(218 60% 11% / 0.94) 100%)',
+      'linear-gradient(180deg, rgba(14, 18, 28, 0.80) 0%, rgba(8, 10, 16, 0.70) 100%)',
     accentGradient:
       'linear-gradient(135deg, hsl(186 100% 50% / 0.25) 0%, hsl(310 96% 62% / 0.22) 100%)',
     borderGlow: 'hsl(186 100% 50% / 0.4)',
@@ -285,9 +295,9 @@ export const PRECISION_LIGHT: Skin = {
     ring: '16 68% 42%',
     radius: '0.85rem',
     panelGradient:
-      'linear-gradient(180deg, hsl(42 45% 98% / 0.96) 0%, hsl(40 36% 95% / 0.96) 100%)',
+      'linear-gradient(160deg, rgba(255, 253, 247, 0.72) 0%, rgba(235, 243, 232, 0.64) 100%)',
     headerGradient:
-      'linear-gradient(90deg, hsl(42 48% 98% / 0.98) 0%, hsl(40 38% 95% / 0.98) 100%)',
+      'linear-gradient(180deg, rgba(252, 250, 242, 0.82) 0%, rgba(238, 244, 234, 0.72) 100%)',
     accentGradient:
       'linear-gradient(135deg, hsl(158 54% 28% / 0.14) 0%, hsl(16 68% 42% / 0.12) 100%)',
     borderGlow: 'transparent',
@@ -335,8 +345,10 @@ export const EMBER: Skin = {
     input: '276 20% 18%',
     ring: '328 96% 58%',
     radius: '0.15rem',
-    panelGradient: 'hsl(276 20% 13%)',
-    headerGradient: 'hsl(276 22% 12%)',
+    panelGradient:
+      'linear-gradient(145deg, rgba(36, 24, 44, 0.70) 0%, rgba(22, 14, 28, 0.78) 100%)',
+    headerGradient:
+      'linear-gradient(180deg, rgba(30, 18, 38, 0.84) 0%, rgba(20, 12, 26, 0.76) 100%)',
     accentGradient: 'linear-gradient(135deg, hsl(78 96% 52%) 0%, hsl(100 90% 50%) 100%)',
     borderGlow: 'transparent',
     panelShadow: '4px 4px 0px 0px hsl(328 96% 58% / 0.85)',
@@ -383,9 +395,9 @@ export const TITANIUM: Skin = {
     ring: '348 45% 54%',
     radius: '0.45rem',
     panelGradient:
-      'linear-gradient(180deg, hsl(26 16% 12% / 0.94) 0%, hsl(24 14% 9% / 0.96) 100%)',
+      'linear-gradient(165deg, rgba(33, 27, 24, 0.64) 0%, rgba(18, 15, 13, 0.74) 100%)',
     headerGradient:
-      'linear-gradient(90deg, hsl(26 16% 12% / 0.96) 0%, hsl(32 18% 13% / 0.96) 100%)',
+      'linear-gradient(180deg, rgba(33, 27, 24, 0.80) 0%, rgba(20, 16, 14, 0.72) 100%)',
     accentGradient:
       'linear-gradient(135deg, hsl(40 62% 58% / 0.24) 0%, hsl(348 45% 54% / 0.2) 100%)',
     borderGlow: 'hsl(40 62% 58% / 0.2)',
@@ -468,10 +480,13 @@ function tokenEntries(t: SkinTokens): Array<[string, string]> {
  */
 export function getSkinCssVars(skin: Skin): Record<string, string> {
   const t = skin.tokens;
+  const activePattern = getBackgroundPattern(skin.patternId);
   const vars: Record<string, string> = {};
   for (const [k, v] of tokenEntries(t)) {
     vars[k] = v;
   }
+  vars['--skin-pattern-image'] = buildPatternDataUrl(activePattern.svg, t.primary);
+  vars['--skin-pattern-size'] = activePattern.size;
   vars.backgroundColor = `hsl(${t.background})`;
   vars.color = `hsl(${t.foreground})`;
   vars.colorScheme = t.scheme;
@@ -484,14 +499,18 @@ const STYLE_ELEMENT_ID = 'lw-active-skin-css';
  * Triple-enforces a Skin across `:root`, `body`, `#root`, and `[data-theme]`
  * via `!important` inline properties, sets archetype & pattern attributes, and switches audio profile.
  */
-export function applySkin(skin: Skin, patternOverride?: string | null) {
+export function applySkin(skin: Skin) {
   setSoundProfile(skin.soundProfile);
   if (typeof document === 'undefined') return;
   const root = document.documentElement;
   const body = document.body;
   const t = skin.tokens;
-  const entries = tokenEntries(t);
-  const activePattern = getBackgroundPattern(patternOverride || skin.patternId);
+  const activePattern = getBackgroundPattern(skin.patternId);
+  const entries: Array<[string, string]> = [
+    ...tokenEntries(t),
+    ['--skin-pattern-image', buildPatternDataUrl(activePattern.svg, t.primary)],
+    ['--skin-pattern-size', activePattern.size],
+  ];
 
   for (const [name, value] of entries) {
     root.style.setProperty(name, value, 'important');

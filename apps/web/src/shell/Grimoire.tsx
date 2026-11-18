@@ -5,6 +5,7 @@ import {
   PanelLeftOpen,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { DumpEntry, DumpPayload } from '../lib/lw.js';
 import type { Jumper } from '../lib/saga-helpers.js';
 import { playRadialTick, playSwitch } from '../lib/sound.js';
@@ -176,191 +177,195 @@ export function Grimoire({
     });
   }, [sections]);
 
-  return (
-    <>
-      {/* Left-Edge Half-Circle Radial Slide-Out Grimoire */}
-      <div
-        className="fixed left-0 top-1/2 -translate-y-1/2 z-50 select-none"
-        onMouseEnter={openWheel}
-        onMouseLeave={scheduleCloseWheel}
-      >
-        {!wheelOpen ? (
-          <div className="flex flex-col items-start gap-2">
+  const radialDock = (
+    <div
+      className="fixed left-0 top-1/2 -translate-y-1/2 z-[60] select-none"
+      onMouseEnter={openWheel}
+      onMouseLeave={scheduleCloseWheel}
+    >
+      {!wheelOpen ? (
+        <div className="flex flex-col items-start gap-2">
+          <button
+            type="button"
+            onClick={openWheel}
+            aria-label="Open Radial Grimoire Menu"
+            title={`Grimoire: ${activeMeta.label} — hover or click to switch`}
+            className="group relative flex h-28 w-8 flex-col items-center justify-center gap-1.5 rounded-r-full popover-glass border-l-0 shadow-xl transition-all duration-300 hover:w-10 hover:border-primary/60"
+          >
+            <span
+              aria-hidden="true"
+              className="absolute right-1 top-3 h-1.5 w-1.5 rounded-full bg-primary animate-pulse"
+            />
+            <ActiveIcon className="h-4 w-4 text-primary transition-transform duration-300 group-hover:scale-110" />
+            <ChevronRight className="h-3 w-3 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all" />
+          </button>
+
+          {collapsed && (
             <button
               type="button"
-              onClick={openWheel}
-              aria-label="Open Radial Grimoire Menu"
-              title={`Grimoire: ${activeMeta.label} — hover or click to switch`}
-              className="group relative flex h-28 w-8 flex-col items-center justify-center gap-1.5 rounded-r-full panel-glass border-l-0 shadow-xl transition-all duration-300 hover:w-10 hover:border-primary/60"
+              onClick={toggleCollapsed}
+              aria-label="Expand contextual sidebar"
+              title="Show section directory sidebar"
+              className="flex h-8 w-8 items-center justify-center rounded-r-xl popover-glass border-l-0 text-muted-foreground hover:text-primary interactive-lift"
             >
-              <span
-                aria-hidden="true"
-                className="absolute right-1 top-3 h-1.5 w-1.5 rounded-full bg-primary animate-pulse"
-              />
-              <ActiveIcon className="h-4 w-4 text-primary transition-transform duration-300 group-hover:scale-110" />
-              <ChevronRight className="h-3 w-3 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all" />
+              <PanelLeftOpen className="h-3.5 w-3.5" />
             </button>
-
-            {collapsed && (
-              <button
-                type="button"
-                onClick={toggleCollapsed}
-                aria-label="Expand contextual sidebar"
-                title="Show section directory sidebar"
-                className="flex h-8 w-8 items-center justify-center rounded-r-xl panel-glass border-l-0 text-muted-foreground hover:text-primary interactive-lift"
-              >
-                <PanelLeftOpen className="h-3.5 w-3.5" />
-              </button>
-            )}
-          </div>
-        ) : (
-          <div
-            role="menu"
-            aria-label="Grimoire Radial Switcher"
-            className="relative w-[348px] h-[480px] rounded-r-[240px] panel-glass border-l-0 shadow-2xl overflow-hidden animate-modal-pop"
+          )}
+        </div>
+      ) : (
+        <div
+          role="menu"
+          aria-label="Grimoire Radial Switcher"
+          className="relative w-[348px] h-[480px] rounded-r-[240px] popover-glass border-l-0 shadow-2xl overflow-hidden animate-modal-pop"
+        >
+          {/* Orbital Rings & Radial Spokes Backdrop */}
+          <svg
+            viewBox="0 0 348 480"
+            className="pointer-events-none absolute inset-0 h-full w-full"
+            aria-hidden="true"
           >
-            {/* Orbital Rings & Radial Spokes Backdrop */}
-            <svg
-              viewBox="0 0 348 480"
-              className="pointer-events-none absolute inset-0 h-full w-full"
-              aria-hidden="true"
-            >
-              <circle
-                cx={HUB_X}
-                cy={HUB_Y}
-                r={84}
-                fill="none"
-                stroke="hsl(var(--primary))"
-                strokeOpacity="0.22"
-                strokeWidth="1"
-              />
-              <circle
-                cx={HUB_X}
-                cy={HUB_Y}
-                r={ORBIT_R}
-                fill="none"
-                stroke="hsl(var(--primary))"
-                strokeOpacity="0.34"
-                strokeWidth="1.25"
-                strokeDasharray="4 6"
-              />
-              <circle
-                cx={HUB_X}
-                cy={HUB_Y}
-                r={224}
-                fill="none"
-                stroke="hsl(var(--border))"
-                strokeOpacity="0.45"
-                strokeWidth="1"
-                strokeDasharray="2 8"
-              />
+            <circle
+              cx={HUB_X}
+              cy={HUB_Y}
+              r={84}
+              fill="none"
+              stroke="hsl(var(--primary))"
+              strokeOpacity="0.22"
+              strokeWidth="1"
+            />
+            <circle
+              cx={HUB_X}
+              cy={HUB_Y}
+              r={ORBIT_R}
+              fill="none"
+              stroke="hsl(var(--primary))"
+              strokeOpacity="0.34"
+              strokeWidth="1.25"
+              strokeDasharray="4 6"
+            />
+            <circle
+              cx={HUB_X}
+              cy={HUB_Y}
+              r={224}
+              fill="none"
+              stroke="hsl(var(--border))"
+              strokeOpacity="0.45"
+              strokeWidth="1"
+              strokeDasharray="2 8"
+            />
 
-              {radialItems.map(({ meta, x, y }) => {
-                const isInspected = meta.id === inspectedMeta.id;
-                const isActive = meta.id === section;
-                return (
-                  <line
-                    key={`spoke:${meta.id}`}
-                    x1={HUB_X}
-                    y1={HUB_Y}
-                    x2={x}
-                    y2={y}
-                    stroke={
-                      isInspected || isActive
-                        ? 'hsl(var(--primary))'
-                        : 'hsl(var(--border))'
-                    }
-                    strokeOpacity={isInspected ? 0.85 : isActive ? 0.6 : 0.32}
-                    strokeWidth={isInspected ? 1.8 : 1}
-                    strokeDasharray={isInspected ? undefined : '3 4'}
-                  />
-                );
-              })}
-            </svg>
-
-            {/* Central Half-Disc Inspector Hub */}
-            <div
-              style={{ top: `${HUB_Y}px` }}
-              className="pointer-events-none absolute left-0 -translate-y-1/2 w-[114px] h-[168px] rounded-r-full border border-l-0 border-border/75 bg-card/90 pl-3 pr-4 flex flex-col justify-center gap-1 shadow-lg"
-            >
-              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/15 text-primary border border-primary/30">
-                <InspectedIcon className="h-3.5 w-3.5" />
-              </div>
-              <div className="text-xs font-bold tracking-tight text-foreground truncate">
-                {inspectedMeta.label}
-              </div>
-              <div className="text-[10px] leading-tight text-muted-foreground line-clamp-2">
-                {inspectedMeta.hint}
-              </div>
-              {inspectedCount !== null && (
-                <div className="mt-0.5 inline-flex w-fit items-center rounded-full border border-border/70 bg-background/60 px-1.5 py-0.5 font-mono text-[9px] text-primary font-semibold">
-                  {inspectedCount} items
-                </div>
-              )}
-            </div>
-
-            {/* Radial Arc Menu Items */}
-            {radialItems.map(({ meta, idx, x, y }) => {
-              const Icon = meta.icon;
-              const isSelected = meta.id === section;
-              const isHovered = meta.id === hoveredSection;
-              const count = getSectionCount(meta.id, data, visibleEntries);
-
+            {radialItems.map(({ meta, x, y }) => {
+              const isInspected = meta.id === inspectedMeta.id;
+              const isActive = meta.id === section;
               return (
-                <button
-                  key={meta.id}
-                  type="button"
-                  role="menuitem"
-                  data-sound="none"
-                  onMouseEnter={() => {
-                    setHoveredSection(meta.id);
-                    playRadialTick(idx, radialItems.length);
-                  }}
-                  onClick={() => {
-                    playSwitch();
-                    onSectionChange(meta.id);
-                    setWheelOpen(false);
-                    setHoveredSection(null);
-                  }}
-                  style={{
-                    left: `${x - 14}px`,
-                    top: `${y}px`,
-                  }}
-                  className={cn(
-                    'group absolute -translate-y-1/2 flex items-center gap-2 rounded-full border pl-1.5 pr-2.5 py-1 text-left transition-all duration-150 shadow-md',
-                    isSelected
-                      ? 'active-theme-pill font-semibold scale-105 z-20'
-                      : isHovered
-                        ? 'border-primary/70 bg-card text-foreground scale-105 z-20'
-                        : 'border-border/75 bg-card/85 text-foreground/85 hover:text-foreground',
-                  )}
-                >
-                  <span
-                    className={cn(
-                      'flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-colors',
-                      isSelected
-                        ? 'border-current/30 bg-background/20'
-                        : isHovered
-                          ? 'border-primary/60 bg-primary/15 text-primary'
-                          : 'border-border/70 bg-background/50 text-muted-foreground group-hover:text-primary',
-                    )}
-                  >
-                    <Icon className="h-3 w-3" />
-                  </span>
-                  <span className="text-[11px] font-medium whitespace-nowrap">
-                    {meta.label}
-                  </span>
-                  {count !== null && (
-                    <span className="font-mono text-[9px] opacity-70">
-                      {count}
-                    </span>
-                  )}
-                </button>
+                <line
+                  key={`spoke:${meta.id}`}
+                  x1={HUB_X}
+                  y1={HUB_Y}
+                  x2={x}
+                  y2={y}
+                  stroke={
+                    isInspected || isActive
+                      ? 'hsl(var(--primary))'
+                      : 'hsl(var(--border))'
+                  }
+                  strokeOpacity={isInspected ? 0.85 : isActive ? 0.6 : 0.32}
+                  strokeWidth={isInspected ? 1.8 : 1}
+                  strokeDasharray={isInspected ? undefined : '3 4'}
+                />
               );
             })}
+          </svg>
+
+          {/* Central Half-Disc Inspector Hub */}
+          <div
+            style={{ top: `${HUB_Y}px` }}
+            className="pointer-events-none absolute left-0 -translate-y-1/2 w-[114px] h-[168px] rounded-r-full border border-l-0 border-border/75 bg-card/90 pl-3 pr-4 flex flex-col justify-center gap-1 shadow-lg"
+          >
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/15 text-primary border border-primary/30">
+              <InspectedIcon className="h-3.5 w-3.5" />
+            </div>
+            <div className="text-xs font-bold tracking-tight text-foreground truncate">
+              {inspectedMeta.label}
+            </div>
+            <div className="text-[10px] leading-tight text-muted-foreground line-clamp-2">
+              {inspectedMeta.hint}
+            </div>
+            {inspectedCount !== null && (
+              <div className="mt-0.5 inline-flex w-fit items-center rounded-full border border-border/70 bg-background/60 px-1.5 py-0.5 font-mono text-[9px] text-primary font-semibold">
+                {inspectedCount} items
+              </div>
+            )}
           </div>
-        )}
-      </div>
+
+          {/* Radial Arc Menu Items */}
+          {radialItems.map(({ meta, idx, x, y }) => {
+            const Icon = meta.icon;
+            const isSelected = meta.id === section;
+            const isHovered = meta.id === hoveredSection;
+            const count = getSectionCount(meta.id, data, visibleEntries);
+
+            return (
+              <button
+                key={meta.id}
+                type="button"
+                role="menuitem"
+                data-sound="none"
+                onMouseEnter={() => {
+                  setHoveredSection(meta.id);
+                  playRadialTick(idx, radialItems.length);
+                }}
+                onClick={() => {
+                  playSwitch();
+                  onSectionChange(meta.id);
+                  setWheelOpen(false);
+                  setHoveredSection(null);
+                }}
+                style={{
+                  left: `${x - 14}px`,
+                  top: `${y}px`,
+                }}
+                className={cn(
+                  'group absolute -translate-y-1/2 flex items-center gap-2 rounded-full border pl-1.5 pr-2.5 py-1 text-left transition-all duration-150 shadow-md',
+                  isSelected
+                    ? 'active-theme-pill font-semibold scale-105 z-20'
+                    : isHovered
+                      ? 'border-primary/70 bg-card text-foreground scale-105 z-20'
+                      : 'border-border/75 bg-card/85 text-foreground/85 hover:text-foreground',
+                )}
+              >
+                <span
+                  className={cn(
+                    'flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-colors',
+                    isSelected
+                      ? 'border-current/30 bg-background/20'
+                      : isHovered
+                        ? 'border-primary/60 bg-primary/15 text-primary'
+                        : 'border-border/70 bg-background/50 text-muted-foreground group-hover:text-primary',
+                  )}
+                >
+                  <Icon className="h-3 w-3" />
+                </span>
+                <span className="text-[11px] font-medium whitespace-nowrap">
+                  {meta.label}
+                </span>
+                {count !== null && (
+                  <span className="font-mono text-[9px] opacity-70">
+                    {count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+
+  return (
+    <>
+      {/* Left-Edge Half-Circle Radial Slide-Out Grimoire (portaled above panels & header) */}
+      {typeof document !== 'undefined' ? createPortal(radialDock, document.body) : radialDock}
 
       {/* Full-Height Contextual Left Sidebar */}
       {!collapsed && (

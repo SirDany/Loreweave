@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { lwCreate, lwDelete, lwWrite } from '../lib/lw.js';
 import { slugify } from '../lib/helpers.js';
 
@@ -117,15 +118,15 @@ export function RulesDialog({ sagaPath, onClose }: Props) {
     }
   };
 
-  return (
+  const modal = (
     <div
-      className="fixed inset-0 bg-black/60 flex items-center justify-center z-50"
+      className="fixed inset-0 bg-black/75 backdrop-blur-md flex items-center justify-center z-[100] p-4 animate-fade-in"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
       <div
-        className="bg-card border border-border rounded shadow-xl w-[56rem] max-w-[95vw] h-[36rem] max-h-[90vh] flex flex-col overflow-hidden"
+        className="bg-card/95 border border-border/80 rounded-2xl shadow-2xl w-[56rem] max-w-[95vw] h-[36rem] max-h-[90vh] flex flex-col overflow-hidden backdrop-blur-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-border px-4 py-3">
@@ -244,4 +245,8 @@ export function RulesDialog({ sagaPath, onClose }: Props) {
       </div>
     </div>
   );
+
+  return typeof document !== 'undefined'
+    ? createPortal(modal, document.body)
+    : modal;
 }

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { cp, mkdtemp, rm } from 'node:fs/promises';
+import { cp, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { createServer, type Server } from 'node:http';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
@@ -8,6 +8,7 @@ import { registerSidecar, type MiddlewareHost } from '../src/middleware.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const exampleSaga = path.resolve(here, '../../../sagas/example-saga');
+const cliBin = path.resolve(here, '../../cli/dist/bin.js');
 
 /**
  * Minimal connect-style host backed by Node's http server. Routes by exact
@@ -90,5 +91,68 @@ describe('sidecar /lw/digest', () => {
     const port = await h.port;
     const res = await fetch(`http://127.0.0.1:${port}/lw/digest`);
     expect(res.status).toBe(400);
+  });
+
+  it('POST /lw/ingest stages base64-uploaded files via lw ingest', async () => {
+    const h = makeHost();
+    server = h.server;
+    registerSidecar(h.host, { repoRoot: dir, cliBin });
+    const port = await h.port;
+
+    const contentBase64 = Buffer.from('# Notes\n\nCharacter: Lyra.\n', 'utf8').toString('base64');
+    const res = await fetch(`http://127.0.0.1:${port}/lw/ingest`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        sagaRoot: saga,
+        label: 'test-batch',
+        files: [
+          {
+            name: 'notes.md',
+            relPath: 'folder/notes.md',
+            contentBase64,
+          },
+        ],
+      }),
+    });
+    expect(res.status).toBe(200);
+    const json = (await res.json()) as {
+      ok: boolean;
+      manifest: {
+        batchId: string;
+        files: Array<{ source: string; staged: string; size: number }>;
+      };
+    };
+    expect(json.ok).toBe(true);
+    expect(json.manifest.files).toHaveLength(1);
+    const stagedText = await readFile(json.manifest.files[0]!.staged, 'utf8');
+    expect(stagedText).toContain('Lyra');
+  });
+
+  it('POST /lw/import-upload writes a base64 archive to a temp zip file', async () => {
+    const h = makeHost();
+    server = h.server;
+    registerSidecar(h.host, { repoRoot: dir, cliBin });
+    const port = await h.port;
+
+    const payload = Buffer.from('PK\x03\x04dummy-zip-bytes', 'binary');
+    const res = await fetch(`http://127.0.0.1:${port}/lw/import-upload`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        name: '../evil/bundle.zip',
+        contentBase64: payload.toString('base64'),
+      }),
+    });
+    expect(res.status).toBe(200);
+    const json = (await res.json()) as { ok: boolean; zipPath: string };
+    expect(json.ok).toBe(true);
+    expect(path.basename(json.zipPath)).toBe('bundle.zip');
+    try {
+      const written = await readFile(json.zipPath);
+      expect(written.equals(payload)).toBe(true);
+    } finally {
+      await rm(path.dirname(json.zipPath), { recursive: true, force: true });
+    }
   });
 });

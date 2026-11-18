@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import YAML from "yaml";
 import { EchoPicker } from "../components/forms/EchoPicker.js";
 import { KindForm } from "../components/forms/KindForm.js";
@@ -120,10 +121,16 @@ export function EntryEditor({ entry, sagaPath, allEntries, kinds, onClose, onSav
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+  const modal = (
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 backdrop-blur-md p-4 animate-fade-in"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
       <div
-        className="w-full max-w-2xl max-h-[90vh] overflow-auto bg-card border border-border rounded-lg shadow-2xl"
+        className="w-full max-w-2xl max-h-[90vh] overflow-auto bg-card/95 border border-border/80 rounded-2xl shadow-2xl backdrop-blur-xl"
+        onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => {
           if (e.key === "Escape") onClose();
         }}
@@ -247,6 +254,10 @@ export function EntryEditor({ entry, sagaPath, allEntries, kinds, onClose, onSav
       </div>
     </div>
   );
+
+  return typeof document !== "undefined"
+    ? createPortal(modal, document.body)
+    : modal;
 }
 
 function Field({

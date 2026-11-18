@@ -17,8 +17,9 @@
  */
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { watch as fsWatch, type FSWatcher } from 'node:fs';
+import { promises as fs, watch as fsWatch, type FSWatcher } from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import os from 'node:os';
 import path from 'node:path';
 import {
   FsAdapter,
@@ -102,7 +103,7 @@ interface ChatRequest {
   };
 }
 
-const MAX_BODY = 8 * 1024 * 1024; // 8 MiB — plenty for a chapter + frontmatter
+const MAX_BODY = 32 * 1024 * 1024; // 32 MiB — accommodates harvest uploads & saga zips
 const CLI_TIMEOUT_MS = 30_000;
 const MAX_CONCURRENT_CLI = 4;
 const CHAT_WINDOW_MS = 60_000;
@@ -1205,6 +1206,168 @@ export function registerSidecar(
       } catch {
         /* ignore log failures */
       }
+    }
+  });
+
+  // --- /lw/ingest (stage uploaded files or local paths via `lw ingest`) ----
+  host.use('/lw/ingest', async (req, res) => {
+    if (req.method !== 'POST') {
+      res.statusCode = 405;
+      res.end('method not allowed');
+      return;
+    }
+    const body = await readBody(req, res);
+    if (body == null) return;
+    let tmpDir: string | null = null;
+    try {
+      const parsed = JSON.parse(body || '{}') as {
+        sagaRoot?: unknown;
+        label?: unknown;
+        files?: unknown;
+        paths?: unknown;
+      };
+      if (typeof parsed.sagaRoot !== 'string' || !parsed.sagaRoot.trim()) {
+        throw new Error('sagaRoot required');
+      }
+      const sagaRoot = parsed.sagaRoot.trim();
+      const label =
+        typeof parsed.label === 'string' && parsed.label.trim()
+          ? parsed.label.trim()
+          : 'harvested-content';
+      const uploadedFiles = Array.isArray(parsed.files) ? parsed.files : [];
+      const extraPaths = Array.isArray(parsed.paths)
+        ? parsed.paths
+            .filter((p): p is string => typeof p === 'string')
+            .map((p) => p.trim())
+            .filter(Boolean)
+        : [];
+
+      tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'lw-harvest-'));
+      let writtenCount = 0;
+      for (const item of uploadedFiles) {
+        if (!item || typeof item !== 'object') continue;
+        const rec = item as {
+          name?: unknown;
+          relPath?: unknown;
+          contentBase64?: unknown;
+        };
+        if (typeof rec.contentBase64 !== 'string') continue;
+        const rawRel =
+          typeof rec.relPath === 'string' && rec.relPath.trim()
+            ? rec.relPath
+            : typeof rec.name === 'string'
+              ? rec.name
+              : '';
+        const sanitizedRel = rawRel
+          .replace(/\\/g, '/')
+          .replace(/^\/+/, '')
+          .split('/')
+          .filter((seg) => seg && seg !== '.' && seg !== '..')
+          .join('/');
+        if (!sanitizedRel) continue;
+        const dst = safeJoin(tmpDir, sanitizedRel);
+        await fs.mkdir(path.dirname(dst), { recursive: true });
+        await fs.writeFile(dst, Buffer.from(rec.contentBase64, 'base64'));
+        writtenCount++;
+      }
+
+      const inputs: string[] = [];
+      if (writtenCount > 0) inputs.push(tmpDir);
+      inputs.push(...extraPaths);
+      if (inputs.length === 0) {
+        throw new Error('Select files, a folder, or enter a local file/folder path.');
+      }
+
+      await acquireSlot();
+      const cliResult = await new Promise<{
+        stdout: string;
+        stderr: string;
+        code: number;
+      }>((resolve) => {
+        const child = spawn(
+          'node',
+          [cliBin, 'ingest', sagaRoot, ...inputs, '--label', label, '--json'],
+          { cwd: repoRoot },
+        );
+        let stdout = '';
+        let stderr = '';
+        const timer = setTimeout(() => {
+          stderr += `\n[lw sidecar] ingest aborted after ${CLI_TIMEOUT_MS}ms`;
+          child.kill('SIGTERM');
+          setTimeout(() => child.kill('SIGKILL'), 2000).unref();
+        }, CLI_TIMEOUT_MS);
+        child.stdout.on('data', (c) => (stdout += c));
+        child.stderr.on('data', (c) => (stderr += c));
+        child.on('error', (err) => {
+          clearTimeout(timer);
+          resolve({ stdout, stderr: stderr + String(err), code: 1 });
+        });
+        child.on('close', (code) => {
+          clearTimeout(timer);
+          resolve({ stdout, stderr, code: code ?? -1 });
+        });
+      }).finally(() => {
+        releaseSlot();
+      });
+
+      if (cliResult.code !== 0) {
+        res.statusCode = 400;
+        res.end(cliResult.stderr || cliResult.stdout || `ingest failed (${cliResult.code})`);
+        return;
+      }
+      const manifest = JSON.parse(cliResult.stdout) as {
+        batchId?: string;
+        files?: Array<unknown>;
+      };
+      if (!manifest.files || manifest.files.length === 0) {
+        res.statusCode = 400;
+        res.end('No supported files were found to stage.');
+        return;
+      }
+
+      res.statusCode = 200;
+      res.setHeader('content-type', 'application/json');
+      res.setHeader('cache-control', 'no-store');
+      res.end(JSON.stringify({ ok: true, manifest }));
+    } catch (e) {
+      res.statusCode = 400;
+      res.end((e as Error).message ?? String(e));
+    } finally {
+      if (tmpDir) {
+        await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
+      }
+    }
+  });
+
+  // --- /lw/import-upload (write a browser-picked .zip to a temp path) -----
+  host.use('/lw/import-upload', async (req, res) => {
+    if (req.method !== 'POST') {
+      res.statusCode = 405;
+      res.end('method not allowed');
+      return;
+    }
+    const body = await readBody(req, res);
+    if (body == null) return;
+    try {
+      const parsed = JSON.parse(body || '{}') as {
+        name?: unknown;
+        contentBase64?: unknown;
+      };
+      if (typeof parsed.contentBase64 !== 'string' || !parsed.contentBase64) {
+        throw new Error('contentBase64 required');
+      }
+      const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'lw-import-zip-'));
+      const rawName = typeof parsed.name === 'string' && parsed.name ? parsed.name : 'saga.zip';
+      const safeName = path.basename(rawName).replace(/[^a-zA-Z0-9._-]/g, '_') || 'saga.zip';
+      const zipPath = path.join(tmpDir, safeName);
+      await fs.writeFile(zipPath, Buffer.from(parsed.contentBase64, 'base64'));
+      res.statusCode = 200;
+      res.setHeader('content-type', 'application/json');
+      res.setHeader('cache-control', 'no-store');
+      res.end(JSON.stringify({ ok: true, zipPath }));
+    } catch (e) {
+      res.statusCode = 400;
+      res.end((e as Error).message ?? String(e));
     }
   });
 

@@ -186,7 +186,7 @@ export function loreweaveExtensions(catalog: RefCatalog) {
             dom.className = "lw-hover";
             if (!entry) {
               dom.textContent = `unknown reference: ${key}`;
-              dom.style.color = "#fecaca";
+              dom.style.color = "hsl(var(--destructive))";
             } else {
               const header = document.createElement("div");
               header.style.display = "flex";
@@ -194,6 +194,7 @@ export function loreweaveExtensions(catalog: RefCatalog) {
               header.style.gap = "0.4rem";
               const h = document.createElement("div");
               h.style.fontWeight = "600";
+              h.style.color = "hsl(var(--popover-foreground))";
               h.textContent = entry.name;
               header.appendChild(h);
               if (entry.status) {
@@ -202,24 +203,27 @@ export function loreweaveExtensions(catalog: RefCatalog) {
                 badge.style.fontSize = "0.65rem";
                 badge.style.textTransform = "uppercase";
                 badge.style.padding = "0.05rem 0.35rem";
-                badge.style.borderRadius = "0.2rem";
-                badge.style.border = "1px solid #57534e";
+                badge.style.borderRadius = "0.25rem";
+                badge.style.border = "1px solid hsl(var(--border))";
                 badge.style.color =
-                  entry.status === "draft" ? "#fde68a" : "#bbf7d0";
+                  entry.status === "draft"
+                    ? "hsl(var(--ring))"
+                    : "hsl(var(--primary))";
                 header.appendChild(badge);
               }
               dom.appendChild(header);
 
               const s = document.createElement("div");
               s.style.fontSize = "0.75rem";
-              s.style.color = "#a8a29e";
+              s.style.color = "hsl(var(--primary))";
+              s.style.fontFamily = "ui-monospace, SFMono-Regular, Menlo, monospace";
               s.textContent = `${entry.type}/${entry.id}`;
               dom.appendChild(s);
 
               if (display !== undefined) {
                 const d = document.createElement("div");
                 d.style.fontSize = "0.7rem";
-                d.style.color = "#a8a29e";
+                d.style.color = "hsl(var(--muted-foreground))";
                 d.style.marginTop = "0.15rem";
                 d.style.fontStyle = "italic";
                 d.textContent = `displays as: ${display || "(empty)"}`;
@@ -229,7 +233,7 @@ export function loreweaveExtensions(catalog: RefCatalog) {
               if (entry.aliases && entry.aliases.length > 0) {
                 const a = document.createElement("div");
                 a.style.fontSize = "0.7rem";
-                a.style.color = "#a8a29e";
+                a.style.color = "hsl(var(--muted-foreground))";
                 a.style.marginTop = "0.15rem";
                 a.textContent = `a.k.a. ${entry.aliases.join(", ")}`;
                 dom.appendChild(a);
@@ -238,27 +242,28 @@ export function loreweaveExtensions(catalog: RefCatalog) {
               if (entry.summary) {
                 const p = document.createElement("div");
                 p.style.fontSize = "0.8rem";
-                p.style.marginTop = "0.3rem";
-                p.style.maxWidth = "26rem";
+                p.style.marginTop = "0.35rem";
+                p.style.color = "hsl(var(--popover-foreground) / 0.9)";
+                p.style.maxWidth = "20rem";
                 p.textContent = entry.summary;
                 dom.appendChild(p);
               }
 
               if (entry.properties && entry.properties.length > 0) {
                 const tbl = document.createElement("div");
-                tbl.style.marginTop = "0.4rem";
+                tbl.style.marginTop = "0.45rem";
                 tbl.style.display = "grid";
                 tbl.style.gridTemplateColumns = "auto 1fr";
-                tbl.style.columnGap = "0.5rem";
-                tbl.style.rowGap = "0.1rem";
+                tbl.style.columnGap = "0.55rem";
+                tbl.style.rowGap = "0.15rem";
                 tbl.style.fontSize = "0.72rem";
                 for (const p of entry.properties) {
                   const k = document.createElement("div");
                   k.textContent = p.key;
-                  k.style.color = "#a8a29e";
+                  k.style.color = "hsl(var(--muted-foreground))";
                   const v = document.createElement("div");
                   v.textContent = formatPropValue(p.value);
-                  v.style.color = "#e7e5e4";
+                  v.style.color = "hsl(var(--popover-foreground))";
                   if (p.from.startsWith("sigil:")) {
                     v.title = `inherited from ${p.from}`;
                     v.style.fontStyle = "italic";
@@ -271,9 +276,9 @@ export function loreweaveExtensions(catalog: RefCatalog) {
 
               if (entry.tags && entry.tags.length > 0) {
                 const t = document.createElement("div");
-                t.style.fontSize = "0.65rem";
-                t.style.color = "#a8a29e";
-                t.style.marginTop = "0.3rem";
+                t.style.fontSize = "0.68rem";
+                t.style.color = "hsl(var(--muted-foreground))";
+                t.style.marginTop = "0.35rem";
                 t.textContent = entry.tags.map((x) => `#${x}`).join(" ");
                 dom.appendChild(t);
               }
@@ -294,17 +299,24 @@ export function loreweaveExtensions(catalog: RefCatalog) {
     brokenRefPlugin(catalog),
     hover,
     EditorView.theme({
-      ".lw-ref": { color: "#fbbf24", textDecoration: "underline dotted #fbbf24" },
+      ".lw-ref": { color: "hsl(var(--primary))", textDecoration: "underline dotted hsl(var(--primary))" },
       ".lw-broken-ref": {
-        color: "#f87171",
-        textDecoration: "underline wavy #f87171",
+        color: "hsl(var(--destructive))",
+        textDecoration: "underline wavy hsl(var(--destructive))",
       },
       ".lw-hover": {
-        padding: "0.5rem 0.75rem",
-        background: "#1c1917",
-        border: "1px solid #44403c",
-        borderRadius: "0.25rem",
-        color: "#e7e5e4",
+        padding: "0.65rem 0.85rem",
+        backgroundColor: "hsl(var(--popover) / 0.96)",
+        backdropFilter: "blur(16px)",
+        border: "1px solid hsl(var(--primary) / 0.35)",
+        borderRadius: "0.75rem",
+        color: "hsl(var(--popover-foreground))",
+        maxWidth: "22rem",
+        minWidth: "13rem",
+        boxShadow:
+          "0 16px 36px -6px rgba(0, 0, 0, 0.55), 0 0 0 1px hsl(var(--border) / 0.5)",
+        fontSize: "0.8125rem",
+        lineHeight: "1.45",
       },
     }),
   ];

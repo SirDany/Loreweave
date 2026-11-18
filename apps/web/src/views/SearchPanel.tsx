@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { search, type SearchHit, type SearchResult, type SearchScope } from "../lib/lw.js";
 
 interface Props {
@@ -64,9 +65,9 @@ export function SearchPanel({ sagaPath, onClose, onJump }: Props) {
 
   const grouped = useMemo(() => groupHits(result?.hits ?? []), [result]);
 
-  return (
+  const modal = (
     <div
-      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-start justify-center p-8"
+      className="fixed inset-0 z-[100] bg-black/75 backdrop-blur-md flex items-start justify-center pt-16 sm:pt-20 px-4 pb-8 animate-fade-in"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -198,6 +199,10 @@ export function SearchPanel({ sagaPath, onClose, onJump }: Props) {
       </div>
     </div>
   );
+
+  return typeof document !== "undefined"
+    ? createPortal(modal, document.body)
+    : modal;
 }
 
 interface HitGroup {
@@ -225,7 +230,7 @@ function jumpTo(
   onJump: (loc: { kind: "entry" | "chapter"; key: string; line?: number }) => void,
 ): void {
   if (hit.kind === "prose") {
-    onJump({ kind: "chapter", key: hit.ref, line: hit.line });
+    onJump({ kind: "chapter", key: hit.ref.replace("/", "::"), line: hit.line });
   } else {
     onJump({ kind: "entry", key: hit.ref, line: hit.line });
   }

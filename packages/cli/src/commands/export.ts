@@ -1,4 +1,4 @@
-import { loadSaga } from '@loreweave/core';
+import { canonicalType, loadSaga, REF_REGEX } from '@loreweave/core';
 import archiver from 'archiver';
 import { marked } from 'marked';
 import { spawn, spawnSync } from 'node:child_process';
@@ -239,18 +239,52 @@ async function exportSagaZip(sagaPath: string, outFile: string): Promise<void> {
   });
 }
 
+function parseRefMatch(
+  mdDisplay: string | undefined,
+  mdType: string | undefined,
+  mdId: string | undefined,
+  echoType: string | undefined,
+  echoId: string | undefined,
+  echoDisplay: string | undefined,
+): { type: string; id: string; display: string | undefined } {
+  const type =
+    mdDisplay !== undefined ? canonicalType(mdType!) : canonicalType(echoType!);
+  const id = mdDisplay !== undefined ? mdId! : echoId!;
+  const display = mdDisplay !== undefined ? mdDisplay : echoDisplay;
+  return { type, id, display };
+}
+
 /**
- * Replace `@type/id` references with the entity's display name when
- * resolvable; otherwise leave the raw ref in place. Used by tome-md and
- * tome-html exports so published prose doesn't leak Codex ids.
+ * Replace `@type/id` and `[Display](@type/id)` references with the entity's
+ * display name when resolvable; otherwise leave the raw ref in place. Used by
+ * tome-md and tome-html exports so published prose doesn't leak Codex ids.
  *
- * Recognizes the optional `{display text}` override syntax: when
- * present, the override wins over the resolved entity name.
+ * Recognizes the optional `{display text}` override syntax and markdown-link
+ * labels `[Display](@type/id)`: when present, the override wins over the
+ * resolved entity name.
  */
 export function stripRefs(text: string, idx: Map<string, string>): string {
   return text.replace(
-    /@([a-z][a-z0-9-]*)\/([a-z0-9][a-z0-9-]*)(?:\{([^}\n]*)\})?/g,
-    (raw, type: string, id: string, display: string | undefined) => {
+    new RegExp(REF_REGEX.source, 'g'),
+    (
+      _raw,
+      mdDisplay: string | undefined,
+      mdType: string | undefined,
+      mdId: string | undefined,
+      _mdAnchor: string | undefined,
+      echoType: string | undefined,
+      echoId: string | undefined,
+      _echoAnchor: string | undefined,
+      echoDisplay: string | undefined,
+    ) => {
+      const { type, id, display } = parseRefMatch(
+        mdDisplay,
+        mdType,
+        mdId,
+        echoType,
+        echoId,
+        echoDisplay,
+      );
       if (display !== undefined && display.length > 0) return display;
       // Strip the `{...}` suffix from the fallback so a missing entity
       // still renders as the bare echo rather than echo+braces.
@@ -497,10 +531,28 @@ async function exportCodex(
           `### ${name}  <a id="${anchorOf(g.type, e.frontmatter.id)}"></a>\n\n`
         );
         parts.push(`*${g.type}/${e.frontmatter.id}*\n\n`);
-        // Replace @echoes with markdown links to in-document anchors.
+        // Replace @echoes and [Display](@type/id) with markdown links to in-document anchors.
         const linked = e.body.replace(
-          /@([a-zA-Z]+)\/([a-zA-Z0-9\-_]+)(?:\{([^}\n]*)\})?/g,
-          (raw, type, id, override) => {
+          new RegExp(REF_REGEX.source, 'g'),
+          (
+            raw,
+            mdDisplay: string | undefined,
+            mdType: string | undefined,
+            mdId: string | undefined,
+            _mdAnchor: string | undefined,
+            echoType: string | undefined,
+            echoId: string | undefined,
+            _echoAnchor: string | undefined,
+            echoDisplay: string | undefined,
+          ) => {
+            const { type, id, display: override } = parseRefMatch(
+              mdDisplay,
+              mdType,
+              mdId,
+              echoType,
+              echoId,
+              echoDisplay,
+            );
             const display =
               override !== undefined && override.length > 0
                 ? override
@@ -543,8 +595,26 @@ async function exportCodex(
         // escape user text for us.
         const tokens: Array<{ type: string; id: string; display: string }> = [];
         const tokenized = e.body.replace(
-          /@([a-zA-Z]+)\/([a-zA-Z0-9\-_]+)(?:\{([^}\n]*)\})?/g,
-          (raw, type, id, override) => {
+          new RegExp(REF_REGEX.source, 'g'),
+          (
+            raw,
+            mdDisplay: string | undefined,
+            mdType: string | undefined,
+            mdId: string | undefined,
+            _mdAnchor: string | undefined,
+            echoType: string | undefined,
+            echoId: string | undefined,
+            _echoAnchor: string | undefined,
+            echoDisplay: string | undefined,
+          ) => {
+            const { type, id, display: override } = parseRefMatch(
+              mdDisplay,
+              mdType,
+              mdId,
+              echoType,
+              echoId,
+              echoDisplay,
+            );
             const display =
               override !== undefined && override.length > 0
                 ? override

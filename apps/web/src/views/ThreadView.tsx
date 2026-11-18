@@ -749,7 +749,10 @@ function EtherealChronologyStream({
               <div
                 key={`${pt.threadLabel}:${w.id}`}
                 style={{ left: `${xPct}%`, top: `${yPct}%` }}
-                className="absolute -translate-x-1/2 -translate-y-1/2 z-20"
+                className={cn(
+                  "absolute -translate-x-1/2 -translate-y-1/2",
+                  isHovered ? "z-40" : isSelected ? "z-30" : "z-20",
+                )}
               >
                 <button
                   type="button"

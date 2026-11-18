@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import type { TraceKind } from "../lib/lw.js";
 import { lwWrite } from "../lib/lw.js";
 import { filterTargets, slugify } from "../lib/helpers.js";
@@ -85,18 +86,18 @@ export function NewTraceDialog({ sagaPath, initialTarget, suggestions, onClose, 
     }
   };
 
-  return (
+  const modal = (
     <div
-      className="fixed inset-0 bg-black/75 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-fade-in"
+      className="fixed inset-0 bg-black/75 backdrop-blur-md flex items-center justify-center z-[100] p-4 animate-fade-in"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
       <div
-        className="bg-card/95 border border-border/80 rounded-2xl shadow-2xl w-[32rem] max-w-full overflow-hidden flex flex-col backdrop-blur-xl"
+        className="bg-card/95 border border-border/80 rounded-2xl shadow-2xl w-[32rem] max-w-full flex flex-col backdrop-blur-xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <header className="px-6 py-4 border-b border-border/70 bg-muted/20 flex items-center justify-between">
+        <header className="px-6 py-4 border-b border-border/70 bg-muted/20 rounded-t-2xl flex items-center justify-between">
           <h2 className="text-base font-semibold tracking-tight text-foreground">New Trace</h2>
           <button
             onClick={onClose}
@@ -157,7 +158,7 @@ export function NewTraceDialog({ sagaPath, initialTarget, suggestions, onClose, 
                   className="mt-1 w-full bg-background border border-border rounded-lg px-3 py-2 text-xs font-mono focus:ring-1 focus:ring-primary focus:outline-none transition-colors"
                 />
                 {showSuggest && filteredSuggestions.length > 0 && (
-                  <ul className="absolute left-0 right-0 top-full mt-1 z-10 bg-card border border-border/80 rounded-xl shadow-xl max-h-56 overflow-auto py-1">
+                  <ul className="absolute left-0 right-0 top-full mt-1 z-[110] bg-popover/95 backdrop-blur-md border border-border/90 rounded-xl shadow-2xl max-h-56 overflow-auto py-1">
                     {filteredSuggestions.map((s) => (
                       <li key={s.value}>
                         <button
@@ -197,7 +198,7 @@ export function NewTraceDialog({ sagaPath, initialTarget, suggestions, onClose, 
           {err && <div className="text-xs text-rose-400 font-mono p-3 bg-rose-500/10 rounded-lg border border-rose-500/30">{err}</div>}
         </div>
 
-        <footer className="px-6 py-3.5 border-t border-border/70 bg-muted/20 flex justify-end gap-2.5">
+        <footer className="px-6 py-3.5 border-t border-border/70 bg-muted/20 rounded-b-2xl flex justify-end gap-2.5">
           <button
             onClick={onClose}
             className="px-4 py-1.5 rounded-lg border border-border text-foreground hover:bg-muted text-xs font-medium transition-colors"
@@ -215,4 +216,8 @@ export function NewTraceDialog({ sagaPath, initialTarget, suggestions, onClose, 
       </div>
     </div>
   );
+
+  return typeof document !== "undefined"
+    ? createPortal(modal, document.body)
+    : modal;
 }

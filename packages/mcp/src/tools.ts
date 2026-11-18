@@ -311,7 +311,7 @@ export async function deleteEntry(ref: string, createAuditNote: boolean = true, 
   const id = norm.slice(slash + 1);
 
   const storage = new FsAdapter(root);
-  const result = await deleteEntryWithAudit(saga, type, id, storage);
+  const result = await deleteEntryWithAudit(saga, type, id, storage, { createAuditNote });
 
   return {
     deleted: true,
@@ -349,7 +349,10 @@ export async function renameEntry(ref: string, newId: string, newName?: string, 
   const usages = findEntryUsages(saga, type, oldId);
   const uniqueFiles = Array.from(new Set(usages.map((u) => u.file)));
 
-  const oldRefEcho = `@${type}/${oldId}`;
+  const oldRefRegex = new RegExp(
+    `@${type}/${oldId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![a-z0-9-])`,
+    'g'
+  );
   const newRefEcho = `@${type}/${cleanNewId}`;
 
   // 1. Rewrite references in affected files
@@ -358,7 +361,7 @@ export async function renameEntry(ref: string, newId: string, newName?: string, 
     try {
       let content = await fs.readFile(abs, 'utf8');
       // Replace @type/oldId and [display](@type/oldId)
-      content = content.replaceAll(oldRefEcho, newRefEcho);
+      content = content.replace(oldRefRegex, newRefEcho);
       await fs.writeFile(abs, content, 'utf8');
     } catch {
       // file might have been moved

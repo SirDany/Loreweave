@@ -78,6 +78,30 @@ export function IntegrityView({ sagaPath, data, onJump }: IntegrityViewProps) {
     t.message.toLowerCase().includes(filterQuery)
   );
 
+  const resolveBrokenTarget = (
+    b: (typeof brokenRefs)[number],
+  ): { kind: 'entry' | 'chapter'; key: string; line?: number } | null => {
+    const fileNorm = b.file.replace(/\\/g, '/');
+    if (b.sourceType === 'chapter' || b.sourceType === 'meta') {
+      for (const t of data.tomes) {
+        for (const c of t.chapters) {
+          const dir = c.relPath.replace(/\/chapter\.md$/, '');
+          if (fileNorm === c.relPath || fileNorm.startsWith(dir + '/')) {
+            return { kind: 'chapter', key: `${t.id}::${c.slug}`, line: b.line };
+          }
+        }
+      }
+      return null;
+    }
+    if (b.sourceType === 'entry') {
+      const entry = data.entries.find((e) => e.relPath === fileNorm);
+      if (entry) {
+        return { kind: 'entry', key: `${entry.type}/${entry.id}`, line: b.line };
+      }
+    }
+    return null;
+  };
+
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden animate-panel-enter">
       {/* Top Header */}
@@ -211,36 +235,39 @@ export function IntegrityView({ sagaPath, data, onJump }: IntegrityViewProps) {
             </div>
 
             <div className="grid gap-2">
-              {filteredBroken.map((b, idx) => (
-                <div
-                  key={idx}
-                  className="p-3 rounded-lg border border-rose-500/20 bg-rose-500/5 flex items-center justify-between gap-4"
-                >
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <code className="text-xs px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 font-mono">
-                        {b.raw}
-                      </code>
-                      <span className="text-xs text-muted-foreground">
-                        → target <span className="font-mono text-foreground">{b.type}/{b.id}</span> not found
-                      </span>
+              {filteredBroken.map((b, idx) => {
+                const target = resolveBrokenTarget(b);
+                return (
+                  <div
+                    key={idx}
+                    className="p-3 rounded-lg border border-rose-500/20 bg-rose-500/5 flex items-center justify-between gap-4"
+                  >
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <code className="text-xs px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 font-mono">
+                          {b.raw}
+                        </code>
+                        <span className="text-xs text-muted-foreground">
+                          → target <span className="font-mono text-foreground">{b.type}/{b.id}</span> not found
+                        </span>
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        In file: <span className="text-foreground">{b.file}</span> (line {b.line})
+                      </div>
                     </div>
-                    <div className="text-xs text-muted-foreground">
-                      In file: <span className="text-foreground">{b.file}</span> (line {b.line})
-                    </div>
-                  </div>
 
-                  {b.sourceType === 'chapter' && (
-                    <button
-                      onClick={() => onJump({ kind: 'chapter', key: b.file.replace(/chapter\.md$/, ''), line: b.line })}
-                      className="flex items-center gap-1 text-xs px-2.5 py-1 rounded bg-card border border-border hover:bg-muted transition-colors text-foreground"
-                    >
-                      <span>Jump</span>
-                      <ExternalLink className="w-3 h-3 text-muted-foreground" />
-                    </button>
-                  )}
-                </div>
-              ))}
+                    {target && (
+                      <button
+                        onClick={() => onJump(target)}
+                        className="flex items-center gap-1 text-xs px-2.5 py-1 rounded bg-card border border-border hover:bg-muted transition-colors text-foreground"
+                      >
+                        <span>Jump</span>
+                        <ExternalLink className="w-3 h-3 text-muted-foreground" />
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </section>
         )}

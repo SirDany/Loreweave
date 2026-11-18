@@ -2,20 +2,20 @@ import {
   createContext,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useSyncExternalStore,
   type CSSProperties,
   type ReactNode,
 } from 'react';
 import { fetchConfig, saveConfigPatch } from '../lib/lw.js';
-import { playSwitch, playThemeMorph } from '../lib/sound.js';
+import { playThemeMorph } from '../lib/sound.js';
 import {
   applySkin,
   BUILTIN_SKINS,
   DEFAULT_SKIN_ID,
   getAllSkins,
   getBackgroundPattern,
-  getBackgroundPatterns,
   getSkinCssVars,
   type BackgroundPatternSpec,
   type Skin,
@@ -26,13 +26,10 @@ export interface SkinContextValue {
   available: Skin[];
   setSkinId: (id: string) => void;
   pattern: BackgroundPatternSpec;
-  patterns: readonly BackgroundPatternSpec[];
-  patternOverride: string | null;
-  setPatternOverride: (patternId: string | null) => void;
 }
 
 const STORAGE_KEY = 'loreweave.skin';
-const PATTERN_STORAGE_KEY = 'loreweave.patternOverride';
+const LEGACY_PATTERN_STORAGE_KEY = 'loreweave.patternOverride';
 
 function normalizeSkinId(raw: string): string {
   if (raw === 'avl-dark' || raw === 'ink') return 'cyber-dark';
@@ -52,24 +49,12 @@ function loadStoredId(): string {
   }
 }
 
-function loadStoredPatternOverride(): string | null {
-  try {
-    const raw = window.localStorage.getItem(PATTERN_STORAGE_KEY);
-    if (!raw || raw === 'auto') return null;
-    return raw;
-  } catch {
-    return null;
-  }
-}
-
 function getActiveSkin(id: string): Skin {
   const all = getAllSkins();
   return all.find((s) => s.id === id) ?? BUILTIN_SKINS[0]!;
 }
 
 let currentSkinId = typeof window !== 'undefined' ? loadStoredId() : DEFAULT_SKIN_ID;
-let currentPatternOverride: string | null =
-  typeof window !== 'undefined' ? loadStoredPatternOverride() : null;
 let hasExplicitUserChange = false;
 const listeners = new Set<() => void>();
 
@@ -83,8 +68,16 @@ function notifyListeners() {
   });
 }
 
+if (typeof window !== 'undefined') {
+  try {
+    window.localStorage.removeItem(LEGACY_PATTERN_STORAGE_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
 if (typeof document !== 'undefined') {
-  applySkin(getActiveSkin(currentSkinId), currentPatternOverride);
+  applySkin(getActiveSkin(currentSkinId));
 }
 
 function commitSkinLocally(normalized: string) {
@@ -97,16 +90,13 @@ function commitSkinLocally(normalized: string) {
       /* ignore */
     }
   }
-  applySkin(skin, currentPatternOverride);
+  applySkin(skin);
   notifyListeners();
 }
 
 export const skinStore = {
   getSkinId(): string {
     return currentSkinId;
-  },
-  getPatternOverride(): string | null {
-    return currentPatternOverride;
   },
   getSkin(): Skin {
     return getActiveSkin(currentSkinId);
@@ -119,24 +109,6 @@ export const skinStore = {
     saveConfigPatch({ skin: normalized }).catch(() => {
       /* offline or demo mode — localStorage remains active */
     });
-  },
-  setPatternOverride(patternId: string | null) {
-    const clean = patternId && patternId !== 'auto' ? patternId : null;
-    currentPatternOverride = clean;
-    if (typeof window !== 'undefined') {
-      try {
-        if (clean) {
-          window.localStorage.setItem(PATTERN_STORAGE_KEY, clean);
-        } else {
-          window.localStorage.removeItem(PATTERN_STORAGE_KEY);
-        }
-      } catch {
-        /* ignore */
-      }
-    }
-    applySkin(getActiveSkin(currentSkinId), clean);
-    playSwitch();
-    notifyListeners();
   },
   hydrateFromServer(id: string) {
     if (hasExplicitUserChange) return;
@@ -161,19 +133,13 @@ export function SkinProvider({ children }: { children: ReactNode }) {
     skinStore.getSkinId,
     () => DEFAULT_SKIN_ID,
   );
-  const patternOverride = useSyncExternalStore(
-    skinStore.subscribe,
-    skinStore.getPatternOverride,
-    () => null,
-  );
   const skin = getActiveSkin(skinId);
-  const pattern = getBackgroundPattern(patternOverride || skin.patternId);
-  const patterns = getBackgroundPatterns();
+  const pattern = useMemo(() => getBackgroundPattern(skin.patternId), [skin]);
   const userChangedRef = useRef(false);
 
   useEffect(() => {
-    applySkin(skin, patternOverride);
-  }, [skin, patternOverride]);
+    applySkin(skin);
+  }, [skin]);
 
   useEffect(() => {
     fetchConfig()
@@ -195,9 +161,6 @@ export function SkinProvider({ children }: { children: ReactNode }) {
       skinStore.setSkinId(id);
     },
     pattern,
-    patterns,
-    patternOverride,
-    setPatternOverride: (id: string | null) => skinStore.setPatternOverride(id),
   };
 
   return (
@@ -222,22 +185,14 @@ export function useSkin(): SkinContextValue {
     skinStore.getSkinId,
     () => DEFAULT_SKIN_ID,
   );
-  const patternOverride = useSyncExternalStore(
-    skinStore.subscribe,
-    skinStore.getPatternOverride,
-    () => null,
-  );
   const skin = getActiveSkin(skinId);
-  const pattern = getBackgroundPattern(patternOverride || skin.patternId);
-  const patterns = getBackgroundPatterns();
+  const pattern = useMemo(() => getBackgroundPattern(skin.patternId), [skin]);
 
   if (ctx) {
     return {
       ...ctx,
       skin,
       pattern,
-      patterns,
-      patternOverride,
     };
   }
   return {
@@ -245,8 +200,5 @@ export function useSkin(): SkinContextValue {
     available: getAllSkins(),
     setSkinId: (id: string) => skinStore.setSkinId(id),
     pattern,
-    patterns,
-    patternOverride,
-    setPatternOverride: (id: string | null) => skinStore.setPatternOverride(id),
   };
 }

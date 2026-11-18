@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from "react";
+import { canonicalType, REF_REGEX } from "@loreweave/core";
 import {
   ArrowRight,
   Compass,
@@ -155,16 +156,26 @@ export function ConstellationView({ data, onJump }: Props) {
     for (const node of nodeMap.values()) {
       const { entry, id: fromId } = node;
       for (const rawParent of entry.inherits) {
-        const normalized = rawParent.includes("/")
-          ? rawParent.replace(/^@/, "")
-          : `${entry.type}/${rawParent}`;
+        const cleaned = rawParent.replace(/^@/, "");
+        const normalized = cleaned.includes("/")
+          ? cleaned
+          : byId.has(`sigil/${cleaned}`)
+            ? `sigil/${cleaned}`
+            : `${entry.type}/${cleaned}`;
         if (byId.has(normalized)) {
           pushEdge(fromId, normalized, "inherits");
         }
       }
       if (edgeMode === "all" && entry.body) {
-        for (const match of entry.body.matchAll(REF_RE)) {
-          const target = `${match[1]}/${match[2]}`;
+        const re = new RegExp(REF_REGEX.source, "g");
+        let match: RegExpExecArray | null;
+        while ((match = re.exec(entry.body))) {
+          const type =
+            match[1] !== undefined
+              ? canonicalType(match[2]!)
+              : canonicalType(match[5]!);
+          const id = match[1] !== undefined ? match[3]! : match[6]!;
+          const target = `${type}/${id}`;
           if (byId.has(target)) {
             pushEdge(fromId, target, "echo");
           }

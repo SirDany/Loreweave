@@ -331,7 +331,8 @@ export async function deleteEntryWithAudit(
   saga: Saga,
   type: string,
   id: string,
-  storage: StorageAdapter
+  storage: StorageAdapter,
+  opts?: { createAuditNote?: boolean }
 ): Promise<DeleteWithAuditResult> {
   const normType = canonicalType(type);
   const targetKey = entryKey(normType, id);
@@ -353,7 +354,7 @@ export async function deleteEntryWithAudit(
 
   // 3. If there are dangling usages, create a trace note
   let auditNoteCreated: string | undefined;
-  if (usages.length > 0) {
+  if (usages.length > 0 && (opts?.createAuditNote ?? true)) {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const auditRelPath = `notes/audit-deleted-${normType}-${id}-${timestamp}.md`;
     const content = [

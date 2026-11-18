@@ -26,8 +26,8 @@ const BaseFrontmatter = z.object({
   aliases: z.array(z.string()).optional(),
   tags: z.array(Id).optional(),
   inherits: z.array(Id).optional(),
-  overrides: z.record(z.unknown()).optional(),
-  properties: z.record(z.unknown()).optional(),
+  overrides: z.record(z.string(), z.unknown()).optional(),
+  properties: z.record(z.string(), z.unknown()).optional(),
   appears_in: z.array(z.string()).optional(),
   status: StatusSchema.optional(),
   /**

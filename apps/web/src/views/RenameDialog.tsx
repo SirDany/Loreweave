@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   renameApply,
   renamePlan,
@@ -73,9 +74,9 @@ export function RenameDialog({
   const totalExtra = plan?.extraHits.reduce((n, h) => n + h.count, 0) ?? 0;
   const validId = /^[a-z0-9][a-z0-9-]*$/.test(newId);
 
-  return (
+  const modal = (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md p-4 animate-fade-in"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 backdrop-blur-md p-4 animate-fade-in"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -184,4 +185,8 @@ export function RenameDialog({
       </div>
     </div>
   );
+
+  return typeof document !== "undefined"
+    ? createPortal(modal, document.body)
+    : modal;
 }

@@ -99,7 +99,7 @@ export function ActionsMenu({
       {open && (
         <div
           role="menu"
-          className="absolute right-0 top-full mt-2 w-52 rounded-xl panel-glass p-1.5 shadow-2xl z-50 animate-modal-pop"
+          className="absolute right-0 top-full mt-2 w-52 rounded-xl popover-glass p-1.5 shadow-2xl z-[70] animate-modal-pop"
         >
           {items.map((it) => {
             const Icon = it.icon;

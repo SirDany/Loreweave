@@ -34,4 +34,22 @@ describe('stripRefs', () => {
   it('ignores empty {} (falls back to indexed name)', () => {
     expect(stripRefs('@character/aaron{} stood.', idx)).toBe('Aaron stood.');
   });
+
+  it('strips markdown-link echoes [Display](@type/id) to their display label', () => {
+    expect(stripRefs('Hi [Aaron of Vellmar](@character/aaron), welcome.', idx)).toBe(
+      'Hi Aaron of Vellmar, welcome.',
+    );
+  });
+
+  it('handles shorthand [Display](@char/id) aliases in markdown links', () => {
+    expect(stripRefs('[The King](@char/aaron) stood watch.', idx)).toBe(
+      'The King stood watch.',
+    );
+  });
+
+  it('strips unknown markdown-link echoes [Unknown](@character/ghost) to display text', () => {
+    expect(stripRefs('[Unknown](@character/ghost) vanished.', idx)).toBe(
+      'Unknown vanished.',
+    );
+  });
 });

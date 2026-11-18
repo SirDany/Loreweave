@@ -1,3 +1,4 @@
+import { normalizeRef } from "@loreweave/core";
 import { useEffect, useState, type ReactNode } from "react";
 import type { DumpChapter, DumpEntry } from "../lib/lw.js";
 import { entryDiff } from "../lib/lw.js";
@@ -246,6 +247,28 @@ function ResolvedTab({
   );
 }
 
+function renderMetaRef(
+  raw: string,
+  onJumpRef?: (type: string, id: string) => void,
+) {
+  const norm = normalizeRef(raw);
+  const slash = norm.indexOf("/");
+  if (slash > 0 && onJumpRef) {
+    const type = norm.slice(0, slash);
+    const id = norm.slice(slash + 1);
+    return (
+      <button
+        type="button"
+        className="font-mono text-xs text-primary/90 hover:underline text-left"
+        onClick={() => onJumpRef(type, id)}
+      >
+        {raw}
+      </button>
+    );
+  }
+  return <span className="font-mono text-xs text-foreground/90">{raw}</span>;
+}
+
 function ChapterInspector({
   chapter,
   onJumpRef,
@@ -257,14 +280,21 @@ function ChapterInspector({
 }) {
   const c = chapter.chapter;
   const meta = (c.meta ?? {}) as Record<string, unknown>;
-  const pov = typeof meta.pov === "string" ? meta.pov : null;
+  const povList: string[] = Array.isArray(meta.pov)
+    ? (meta.pov as unknown[]).filter((x): x is string => typeof x === "string")
+    : typeof meta.pov === "string" && meta.pov.trim()
+      ? [meta.pov]
+      : [];
   const summary = typeof meta.summary === "string" ? meta.summary : null;
   const status = typeof meta.status === "string" ? meta.status : null;
-  const wp = Array.isArray(meta.waypoints)
-    ? (meta.waypoints as unknown[]).filter(
-        (x): x is string => typeof x === "string",
-      )
-    : [];
+  const rawEvents = Array.isArray(meta.linked_events)
+    ? meta.linked_events
+    : Array.isArray(meta.waypoints)
+      ? meta.waypoints
+      : [];
+  const wp = (rawEvents as unknown[]).filter(
+    (x): x is string => typeof x === "string",
+  );
   const refs = Array.from(
     new Map(c.refs.map((r) => [`${r.type}/${r.id}`, r])).values(),
   );
@@ -286,10 +316,14 @@ function ChapterInspector({
         )}
       </div>
       <div className="flex-1 overflow-auto scrollbar-ember p-4 space-y-4 text-sm">
-        {pov && (
+        {povList.length > 0 && (
           <div>
             <div className="label-rune mb-1">POV</div>
-            <div className="text-foreground/90">{pov}</div>
+            <ul className="space-y-0.5">
+              {povList.map((p) => (
+                <li key={p}>{renderMetaRef(p, onJumpRef)}</li>
+              ))}
+            </ul>
           </div>
         )}
         {summary && (
@@ -303,9 +337,7 @@ function ChapterInspector({
             <div className="label-rune mb-1">Waypoints</div>
             <ul className="space-y-0.5 font-mono text-xs">
               {wp.map((w) => (
-                <li key={w} className="text-primary/80">
-                  {w}
-                </li>
+                <li key={w}>{renderMetaRef(w, onJumpRef)}</li>
               ))}
             </ul>
           </div>

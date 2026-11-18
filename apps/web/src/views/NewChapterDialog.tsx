@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { lwCreate } from '../lib/lw.js';
 import { slugify } from '../lib/helpers.js';
 import type { DumpPayload } from '../lib/lw.js';
@@ -49,12 +50,14 @@ export function NewChapterDialog({
     setSaving(true);
     setErr(null);
     try {
+      const povList = pov
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
       const meta = [
         `title: ${JSON.stringify(title.trim())}`,
         `ordinal: ${nextOrdinal}`,
-        ...(pov.trim()
-          ? [`pov: ${JSON.stringify(pov.trim())}`]
-          : []),
+        ...(povList.length > 0 ? [`pov: ${JSON.stringify(povList)}`] : []),
         'status: draft',
         '',
       ].join('\n');
@@ -75,15 +78,15 @@ export function NewChapterDialog({
     }
   };
 
-  return (
+  const modal = (
     <div
-      className="fixed inset-0 bg-black/60 flex items-center justify-center z-50"
+      className="fixed inset-0 bg-black/75 backdrop-blur-md flex items-center justify-center z-[100] p-4 animate-fade-in"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
       <div
-        className="bg-card border border-border rounded shadow-xl w-[32rem] max-w-full p-4 space-y-3"
+        className="bg-card/95 border border-border/80 rounded-2xl shadow-2xl w-[32rem] max-w-full p-5 space-y-3 backdrop-blur-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between">
@@ -156,4 +159,8 @@ export function NewChapterDialog({
       </div>
     </div>
   );
+
+  return typeof document !== 'undefined'
+    ? createPortal(modal, document.body)
+    : modal;
 }

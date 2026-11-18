@@ -149,7 +149,7 @@ export function EchoPicker({
       {open && matches.length > 0 && (
         <ul
           role="listbox"
-          className="absolute z-50 mt-1 w-full max-h-60 overflow-auto bg-popover border border-border rounded shadow-lg text-sm"
+          className="absolute z-[120] mt-1 w-full max-h-60 overflow-auto bg-popover/95 backdrop-blur-md border border-border/90 rounded-lg shadow-2xl text-sm"
         >
           {matches.map((m, i) => (
             <li

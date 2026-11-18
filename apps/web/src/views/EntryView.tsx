@@ -1,5 +1,6 @@
 import { Bot } from 'lucide-react';
 import { useState } from 'react';
+import YAML from 'yaml';
 import { Badge } from '../components/ui/badge.js';
 import { Button } from '../components/ui/button.js';
 import { Editor } from '../editor/LazyEditor.js';
@@ -55,7 +56,10 @@ export function EntryView({
     setSaving(true);
     setStatus(null);
     try {
-      await lwWrite(sagaPath, entry.relPath, draft);
+      const fm = YAML.stringify(entry.frontmatter).trimEnd();
+      const body = draft.startsWith('\n') ? draft : `\n\n${draft}`;
+      const content = `---\n${fm}\n---${body.endsWith('\n') ? body : body + '\n'}`;
+      await lwWrite(sagaPath, entry.relPath, content);
       setStatus('saved');
       onSaved();
     } catch (e) {
@@ -137,7 +141,7 @@ export function EntryView({
       </div>
       {editing && (
         <EntryEditor
-          entry={entry}
+          entry={{ ...entry, body: draft }}
           sagaPath={sagaPath}
           allEntries={allEntries}
           kinds={kinds}

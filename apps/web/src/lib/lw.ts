@@ -917,6 +917,62 @@ export function importApply(
   ]);
 }
 
+export interface IngestUploadFile {
+  name: string;
+  relPath?: string;
+  contentBase64: string;
+}
+
+export interface IngestManifest {
+  batchId: string;
+  created: string;
+  label: string | null;
+  files: Array<{ source: string; staged: string; size: number }>;
+}
+
+export async function runIngest(req: {
+  sagaRoot: string;
+  label?: string;
+  files?: IngestUploadFile[];
+  paths?: string[];
+}): Promise<IngestManifest> {
+  const res = await fetch('/lw/ingest', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(req),
+  });
+  if (!res.ok) {
+    throw new Error(await res.text());
+  }
+  const json = (await res.json()) as { ok: boolean; manifest: IngestManifest };
+  return json.manifest;
+}
+
+export async function uploadImportZip(
+  name: string,
+  contentBase64: string,
+): Promise<{ zipPath: string }> {
+  const res = await fetch('/lw/import-upload', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ name, contentBase64 }),
+  });
+  if (!res.ok) {
+    throw new Error(await res.text());
+  }
+  return (await res.json()) as { zipPath: string };
+}
+
+export async function fileToBase64(file: File): Promise<string> {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const CHUNK = 0x8000;
+  const parts: string[] = [];
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    parts.push(String.fromCharCode(...bytes.subarray(i, i + CHUNK)));
+  }
+  return btoa(parts.join(''));
+}
+
 // ---------- rename ----------
 
 export interface RenamePlanSummary {

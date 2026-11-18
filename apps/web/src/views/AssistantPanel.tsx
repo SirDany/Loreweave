@@ -175,6 +175,12 @@ export function AssistantPanel({
   const [attachment, setAttachment] = useState<ChatContextAttachment | undefined>(
     initialContext,
   );
+  useEffect(() => {
+    if (initialPrompt !== undefined) setDraft(initialPrompt);
+  }, [initialPrompt]);
+  useEffect(() => {
+    if (initialContext !== undefined) setAttachment(initialContext);
+  }, [initialContext]);
   const [showingSettings, setShowingSettings] = useState(false);
   const [aiCfg, setAiCfg] = useState<
     MaskedLoreweaveConfig | null | 'unavailable'

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { lwCreate } from '../lib/lw.js';
 import { slugify } from '../lib/helpers.js';
 
@@ -73,6 +74,7 @@ export function NewEntryDialog({ sagaPath, kind, onClose, onCreated }: Props) {
         `id: ${id}`,
         `type: ${TYPE_FOR[kind]}`,
         `name: ${JSON.stringify(name.trim())}`,
+        ...(kind === 'term' ? [`term: ${JSON.stringify(name.trim())}`] : []),
         'status: draft',
         '---',
         '',
@@ -90,15 +92,15 @@ export function NewEntryDialog({ sagaPath, kind, onClose, onCreated }: Props) {
     }
   };
 
-  return (
+  const modal = (
     <div
-      className="fixed inset-0 bg-black/60 flex items-center justify-center z-50"
+      className="fixed inset-0 bg-black/75 backdrop-blur-md flex items-center justify-center z-[100] p-4 animate-fade-in"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
       <div
-        className="bg-card border border-border rounded shadow-xl w-[28rem] max-w-full p-4 space-y-3"
+        className="bg-card/95 border border-border/80 rounded-2xl shadow-2xl w-[28rem] max-w-full p-5 space-y-3 backdrop-blur-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between">
@@ -148,4 +150,8 @@ export function NewEntryDialog({ sagaPath, kind, onClose, onCreated }: Props) {
       </div>
     </div>
   );
+
+  return typeof document !== 'undefined'
+    ? createPortal(modal, document.body)
+    : modal;
 }

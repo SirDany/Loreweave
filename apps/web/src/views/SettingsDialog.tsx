@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Check,
   ExternalLink,
@@ -609,9 +610,9 @@ export function SettingsDialog({
     return null;
   }, [cfg, embProvider, embEndpoint, embKey, ollamaHost, customBaseUrl, keys]);
 
-  return (
+  const modal = (
     <div
-      className="fixed inset-0 z-50 bg-background/45 backdrop-blur-md flex items-center justify-center p-6 animate-fade-in"
+      className="fixed inset-0 z-[100] bg-background/45 backdrop-blur-md flex items-center justify-center p-6 animate-fade-in"
       onClick={(e) => {
         if (e.target === e.currentTarget) handleClose();
       }}
@@ -1201,6 +1202,10 @@ export function SettingsDialog({
       </div>
     </div>
   );
+
+  return typeof document !== 'undefined'
+    ? createPortal(modal, document.body)
+    : modal;
 }
 
 function DiscoveryBadge({

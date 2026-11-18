@@ -1,3 +1,5 @@
+import { createPortal } from 'react-dom';
+
 interface Props {
   file: string;
   patch: string;
@@ -9,9 +11,9 @@ interface Props {
  * `@@` markers; lines beginning with `+`/`-` are colored.
  */
 export function DiffViewer({ file, patch, onClose }: Props) {
-  return (
+  const modal = (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md p-6 animate-fade-in"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 backdrop-blur-md p-6 animate-fade-in"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -64,4 +66,8 @@ export function DiffViewer({ file, patch, onClose }: Props) {
       </div>
     </div>
   );
+
+  return typeof document !== 'undefined'
+    ? createPortal(modal, document.body)
+    : modal;
 }

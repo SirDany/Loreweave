@@ -137,7 +137,7 @@ export const toolSchemas = {
     rationale: z.string().optional(),
   }),
   handoff: z.object({
-    to: z.enum(['muse', 'scribe', 'warden', 'polisher', 'archivist']),
+    to: z.enum(['muse', 'scribe', 'warden', 'polisher', 'archivist', 'harvester']),
     instructions: z
       .string()
       .describe('Short instruction paragraph for the next agent.'),

@@ -1,7 +1,10 @@
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import {
+  fileToBase64,
   importApply,
   importPlan,
+  uploadImportZip,
   type ImportApplyResult,
   type ImportPlan,
 } from "../lib/lw.js";
@@ -40,6 +43,32 @@ export function ImportDialog({ onClose, onImported }: Props) {
     }
   };
 
+  const browseZip = () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".zip,application/zip";
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      setBusy(true);
+      setErr(null);
+      setPlan(null);
+      setResult(null);
+      try {
+        const b64 = await fileToBase64(file);
+        const uploaded = await uploadImportZip(file.name, b64);
+        setZipPath(uploaded.zipPath);
+        const p = await importPlan(uploaded.zipPath, into.trim() || "sagas");
+        setPlan(p);
+      } catch (ex) {
+        setErr((ex as Error).message);
+      } finally {
+        setBusy(false);
+      }
+    };
+    input.click();
+  };
+
   const doApply = async () => {
     if (!plan) return;
     setBusy(true);
@@ -55,9 +84,9 @@ export function ImportDialog({ onClose, onImported }: Props) {
     }
   };
 
-  return (
+  const modal = (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md p-4 animate-fade-in"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 backdrop-blur-md p-4 animate-fade-in"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -84,16 +113,26 @@ export function ImportDialog({ onClose, onImported }: Props) {
         <div className="p-6 space-y-4 text-sm">
           <label className="block text-xs">
             <span className="text-muted-foreground font-medium">ZIP Archive Path</span>
-            <input
-              value={zipPath}
-              onChange={(e) => {
-                setZipPath(e.target.value);
-                setPlan(null);
-                setResult(null);
-              }}
-              placeholder="path/to/saga-export.zip"
-              className="mt-1 w-full bg-background border border-border rounded-lg px-3 py-2 font-mono text-xs focus:ring-1 focus:ring-primary focus:outline-none transition-colors"
-            />
+            <div className="mt-1 flex gap-2">
+              <input
+                value={zipPath}
+                onChange={(e) => {
+                  setZipPath(e.target.value);
+                  setPlan(null);
+                  setResult(null);
+                }}
+                placeholder="path/to/saga-export.zip"
+                className="flex-1 bg-background border border-border rounded-lg px-3 py-2 font-mono text-xs focus:ring-1 focus:ring-primary focus:outline-none transition-colors"
+              />
+              <button
+                type="button"
+                onClick={browseZip}
+                disabled={busy}
+                className="px-3 py-2 rounded-lg border border-border text-foreground hover:bg-muted text-xs font-medium disabled:opacity-40 transition-colors shrink-0"
+              >
+                Browse .zip…
+              </button>
+            </div>
           </label>
 
           <label className="block text-xs">
@@ -215,17 +254,23 @@ export function ImportDialog({ onClose, onImported }: Props) {
             onClick={onClose}
             className="px-4 py-1.5 rounded-lg border border-border text-foreground hover:bg-muted text-xs font-medium transition-colors"
           >
-            Close
+            {result ? "Done" : "Close"}
           </button>
-          <button
-            onClick={() => void doApply()}
-            disabled={busy || !plan || (plan.newFiles.length === 0 && plan.conflicts.length === 0)}
-            className="px-4 py-1.5 rounded-lg border border-primary/50 bg-primary/20 text-primary font-medium hover:bg-primary/30 disabled:opacity-40 text-xs transition-colors shadow-sm"
-          >
-            {busy && plan ? "Importing…" : "Apply import"}
-          </button>
+          {!result && (
+            <button
+              onClick={() => void doApply()}
+              disabled={busy || !plan || (plan.newFiles.length === 0 && plan.conflicts.length === 0)}
+              className="px-4 py-1.5 rounded-lg border border-primary/50 bg-primary/20 text-primary font-medium hover:bg-primary/30 disabled:opacity-40 text-xs transition-colors shadow-sm"
+            >
+              {busy && plan ? "Importing…" : "Apply import"}
+            </button>
+          )}
         </footer>
       </div>
     </div>
   );
+
+  return typeof document !== "undefined"
+    ? createPortal(modal, document.body)
+    : modal;
 }

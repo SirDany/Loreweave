@@ -65,7 +65,6 @@ export function Dialogs({ app, data }: DialogsProps) {
           onImported={(target) => {
             saga.setSagaPath(target);
             setSelection(null);
-            closeDialog('importing');
           }}
         />
       )}
@@ -76,6 +75,9 @@ export function Dialogs({ app, data }: DialogsProps) {
           onClose={() => closeDialog('harvesting')}
           onHarvested={() => {
             void saga.reload();
+          }}
+          onOpenAssistant={(prompt) => {
+            app.openAssistant({ prompt });
             closeDialog('harvesting');
           }}
         />
