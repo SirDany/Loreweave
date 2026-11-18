@@ -230,20 +230,25 @@ export function AssistantPanel({
   }, [chat.messages, chat.streaming, chat.pending.length]);
 
   const onSubmit = async () => {
-    if (!draft.trim() || chat.streaming) return;
+    if (!draft.trim()) return;
     const text = draft;
     setDraft('');
+    if (chat.streaming) {
+      chat.cancel();
+      setTimeout(() => {
+        void chat.send(text, attachment);
+        setAttachment(undefined);
+      }, 40);
+      return;
+    }
     await chat.send(text, attachment);
     setAttachment(undefined);
   };
 
-  const pendingVisible = chat.pending.filter(
-    (p) =>
-      p.status === 'pending' ||
-      p.status === 'stale' ||
-      p.status === 'applied',
-  );
   const pendingActionable = chat.pending.filter((p) => p.status === 'pending');
+  const pendingOpen = chat.pending.filter(
+    (p) => p.status === 'pending' || p.status === 'stale',
+  );
   const tokenTotal = chat.usageTotal.totalTokens ?? 0;
 
   const copyTranscript = useCallback(() => {
@@ -396,10 +401,23 @@ export function AssistantPanel({
         {chat.messages.map((m, idx) => {
           const isLastAssistant =
             m.role === 'assistant' && idx === chat.messages.length - 1;
+          const messageActions = chat.pending.filter((p) =>
+            p.messageId ? p.messageId === m.id : isLastAssistant,
+          );
           return (
             <MessageBubble
               key={m.id}
               message={m}
+              actions={messageActions}
+              onApplyAction={async (id) => {
+                await chat.applyPending(id);
+                onApplied?.();
+              }}
+              onDiscardAction={(id) => chat.discardPending(id)}
+              onRevertAction={async (id) => {
+                await chat.revertApplied(id);
+                onApplied?.();
+              }}
               onRetry={
                 isLastAssistant && chat.canRetry && !chat.streaming
                   ? () => void chat.retry()
@@ -409,11 +427,11 @@ export function AssistantPanel({
           );
         })}
 
-        {pendingVisible.length > 0 && <Separator />}
+        {pendingOpen.length > 0 && <Separator />}
         {pendingActionable.length >= 2 && (
           <div className="flex items-center justify-between gap-2 pt-1">
             <span className="label-rune text-[11px]">
-              Pending Proposals ({pendingActionable.length})
+              Open Proposals ({pendingActionable.length})
             </span>
             <Button
               size="sm"
@@ -437,7 +455,7 @@ export function AssistantPanel({
             </Button>
           </div>
         )}
-        {pendingVisible.map((action) => (
+        {pendingOpen.map((action) => (
           <PendingActionCard
             key={action.id}
             action={action}
@@ -527,15 +545,38 @@ export function AssistantPanel({
               chat.cancel();
             }
           }}
-          placeholder="Ask Scribe… (Ctrl+Enter to send, Esc to stop)"
+          placeholder={
+            chat.streaming
+              ? 'Type instructions to steer Scribe… (Ctrl+Enter to interrupt & steer)'
+              : 'Ask Scribe… (Ctrl+Enter to send, Esc to stop)'
+          }
           className="w-full min-h-[80px] max-h-[200px] resize-y rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
         />
         <div className="flex items-center gap-2">
           {chat.streaming ? (
-            <Button variant="outline" size="sm" className="gap-1.5" onClick={chat.cancel}>
-              <StopCircle className="h-3.5 w-3.5" />
-              Stop
-            </Button>
+            <>
+              {draft.trim() ? (
+                <Button
+                  size="sm"
+                  className="gap-1.5 bg-amber-600 hover:bg-amber-700 text-white"
+                  onClick={() => void onSubmit()}
+                  title="Interrupt current generation and steer Scribe with this instruction"
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Interrupt & Steer
+                </Button>
+              ) : null}
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                onClick={chat.cancel}
+                title="Stop generation (Esc)"
+              >
+                <StopCircle className="h-3.5 w-3.5" />
+                Stop
+              </Button>
+            </>
           ) : (
             <Button
               size="sm"
@@ -676,12 +717,96 @@ function PolicyOption({
   );
 }
 
+function AppliedActionRow({
+  action,
+  onRevert,
+  onDiscard,
+}: {
+  action: PendingAction;
+  onRevert?: () => void | Promise<void>;
+  onDiscard?: () => void;
+}) {
+  const [showDiff, setShowDiff] = useState(false);
+  return (
+    <div className="rounded border border-emerald-500/35 bg-emerald-500/5 text-xs overflow-hidden">
+      <div className="flex items-center gap-1.5 px-2 py-1">
+        <Check className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+        <span className="font-mono text-[11px] truncate flex-1 text-emerald-600 dark:text-emerald-400 font-medium">
+          Applied {action.kind === 'new' ? 'new entry' : action.patch ? 'patch' : 'edit'}: {action.relPath}
+        </span>
+        {action.commitShortSha && (
+          <Badge variant="secondary" className="text-[10px] py-0 px-1.5 h-4 font-mono">
+            ⎇ {action.commitShortSha}
+          </Badge>
+        )}
+        <button
+          type="button"
+          onClick={() => setShowDiff((v) => !v)}
+          className="text-[10px] text-muted-foreground hover:text-foreground underline decoration-dotted px-1 shrink-0"
+        >
+          {showDiff ? 'Hide Diff' : 'View Diff'}
+        </button>
+        {onRevert && (
+          <button
+            type="button"
+            onClick={() => void onRevert()}
+            title="Revert applied change"
+            className="text-muted-foreground hover:text-foreground p-0.5 shrink-0"
+          >
+            <Undo2 className="h-3 w-3" />
+          </button>
+        )}
+        {onDiscard && (
+          <button
+            type="button"
+            onClick={onDiscard}
+            title="Dismiss from history"
+            className="text-muted-foreground hover:text-foreground p-0.5 shrink-0"
+          >
+            <X className="h-3 w-3" />
+          </button>
+        )}
+      </div>
+      {showDiff && (
+        <div className="border-t border-emerald-500/20 max-h-48 overflow-y-auto overflow-x-hidden bg-background p-2 font-mono text-[10px] leading-relaxed">
+          {action.diff ? (
+            <pre className="whitespace-pre-wrap break-words">
+              {action.diff.split('\n').map((line, i) => {
+                let cls = 'text-foreground/90';
+                if (line.startsWith('+++') || line.startsWith('---'))
+                  cls = 'text-muted-foreground';
+                else if (line.startsWith('+')) cls = 'text-emerald-400';
+                else if (line.startsWith('-')) cls = 'text-rose-400';
+                return (
+                  <div key={i} className={cls}>
+                    {line || '\u00A0'}
+                  </div>
+                );
+              })}
+            </pre>
+          ) : (
+            <pre className="whitespace-pre-wrap break-words">{action.next}</pre>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function MessageBubble({
   message,
   onRetry,
+  actions,
+  onApplyAction: _onApplyAction,
+  onDiscardAction,
+  onRevertAction,
 }: {
   message: ChatMessage;
   onRetry?: () => void;
+  actions?: PendingAction[];
+  onApplyAction?: (id: string) => void | Promise<void>;
+  onDiscardAction?: (id: string) => void;
+  onRevertAction?: (id: string) => void | Promise<void>;
 }) {
   const isUser = message.role === 'user';
   return (
@@ -727,6 +852,39 @@ function MessageBubble({
           {message.toolCalls.map((tc, i) => (
             <ToolCallChip key={i} call={tc} />
           ))}
+        </div>
+      )}
+      {actions && actions.length > 0 && (
+        <div className="mt-2 space-y-1.5 pt-1.5 border-t border-border/40">
+          {actions.map((act) => {
+            if (act.status === 'applied') {
+              return (
+                <AppliedActionRow
+                  key={act.id}
+                  action={act}
+                  onRevert={onRevertAction ? () => onRevertAction(act.id) : undefined}
+                  onDiscard={onDiscardAction ? () => onDiscardAction(act.id) : undefined}
+                />
+              );
+            }
+            if (act.status === 'pending' || act.status === 'stale') {
+              return (
+                <div
+                  key={act.id}
+                  className="flex items-center gap-1.5 px-2 py-1 rounded bg-primary/10 border border-primary/20 text-[11px] text-primary"
+                >
+                  <Wrench className="h-3 w-3 shrink-0" />
+                  <span className="font-mono truncate flex-1">
+                    {act.kind === 'new' ? 'Proposed new' : act.patch ? 'Proposed patch' : 'Proposed edit'}: {act.relPath}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground italic shrink-0">
+                    (review below)
+                  </span>
+                </div>
+              );
+            }
+            return null;
+          })}
         </div>
       )}
     </div>

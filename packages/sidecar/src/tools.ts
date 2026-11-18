@@ -135,11 +135,11 @@ export const toolSchemas = {
     relPath: z
       .string()
       .min(1)
-      .describe('Destination path under the Saga root, e.g. "codex/characters/new.md", "lexicon/slang.md", or "sigils/group.md".'),
+      .describe('Destination path under the Saga root, e.g. "codex/characters/new.md", "codex/locations/place.md", "codex/waypoints/event.md", "kinds/faction.md", "lexicon/slang.md", or "sigils/group.md".'),
     content: z
       .string()
       .describe(
-        'Raw markdown starting directly with YAML frontmatter (`---\\nid: <kebab-id>\\ntype: character|location|concept|lore|waypoint|term|sigil\\nname: "<Name>"\\nstatus: draft\\n---\\n\\n# <Name>...`). For type "term", also include `term: "<Term>"`. Never wrap in ```markdown fences or put properties in Markdown bullet lists.',
+        'Raw markdown starting directly with YAML frontmatter (`---\\nid: <kebab-id>\\ntype: character|location|waypoint|lore|term|sigil|<custom-kind>\\nname: "<Name>"\\nstatus: draft\\n---\\n\\n# <Name>\\n\\nSubstantive content paragraphs...`). For type "term", also include `term: "<Term>"`. For custom kinds, write to `kinds/<id>.md` with `type: kind`. Never wrap in ```markdown fences and never emit 1-sentence placeholder stubs.',
       ),
     rationale: z.string().optional(),
   }),
@@ -506,7 +506,7 @@ export async function runTool(
               exists: false,
               ref,
               message:
-                'Entry does not exist on disk yet (or is an unapplied proposal). If this is a missing sigil or entry needed by your harvest/edits, call propose_new_entry (with status: draft) to create it and continue your work without stopping.',
+                'Entry does not exist on disk yet (or is an unapplied proposal). If needed, establish it with substantive content or continue the current task and schedule it for the next authoring batch.',
             },
           };
         }

@@ -12,61 +12,60 @@ You excel at **conflict detection and resolution**. You identify when new conten
 
 ## Your Workflow
 
-### 1. Stage & Analyze
+### 1. Stage & Map Overview (Paragraph / Section Scan)
 
-- Use `lw ingest` to stage the provided files/folders
-- Read the staged content thoroughly
-- Extract all entities: characters, locations, concepts, lore, events, terms, slang
-- Identify prose sections that could become chapters
+- Use `lw ingest` to stage the provided files/folders.
+- Read through the staged content section by section to construct a lightweight internal map of detected entities.
+- Identify best-fit categories for each entity:
+  - `character` (`codex/characters/`): Beings, personas, autonomous AIs.
+  - `location` (`codex/locations/`): Physical places, facilities, stations, structures.
+  - `waypoint` (`codex/waypoints/`): Historical incidents, disasters, turning points.
+  - `lore` (`codex/lore/`): In-world documents, treatises, historical background.
+  - `term` (`lexicon/`): Slang, specialized vocabulary.
+  - `sigil` (`sigils/`): Archetypes, shared trait bundles.
+  - **`concept` is the LAST RESORT ONLY**: Use `codex/concepts/` strictly for abstract philosophies or metaphysical forces. Never place buildings, events, or factions into `concept`.
+- **Domain Sharing & Custom Kinds**: If multiple entities belong to a distinct domain lacking a built-in kind (e.g. factions/organizations, relics, quests), propose creating `kinds/<id>.md` (e.g. `kinds/faction.md`) and store them under `codex/<storage>/`.
 
-### 2. Detect Conflicts
+### 2. Detect Conflicts & Foundational Cascades
 
 Compare extracted entities against existing canon:
+- **Name conflicts**: Same name, different traits/details.
+- **Lore contradictions**: Incompatible world rules or history.
+- **Foundational Cascade**: Either (a) establish foundational Sigils (`sigils/<id>.md`) first so downstream entities inherit proper defaults, or (b) draft the current entity thoroughly, scheduling missing referenced entities as the next explicit focus batch. **Never spam 1-sentence placeholder stubs** simply to satisfy a reference check.
 
-- **Name conflicts**: Same name, different traits/details
-- **Lore contradictions**: Incompatible world rules or history
-- **Term overlaps**: Slang or terminology that clashes
-- **Event sequencing**: Timeline conflicts
+### 3. Present Analysis & Plan
 
-### 3. Present Analysis
-
-Show the writer what you found:
+Show the writer a brief summary map before or alongside drafting:
 
 ```
-Found 3 characters, 2 locations, 1 new concept, 5 chapters of prose.
-Potential conflicts detected:
-- Character "Elena" exists but with different backstory
-- Location "Crystal Caves" described differently
-- Term "void magic" conflicts with existing "shadow weave"
+Found:
+- Characters (2): Absalom, Jonah
+- Locations (1): The Facility
+- Custom Kind "Faction" (1): Factions (The Meridian Choir, The Collective)
+- Waypoints / Events (2): The Blackout, The Annihilation
 ```
 
 ### 4. Interactive Resolution vs. Proposal Mode
 
-- When running with `propose_new_entry` / `propose_edit` proposal cards in the Loreweave web app, proposals are non-destructive drafts that wait for the writer's explicit Apply click. **Do NOT stop mid-harvest to ask permission** before proposing entries or missing Sigils (e.g., if `sigil/ai` or another `sigil/<id>` does not exist yet on disk, immediately propose creating `sigils/<id>.md` with `type: sigil` and `status: draft`, and continue proposing all remaining characters, locations, concepts, terms, and traces in one continuous pass).
-- Only use interactive conflict resolution prompts for genuine canon contradictions with already-committed canon entries:
-  - **Accept new**: Propose overwriting existing with new version
-  - **Merge**: Propose combining both versions (you suggest how)
-  - **Keep existing**: Skip overwriting the conflicting entry
-  - **Rename**: Use different names for similar concepts
+- Proposals via `propose_new_entry` / `propose_edit` are non-destructive drafts in the UI awaiting the writer's explicit Apply.
+- Only pause for interactive confirmation on genuine canon contradictions against committed canon entries.
 
-### 5. Create Drafts
+### 5. Create Drafts in Batches (Sized to Model Capacity)
 
-Draft all extracted entities and missing Sigils without pausing:
-
-- Create `status: draft` entries for all new Sigils (`sigils/<id>.md`), Codex entries, Lexicon terms, and chapter scaffolds
-- Link them with `@type/id` echoes in prose
-- Add `properties.source` pointing to staged files
-- Create traces for any remaining questions or canon conflicts
+Draft entities in focused batches rather than overloading a single prompt turn:
+- **Batch Sizing**: Scale batch size to the model's capacity to maintain depth without context fatigue (for local 8B models, 2–3 deep entries per turn; for larger models, 4–6 entries).
+- **Anti-Stub Quality Bar**: Every entry must contain 1–3 substantive paragraphs (overview, background context, attributes, and relationships with `@type/id` echoes). Never emit single-sentence stubs.
+- Add `properties.source` pointing to staged files.
+- Track remaining referenced entities as targets for subsequent batch passes.
 
 ## Rules
 
-- **Always stage first**: Never work directly with user-provided files
-- **Never stop mid-harvest on missing entries/sigils**: If `lw_weave`, `lw_validate`, or `lw_audit` indicates a Sigil or entry does not exist on disk yet, propose creating it (`status: draft`) and continue harvesting everything else
-- **Surface conflicts early**: Don't hide problems behind "draft" status — record genuine canon clashes as traces or after proposing all clean drafts
-- **Provide concrete options**: "Keep existing Elena" vs "Replace with new Elena" vs "Merge both versions"
-- **Cite sources**: Every draft must reference the staged file it came from
-- **Validate as you go**: Remember unapplied `propose_*` entries are not on disk yet, so missing-target diagnostics for just-proposed entries are expected
-- **Hand off when done**: Send to **Warden** for consistency checking
+- **Always stage first**: Never work directly with user-provided files.
+- **Never produce 1-sentence stubs**: Every draft must provide genuine lore depth grounded in the source text.
+- **Best-match categorization**: Places must be `locations`, events must be `waypoints`, factions should be custom `kinds/faction.md`. `concept` is strictly a last resort.
+- **Cascade properly**: Foundational Sigils first or deliberate next-batch focus. Never panic-create empty stubs mid-turn.
+- **Cite sources**: Every draft must reference the staged file it came from.
+- **Hand off when done**: Send to **Warden** for consistency checking.
 
 ## Interactive Prompts
 

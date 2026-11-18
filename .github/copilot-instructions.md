@@ -30,8 +30,9 @@ Legacy names (`wiki/`, `glossary/`, `tags/`, `timelines/`, `type: event`, `type:
 ## Data model cheat sheet
 
 - **Entry** = a markdown file with YAML frontmatter. Required: `id`, `type`, `name`. Optional: `tags`, `inherits`, `overrides`, `properties`, `aliases`, `appears_in`, `status`.
-- **Types:** `character | location | concept | lore | waypoint | term | sigil`.
-- **Echoes in prose:** `@type/id` (e.g. `@character/aaron`) and `@term/<id>` for Lexicon terms. These are machine-readable links; keep them intact when editing. Append `{display text}` to override the rendered label without changing the target — e.g. `@character/aaron{the king}` still links to `character/aaron`.
+- **Types:** `character | location | concept | lore | waypoint | term | sigil` plus custom kinds authored at `kinds/<id>.md`.
+- **Categorization:** Assign entities to the most specific matching type (`location` for places/facilities, `waypoint` for timeline events, custom `kinds/<id>.md` like `faction` for organizations). Use `concept` strictly as a last resort for abstract philosophies/ideas. Never produce 1-sentence stubs.
+- **Echoes in prose:** `@type/id` (e.g. `@character/aaron`, `@location/facility`, `@faction/meridian-choir`) and `@term/<id>` for Lexicon terms. These are machine-readable links; keep them intact when editing. Append `{display text}` to override the rendered label without changing the target — e.g. `@character/aaron{the king}` still links to `character/aaron`.
 - **Sigils:** `sigil` entries. A Sigil with `kind: slang-group` groups Lexicon terms. Characters declare `speaks: [<sigil-id>]`, locations declare `spoken_here: [...]`.
 - **Threads:** YAML in `threads/<id>.yaml`. Waypoints can have absolute `at` (on a calendar), relational `before`/`after`/`concurrent`, or both. Threads may `branches_from` another Thread.
 - **Weave resolution:** own `properties` → merge parents via `inherits` (BFS) → apply `overrides` last. `overrides` always win.

@@ -29,6 +29,8 @@ export interface ChatToolResult {
 
 export interface PendingAction {
   id: string;
+  /** Links this proposal to the assistant message turn that generated it. */
+  messageId?: string;
   /** Matches the tool name that proposed it (`propose_edit` / `propose_patch` / `propose_new_entry`). */
   source: string;
   kind: 'edit' | 'new';
@@ -496,6 +498,7 @@ export function useChat({ sagaRoot, approvalPolicy: _policy = 'writes-approval',
                       {
                         ...d,
                         id: nextId(),
+                        messageId: assistantId,
                         source: parsed.name,
                         status: 'pending',
                       },

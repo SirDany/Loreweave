@@ -16,6 +16,8 @@ When given a user request or multi-part prompt, analyze the tasks and assume the
 
 ## Constraints
 - **Canon first, prose second.** Read the Codex and weave necessary entities before making claims.
+- **Categorization & Depth.** Categorize entities by best fit (`location` for places/facilities, `waypoint` for timeline events, custom `kinds/<id>.md` like `faction` for organizations; `concept` as last resort only). Never output 1-sentence stubs — every entry must contain substantive worldbuilding paragraphs.
+- **Cascades & Batches.** Map documents section by section; establish foundational Sigils first or schedule referenced targets for the next batch rather than spamming empty stubs.
 - **Preserve `@type/id` references.** Do not flatten references into plain text.
 - **Do not fabricate canon.** Propose entries or confirm ambiguous lore before writing.
 - **Slang hygiene.** Only speak slang terms if the character declares `speaks: [<sigil>]`.

@@ -17,7 +17,13 @@ The `lw ingest` command stages raw source files into `sagas/<saga>/.loreweave/in
 
 Depending on the writer's request, one or more of:
 
-1. **Codex drafts** — one markdown file per detected character / location / concept / lore / waypoint, in `codex/<type>/<slug>.md`, with `status: draft`.
+1. **Codex drafts** — one markdown file per detected entity under its natural category:
+   - `codex/characters/<id>.md` for beings/personas
+   - `codex/locations/<id>.md` for places/facilities/stations
+   - `codex/waypoints/<id>.md` for timeline events/incidents
+   - `codex/lore/<id>.md` for historical documents/chronicles
+   - `codex/concepts/<id>.md` as **last resort only** for abstract philosophies or natural forces
+   - `kinds/<id>.md` when multiple entities share a custom domain (e.g. `faction`), followed by entries under `codex/<storage>/`
 2. **Lexicon drafts** — terms (including slang) in `lexicon/<slug>.md` with `status: draft`.
 3. **Chapter scaffolds** — if the source material includes prose, split it into `tomes/<tome>/story/NN-<slug>/chapter.md` with an accompanying `_meta.yaml` (POV, summary, linked Waypoints). Wrap inferred entity mentions as `@type/id` Echoes that point at the drafted entries.
 4. **Traces** — anything speculative, contradictory, or unclear goes into `traces/<slug>.md` with `kind: question` targeting the relevant entry. Do not inline-invent facts to fill gaps.
@@ -25,20 +31,22 @@ Depending on the writer's request, one or more of:
 ## Rules
 
 - **Every proposal is `status: draft`.** The writer promotes to canon by removing the field or setting `status: canon`.
-- **Every file you create must validate.** Run `lw validate sagas/<saga>` after your batch. Fix your own diagnostics before handing off.
+- **Quality Bar — No 1-Sentence Stubs.** Every drafted entry must contain 1–3 substantial paragraphs explaining overview, context, characteristics, and significance grounded in the source material. Never emit shallow one-line placeholders.
+- **Categorization First:** Places must be `location`, events must be `waypoint`, organizations should be custom `kinds/faction.md`. Never dump everything into `concept`.
+- **Foundational Cascade:** Establish foundational Sigils (`sigils/<id>.md`) first, or complete the current document thoroughly and schedule referenced targets for the next batch pass.
+- **Batch Processing:** Process large documents in batches scaled to model capacity (2–3 deep entries per turn for local models; 4–6 for larger models) rather than rushing all entities into one turn.
 - **Never modify files under `.loreweave/ingest/`.** That directory is the source of truth for what was ingested and must stay untouched.
 - **Surface conflicts as traces.** If the source contradicts existing canon (e.g., Aaron's birthplace differs), create a `kind: question` trace targeting the affected entry instead of overwriting it.
 - **Cite your source.** Each drafted entry must include a `properties.source` field pointing at the staged path (e.g., `.loreweave/ingest/<batch>/<file>`) so the writer can trace back.
-- **Slang groups.** Only create a new slang-group Sigil if the source material explicitly names one. Otherwise, attach detected slang terms to an existing group as a draft and mark as `kind: question` in traces.
 
 ## Workflow
 
 1. Read `manifest.json` for the most recent batch under `.loreweave/ingest/`.
-2. Read each staged file and identify all distinct Sigils, entities, places, events, terms, and prose sections.
-3. Draft missing Sigils (`sigils/<id>.md` with `type: sigil`, `status: draft`) and all extracted Codex/Lexicon entries (`status: draft`) in one continuous pass via `propose_new_entry` (or direct draft files when editing locally). **Do not pause mid-batch** to ask permission for individual entities or missing sigils — proposal cards are non-destructive until the writer clicks Apply.
-4. One file per entity. Use kebab-case ids.
-5. Run validation if helpful, noting that entries only proposed via `propose_new_entry` do not exist on disk yet until applied.
-6. Summarize back: list every file/proposal you created, every `@type/id` it introduced, and every open trace.
+2. Scan the staged content section by section to map distinct Sigils, entities, places, events, and shared domains.
+3. Identify custom kinds (`kinds/<id>.md`) if multiple entities form a new domain (such as factions).
+4. Draft foundational Sigils first (`sigils/<id>.md`), then draft Codex and Lexicon entries in structured batches with rich markdown content.
+5. One file per entity. Use kebab-case ids.
+6. Summarize back: list every file/proposal you created, every `@type/id` it introduced, and next scheduled batches.
 
 ## When to hand off
 

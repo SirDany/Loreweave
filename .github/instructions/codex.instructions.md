@@ -1,10 +1,24 @@
 ---
-description: "Rules for editing Codex entries (characters, locations, concepts, lore, waypoints) under sagas/*/codex/**."
-applyTo: "sagas/**/{codex,wiki}/**"
+description: "Rules for editing Codex entries (characters, locations, concepts, lore, waypoints, custom kinds) under sagas/*/codex/** and kinds/**."
+applyTo: "sagas/**/{codex,wiki,kinds}/**"
 ---
 # Codex rules
 
 - **Frontmatter is canonical.** Every entry needs `id`, `type`, `name`. `id` must be the filename stem. Never edit `id` without updating every Echo.
+- **Categorization & Best-Match Hierarchy (Concept is Last Resort):**
+  - `character` (`codex/characters/`): Beings, personas, autonomous AIs, persons.
+  - `location` (`codex/locations/`): Physical locations, facilities, structures, stations, settlements.
+  - `waypoint` (`codex/waypoints/`): Events, battles, disasters, narrative turning points.
+  - `lore` (`codex/lore/`): Historical annals, chronicles, world background documents.
+  - `term` (`lexicon/`): Dialect words, jargon, slang.
+  - `sigil` (`sigils/`): Archetypes, shared attribute bundles, inheritance groups.
+  - **`concept` is the LAST RESORT ONLY:** Reserve `codex/concepts/` strictly for abstract philosophies, intangible metaphysical forces, or cosmic rules. Never dump facilities, events, or factions into `concept`.
+- **Dynamic Custom Kinds (`kinds/<id>.md`):**
+  - When multiple entities share a domain that lacks a built-in kind (e.g., **factions / organizations**, **quests / missions**, **relics / artifacts**), create a Kind definition at `kinds/<id>.md` with `type: kind`, `storage: codex/<id>s`, `echoPrefix: <id>`, and `display: { icon: ..., color: ... }`.
+  - Author the domain entries under `codex/<storage>/` with `type: <id>` and echo them as `@<id>/<slug>`.
+- **Quality Bar — No 1-Sentence Stubs:**
+  - Every proposed entry must be substantial and informative (minimum 1–3 well-developed paragraphs covering overview, context, capabilities, and narrative significance).
+  - Never generate shallow placeholder one-liners simply to satisfy a missing reference.
 - **Inheritance & overrides.**
   - `inherits: [<sigil-id>, ...]` — Sigil-level defaults merged BFS.
   - `overrides: { key: value, ... }` — **always** wins over inheritance.
