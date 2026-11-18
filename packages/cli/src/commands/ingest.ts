@@ -62,7 +62,7 @@ export async function ingestCmd(
   const ingestDir = path.join(sagaRoot, ".loreweave", "ingest", batchId);
   await fs.mkdir(ingestDir, { recursive: true });
 
-  const staged: Array<{ source: string; staged: string; size: number }> = [];
+  const staged: Array<{ source: string; staged: string; relPath?: string; size: number }> = [];
   for (const input of files) {
     const abs = path.resolve(input);
     const stat = await fs.stat(abs).catch(() => null);
@@ -72,9 +72,9 @@ export async function ingestCmd(
     }
     if (stat.isDirectory()) {
       const walked = await walkFiles(abs);
-      for (const f of walked) await stageOne(f, abs, ingestDir, staged);
+      for (const f of walked) await stageOne(f, abs, ingestDir, staged, batchId);
     } else {
-      await stageOne(abs, path.dirname(abs), ingestDir, staged);
+      await stageOne(abs, path.dirname(abs), ingestDir, staged, batchId);
     }
   }
 
@@ -116,16 +116,18 @@ export async function stageOne(
   file: string,
   baseDir: string,
   ingestDir: string,
-  staged: Array<{ source: string; staged: string; size: number }>,
+  staged: Array<{ source: string; staged: string; relPath?: string; size: number }>,
+  batchId = path.basename(ingestDir),
 ): Promise<void> {
   const ext = path.extname(file).toLowerCase();
   if (!ALLOWED_EXT.has(ext)) return;
   const rel = path.relative(baseDir, file).split(path.sep).join("/");
   const dst = path.join(ingestDir, rel);
+  const relPath = `.loreweave/ingest/${batchId}/${rel}`;
   await fs.mkdir(path.dirname(dst), { recursive: true });
   const buf = await fs.readFile(file);
   await fs.writeFile(dst, buf);
-  staged.push({ source: file, staged: dst, size: buf.length });
+  staged.push({ source: file, staged: dst, relPath, size: buf.length });
 
   // If this is a binary source (pdf/docx), also drop a plain-text .md sibling
   // so the Archivist can read it alongside the original.
@@ -134,10 +136,16 @@ export async function stageOne(
     try {
       const text = await extractor(buf);
       const mdDst = dst.replace(new RegExp(`\\${ext}$`, "i"), "") + ".extracted.md";
+      const mdRelPath = relPath.replace(new RegExp(`\\${ext}$`, "i"), "") + ".extracted.md";
       const banner = `<!-- extracted from ${path.basename(file)} by lw ingest -->\n\n`;
       const body = Buffer.from(banner + (text.trim() || "(no text extracted)") + "\n", "utf8");
       await fs.writeFile(mdDst, body);
-      staged.push({ source: file + " (extracted)", staged: mdDst, size: body.length });
+      staged.push({
+        source: file + " (extracted)",
+        staged: mdDst,
+        relPath: mdRelPath,
+        size: body.length,
+      });
     } catch (e) {
       console.error(
         pc.yellow(

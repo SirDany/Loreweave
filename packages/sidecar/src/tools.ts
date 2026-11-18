@@ -11,6 +11,7 @@ import path from 'node:path';
 import { z } from 'zod';
 import {
   StorageNotFoundError,
+  normalizeSagaFileContent,
   type StorageAdapter,
 } from '@loreweave/core';
 import { providerFromEnv, searchIndex } from './embeddings.js';
@@ -112,7 +113,9 @@ export const toolSchemas = {
     relPath: z.string().min(1),
     newContent: z
       .string()
-      .describe('Full file contents after the edit. Must include frontmatter.'),
+      .describe(
+        'Full file contents after the edit (raw file text, never wrapped in ```markdown code fences). Codex/Lexicon/Sigil files MUST start with valid YAML frontmatter delimited by --- lines (including id, type, name, status).',
+      ),
     rationale: z.string().optional(),
   }),
   propose_patch: z.object({
@@ -132,8 +135,12 @@ export const toolSchemas = {
     relPath: z
       .string()
       .min(1)
-      .describe('Destination path under the Saga root, e.g. "codex/characters/new.md".'),
-    content: z.string(),
+      .describe('Destination path under the Saga root, e.g. "codex/characters/new.md", "lexicon/slang.md", or "sigils/group.md".'),
+    content: z
+      .string()
+      .describe(
+        'Raw markdown starting directly with YAML frontmatter (`---\\nid: <kebab-id>\\ntype: character|location|concept|lore|waypoint|term|sigil\\nname: "<Name>"\\nstatus: draft\\n---\\n\\n# <Name>...`). For type "term", also include `term: "<Term>"`. Never wrap in ```markdown fences or put properties in Markdown bullet lists.',
+      ),
     rationale: z.string().optional(),
   }),
   handoff: z.object({
@@ -274,6 +281,51 @@ function tryJson<T = unknown>(s: string): T | string {
 
 function resolveSagaRoot(ctx: ToolContext, sagaRoot: string): string {
   return path.isAbsolute(sagaRoot) ? sagaRoot : path.join(ctx.repoRoot, sagaRoot);
+}
+
+const SINGULAR_CODEX_MAP: Record<string, string> = {
+  character: 'characters',
+  location: 'locations',
+  concept: 'concepts',
+  waypoint: 'waypoints',
+  event: 'waypoints',
+  events: 'waypoints',
+};
+
+function normalizeSagaRelPath(
+  sagaRootAbs: string,
+  sagaRootRel: string,
+  rawRel: string,
+): string {
+  let rel = rawRel
+    .trim()
+    .replace(/\\\//g, '/')
+    .replace(/\\/g, '/')
+    .replace(/^\.\//, '');
+  const rootAbsNorm = sagaRootAbs.replace(/\\/g, '/').replace(/\/+$/, '');
+  const rootRelNorm = sagaRootRel
+    .trim()
+    .replace(/\\/g, '/')
+    .replace(/^\.\//, '')
+    .replace(/\/+$/, '');
+
+  if (rootAbsNorm && rel.toLowerCase().startsWith(rootAbsNorm.toLowerCase() + '/')) {
+    rel = rel.slice(rootAbsNorm.length + 1);
+  } else if (
+    rootRelNorm &&
+    rootRelNorm !== '.' &&
+    rel.toLowerCase().startsWith(rootRelNorm.toLowerCase() + '/')
+  ) {
+    rel = rel.slice(rootRelNorm.length + 1);
+  }
+  rel = rel.replace(/^\/+/, '');
+
+  rel = rel.replace(
+    /^codex\/(character|location|concept|waypoint|event|events)\//i,
+    (_m, folder: string) => `codex/${SINGULAR_CODEX_MAP[folder.toLowerCase()] ?? folder}/`,
+  );
+  rel = rel.replace(/^sigil\//i, 'sigils/').replace(/^trace\//i, 'traces/');
+  return rel;
 }
 
 /**
@@ -496,7 +548,7 @@ export async function runTool(
         return { ok: true, data: rows };
       }
       case 'read_file': {
-        const rel = args.relPath as string;
+        const rel = normalizeSagaRelPath(sagaRoot, sagaRootRel, args.relPath as string);
         const content = await readSagaFile(ctx, sagaRootRel, sagaRoot, rel);
         return {
           ok: true,
@@ -529,7 +581,7 @@ export async function runTool(
         }
       }
       case 'propose_edit': {
-        const rel = args.relPath as string;
+        const rel = normalizeSagaRelPath(sagaRoot, sagaRootRel, args.relPath as string);
         let original = '';
         try {
           original = await readSagaFile(ctx, sagaRootRel, sagaRoot, rel);
@@ -537,7 +589,7 @@ export async function runTool(
           if (!isMissing(e)) throw e;
           original = '';
         }
-        const next = args.newContent as string;
+        const next = normalizeSagaFileContent(rel, args.newContent as string);
         return {
           ok: true,
           data: {
@@ -553,7 +605,7 @@ export async function runTool(
         };
       }
       case 'propose_patch': {
-        const rel = args.relPath as string;
+        const rel = normalizeSagaRelPath(sagaRoot, sagaRootRel, args.relPath as string);
         let original: string;
         try {
           original = await readSagaFile(ctx, sagaRootRel, sagaRoot, rel);
@@ -597,7 +649,11 @@ export async function runTool(
         };
       }
       case 'propose_new_entry': {
-        const rel = args.relPath as string;
+        const rel = normalizeSagaRelPath(sagaRoot, sagaRootRel, args.relPath as string);
+        const normalizedContent = normalizeSagaFileContent(
+          rel,
+          args.content as string,
+        );
         let exists = false;
         let original = '';
         try {
@@ -613,8 +669,8 @@ export async function runTool(
             kind: 'new',
             sagaRoot: sagaRootRel,
             relPath: rel,
-            content: args.content as string,
-            next: args.content as string,
+            content: normalizedContent,
+            next: normalizedContent,
             original,
             originalHash: hashContent(original),
             exists,

@@ -47,3 +47,10 @@ export {
   type RecentEntry,
   type DiagnosticTotals,
 } from "./summarize.js";
+export {
+  stripOuterCodeFence,
+  inferTypeFromPath,
+  normalizeEntryMarkdown,
+  normalizeTraceMarkdown,
+  normalizeSagaFileContent,
+} from "./normalizer.js";

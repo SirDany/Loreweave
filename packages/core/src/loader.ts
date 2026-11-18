@@ -6,6 +6,11 @@ import YAML from 'yaml';
 import { BUILTIN_KIND_IDS } from './builtin-kinds.js';
 import { loadKindCatalog, type KindCatalog } from './kind-loader.js';
 import {
+  normalizeEntryMarkdown,
+  normalizeTraceMarkdown,
+  stripOuterCodeFence,
+} from './normalizer.js';
+import {
   CalendarFileSchema,
   ChapterMetaSchema,
   CustomKindEntryFrontmatterSchema,
@@ -64,40 +69,62 @@ function toRel(root: string, p: string): string {
 
 async function parseEntry(file: string, root: string): Promise<Entry> {
   const raw = await readText(file);
-  const parsed = matter(raw);
-  // Try the strict discriminated union first (built-in kinds). Fall
-  // back to the permissive custom-kind schema for entries belonging
-  // to a saga-defined Kind.
-  const strict = EntryFrontmatterSchema.safeParse(parsed.data);
+  const relPath = toRel(root, file);
+  const expectedId = path.basename(file, path.extname(file));
+  const hasCodeFence = raw.trimStart().startsWith('```');
+
+  if (!hasCodeFence) {
+    try {
+      const parsed = matter(raw);
+      // Try the strict discriminated union first (built-in kinds). Fall
+      // back to the permissive custom-kind schema for entries belonging
+      // to a saga-defined Kind.
+      const strict = EntryFrontmatterSchema.safeParse(parsed.data);
+      let candidate: Entry['frontmatter'] | null = null;
+      if (strict.success) {
+        candidate = strict.data;
+      } else {
+        const loose = CustomKindEntryFrontmatterSchema.safeParse(parsed.data);
+        if (loose.success) {
+          candidate = loose.data as unknown as Entry['frontmatter'];
+        }
+      }
+      if (candidate && candidate.id === expectedId) {
+        return {
+          frontmatter: candidate,
+          body: parsed.content.trim(),
+          path: file,
+          relPath,
+        };
+      }
+    } catch {
+      // Malformed YAML frontmatter — fall through to the resilient normalizer.
+    }
+  }
+
+  const normalized = normalizeEntryMarkdown(raw, relPath);
+  const parsedNorm = matter(normalized.content);
+  const strictNorm = EntryFrontmatterSchema.safeParse(parsedNorm.data);
   let fm: Entry['frontmatter'];
-  if (strict.success) {
-    fm = strict.data;
+  if (strictNorm.success) {
+    fm = strictNorm.data;
   } else {
-    const loose = CustomKindEntryFrontmatterSchema.safeParse(parsed.data);
-    if (!loose.success) {
-      // Surface the strict error since the typical cause is a typo in a
-      // built-in type rather than an intentional custom kind.
+    const looseNorm = CustomKindEntryFrontmatterSchema.safeParse(parsedNorm.data);
+    if (!looseNorm.success) {
       throw new LoadError(
-        `invalid frontmatter: ${strict.error.issues
+        `invalid frontmatter: ${strictNorm.error.issues
           .map((i) => `${i.path.join('.')}: ${i.message}`)
           .join('; ')}`,
         file,
       );
     }
-    fm = loose.data as unknown as Entry['frontmatter'];
-  }
-  const expectedId = path.basename(file, path.extname(file));
-  if (fm.id !== expectedId) {
-    throw new LoadError(
-      `id "${fm.id}" does not match filename stem "${expectedId}"`,
-      file
-    );
+    fm = looseNorm.data as unknown as Entry['frontmatter'];
   }
   return {
     frontmatter: fm,
-    body: parsed.content.trim(),
+    body: normalized.body.trim(),
     path: file,
-    relPath: toRel(root, file),
+    relPath,
   };
 }
 
@@ -105,7 +132,7 @@ async function parseYamlFile<T>(
   file: string,
   schema: { safeParse: (v: unknown) => { success: boolean } }
 ): Promise<T> {
-  const raw = await readText(file);
+  const raw = stripOuterCodeFence(await readText(file));
   let data: unknown;
   try {
     data = YAML.parse(raw);
@@ -140,29 +167,45 @@ async function loadTraces(root: string): Promise<Trace[]> {
   const out: Trace[] = [];
   for (const f of files) {
     const raw = await readText(f);
-    const parsed = matter(raw);
-    const result = TraceFrontmatterSchema.safeParse(parsed.data);
-    if (!result.success) {
-      throw new LoadError(
-        `invalid trace frontmatter: ${result.error.issues
-          .map((i) => `${i.path.join('.')}: ${i.message}`)
-          .join('; ')}`,
-        f
-      );
-    }
-    const fm = result.data as TraceFrontmatter;
+    const relPath = toRel(root, f);
     const expectedId = path.basename(f, path.extname(f));
-    if (fm.id !== expectedId) {
-      throw new LoadError(
-        `trace id "${fm.id}" does not match filename stem "${expectedId}"`,
-        f
-      );
+    let fm: TraceFrontmatter | null = null;
+    let body = '';
+
+    if (!raw.trimStart().startsWith('```')) {
+      try {
+        const parsed = matter(raw);
+        const result = TraceFrontmatterSchema.safeParse(parsed.data);
+        if (result.success && result.data.id === expectedId) {
+          fm = result.data as TraceFrontmatter;
+          body = parsed.content.trim();
+        }
+      } catch {
+        // Fall through to trace normalization.
+      }
     }
+
+    if (!fm) {
+      const normalized = normalizeTraceMarkdown(raw, relPath);
+      const parsedNorm = matter(normalized.content);
+      const normResult = TraceFrontmatterSchema.safeParse(parsedNorm.data);
+      if (!normResult.success) {
+        throw new LoadError(
+          `invalid trace frontmatter: ${normResult.error.issues
+            .map((i) => `${i.path.join('.')}: ${i.message}`)
+            .join('; ')}`,
+          f,
+        );
+      }
+      fm = normResult.data as TraceFrontmatter;
+      body = normalized.body.trim();
+    }
+
     out.push({
       frontmatter: fm,
-      body: parsed.content.trim(),
+      body,
       path: f,
-      relPath: toRel(root, f),
+      relPath,
     });
   }
   return out;

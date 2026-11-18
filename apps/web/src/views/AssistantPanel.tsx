@@ -191,6 +191,7 @@ export function AssistantPanel({
   }, [initialContext]);
   const [showingSettings, setShowingSettings] = useState(false);
   const [showingUsage, setShowingUsage] = useState(false);
+  const [applyingAll, setApplyingAll] = useState(false);
   const [aiCfg, setAiCfg] = useState<
     MaskedLoreweaveConfig | null | 'unavailable'
   >(null);
@@ -242,6 +243,7 @@ export function AssistantPanel({
       p.status === 'stale' ||
       p.status === 'applied',
   );
+  const pendingActionable = chat.pending.filter((p) => p.status === 'pending');
   const tokenTotal = chat.usageTotal.totalTokens ?? 0;
 
   const copyTranscript = useCallback(() => {
@@ -408,6 +410,33 @@ export function AssistantPanel({
         })}
 
         {pendingVisible.length > 0 && <Separator />}
+        {pendingActionable.length >= 2 && (
+          <div className="flex items-center justify-between gap-2 pt-1">
+            <span className="label-rune text-[11px]">
+              Pending Proposals ({pendingActionable.length})
+            </span>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={applyingAll}
+              onClick={async () => {
+                setApplyingAll(true);
+                try {
+                  for (const item of pendingActionable) {
+                    await chat.applyPending(item.id);
+                  }
+                  onApplied?.();
+                } finally {
+                  setApplyingAll(false);
+                }
+              }}
+              className="h-7 gap-1.5 text-xs border-primary/45 bg-primary/10 text-primary hover:bg-primary/20"
+            >
+              <Check className="h-3.5 w-3.5" />
+              {applyingAll ? 'Applying…' : `Apply All (${pendingActionable.length})`}
+            </Button>
+          </div>
+        )}
         {pendingVisible.map((action) => (
           <PendingActionCard
             key={action.id}

@@ -185,6 +185,7 @@ export interface UpsertEntryInput {
   kind: 'character' | 'location' | 'concept' | 'lore' | 'waypoint' | 'term' | 'sigil';
   name: string;
   id?: string;
+  term?: string;
   properties?: Record<string, unknown>;
   aliases?: string[];
   tags?: string[];
@@ -262,6 +263,13 @@ export async function upsertEntry(input: UpsertEntryInput) {
     name: input.name,
     status: input.status ?? existingFm.status ?? 'canon',
   };
+  if (type === 'term') {
+    fm.term =
+      input.term ??
+      (typeof existingFm.term === 'string' && existingFm.term ? existingFm.term : undefined) ??
+      input.name ??
+      id;
+  }
 
   if (input.aliases) fm.aliases = input.aliases;
   if (input.tags) fm.tags = input.tags;
@@ -515,19 +523,19 @@ export async function addTraceNote(
   sagaRoot?: string
 ) {
   const root = await resolveSagaRoot(sagaRoot);
-  const id = slugify(title);
+  const id = slugify(title) || 'note';
   const timestamp = new Date().toISOString();
   const relPath = `traces/${kind}-${id}.md`;
   const absPath = path.join(root, relPath);
 
-  const fm = {
+  const fm: Record<string, unknown> = {
     id: `${kind}-${id}`,
     kind,
     status: 'open',
-    target: targetRef ? normalizeRef(targetRef) : undefined,
     created: timestamp,
     updated: timestamp,
   };
+  if (targetRef) fm.target = normalizeRef(targetRef);
 
   const content = matter.stringify(`# ${title}\n\n${body}`, fm);
   await fs.mkdir(path.dirname(absPath), { recursive: true });

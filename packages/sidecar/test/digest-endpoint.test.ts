@@ -5,6 +5,7 @@ import path from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { registerSidecar, type MiddlewareHost } from '../src/middleware.js';
+import { runTool } from '../src/tools.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const exampleSaga = path.resolve(here, '../../../sagas/example-saga');
@@ -60,7 +61,9 @@ describe('sidecar /lw/digest', () => {
   });
 
   afterEach(async () => {
-    await new Promise<void>((resolve) => server?.close(() => resolve()));
+    if (server) {
+      await new Promise<void>((resolve) => server!.close(() => resolve()));
+    }
     server = null;
     await rm(dir, { recursive: true, force: true });
   });
@@ -242,5 +245,27 @@ describe('sidecar /lw/digest', () => {
     expect(delRes.status).toBe(200);
     const gone = await stat(created.path).catch(() => null);
     expect(gone).toBeNull();
+  });
+
+  it('runTool propose_new_entry normalizes singular folders and code-fenced entries', async () => {
+    const res = await runTool(
+      'propose_new_entry',
+      {
+        sagaRoot: saga,
+        relPath: 'codex/character/new-ai.md',
+        content: '```markdown\n---\n# New AI\n\n- **Type:** character\n- **Status:** draft\n```',
+      },
+      {
+        repoRoot: dir,
+        cliBin,
+        defaultSagaRoot: saga,
+        safeJoin: (root, rel) => path.resolve(root, rel),
+      },
+    );
+    expect(res.ok).toBe(true);
+    const data = res.data as { relPath: string; content: string };
+    expect(data.relPath).toBe('codex/characters/new-ai.md');
+    expect(data.content.startsWith('---\nid: new-ai\ntype: character\n')).toBe(true);
+    expect(data.content).not.toContain('```markdown');
   });
 });

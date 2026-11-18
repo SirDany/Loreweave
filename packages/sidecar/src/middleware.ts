@@ -28,6 +28,7 @@ import {
   buildEntryIndex,
   extractReferences,
   loadSaga,
+  normalizeSagaFileContent,
   summarizeSaga,
   validateSaga,
   type StorageAdapter,
@@ -286,7 +287,8 @@ export function registerSidecar(
       ) {
         throw new Error('sagaRoot, relPath, content required');
       }
-      await adapterFor(sagaRoot).writeFile(relPath, content);
+      const normalizedContent = normalizeSagaFileContent(relPath, content);
+      await adapterFor(sagaRoot).writeFile(relPath, normalizedContent);
       res.statusCode = 204;
       res.setHeader('cache-control', 'no-store');
       res.end();
@@ -358,7 +360,8 @@ export function registerSidecar(
           return;
         }
       }
-      await adapter.writeFile(relPath, content);
+      const normalizedContent = normalizeSagaFileContent(relPath, content);
+      await adapter.writeFile(relPath, normalizedContent);
       // Any mutation invalidates the on-disk canon digest; the next chat
       // turn will rebuild it from the fresh Saga.
       void invalidateDigest(path.resolve(safeRoot(sagaRoot)));
@@ -389,7 +392,7 @@ export function registerSidecar(
         JSON.stringify({
           ok: true,
           newHash: createHash('sha256')
-            .update(content, 'utf8')
+            .update(normalizedContent, 'utf8')
             .digest('hex')
             .slice(0, 16),
           commit:
@@ -432,7 +435,11 @@ export function registerSidecar(
         res.end(JSON.stringify({ error: 'exists', message: `${relPath} already exists` }));
         return;
       }
-      await adapter.writeFile(relPath, typeof content === 'string' ? content : '');
+      const normalizedContent =
+        typeof content === 'string'
+          ? normalizeSagaFileContent(relPath, content)
+          : '';
+      await adapter.writeFile(relPath, normalizedContent);
       void invalidateDigest(path.resolve(safeRoot(sagaRoot)));
       res.statusCode = 201;
       res.setHeader('content-type', 'application/json');
@@ -1333,7 +1340,7 @@ export function registerSidecar(
       } catch (e) {
         pushLog({ type: 'rules_error', error: (e as Error).message });
       }
-      system += `\n\n---\n\n## Runtime context\n\nYou are operating inside the Loreweave web app. The writer's current Saga root is \`${payload.sagaRoot}\`. Always pass that as \`sagaRoot\` when calling tools. Mutating tools (\`propose_*\`) never write to disk — they produce a pending-action card the writer must approve. Prefer \`propose_patch\` over \`propose_edit\` for localized changes.`;
+      system += `\n\n---\n\n## Runtime context\n\nYou are operating inside the Loreweave web app. The writer's current Saga root is \`${payload.sagaRoot}\`. Always pass that as \`sagaRoot\` when calling tools. Mutating tools (\`propose_*\`) never write to disk — they produce a pending-action card the writer must approve. Prefer \`propose_patch\` over \`propose_edit\` for localized changes.\n\n### Canonical Entry Format\nWhen calling \`propose_new_entry\` or \`propose_edit\` on \`codex/<folder>/<id>.md\`, \`lexicon/<id>.md\`, or \`sigils/<id>.md\`, ALWAYS output raw markdown starting directly on line 1 with valid YAML frontmatter delimited by \`---\` lines (NEVER wrap the file in \`\`\`markdown code fences, and NEVER put \`Type\` or \`Status\` in markdown bullet lists):\n\n---\nid: <kebab-id-matching-filename>\ntype: character # character | location | concept | lore | waypoint | term | sigil\nname: "<Display Name>"\nstatus: draft\ninherits:\n  - <sigil-id>\nproperties:\n  source: <relative-ingest-or-source-path>\n---\n\n# <Display Name>\n\nProse body with \`@type/id\` echoes.\n\n(For \`type: term\`, also include \`term: "<Word>"\` in the YAML frontmatter.)`;
       try {
         const digest = await getDigest(path.resolve(safeRoot(payload.sagaRoot)));
         system += `\n\n---\n\n${renderDigestForPrompt(digest)}`;
@@ -1365,7 +1372,7 @@ export function registerSidecar(
         messages: payload.messages,
         tools,
         // v5 replaced `maxSteps` with the more general `stopWhen` predicate.
-        stopWhen: stepCountIs(8),
+        stopWhen: stepCountIs(20),
         abortSignal: abort.signal,
       } as never) as {
         fullStream: AsyncIterable<

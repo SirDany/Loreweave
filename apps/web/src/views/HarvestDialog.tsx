@@ -267,7 +267,7 @@ export function HarvestDialog({
               type="button"
               onClick={() =>
                 onOpenAssistant(
-                  `Analyze the newly staged harvest batch in .loreweave/ingest/${manifest.batchId}/manifest.json. Read the staged files, extract characters, locations, concepts, terms, and chapter prose, surface any canon conflicts, and propose draft entries.`,
+                  `Analyze the newly staged harvest batch in .loreweave/ingest/${manifest.batchId}/manifest.json. Read the staged files using read_file, extract characters, locations, concepts, terms, and chapter prose, surface any canon conflicts, and use propose_new_entry to draft each new entry starting directly with valid YAML frontmatter (id, type, name, status: draft, and properties.source pointing to the staged file path — never wrap entries in \`\`\`markdown code fences).`,
                 )
               }
               className="px-4 py-1.5 rounded-lg border border-primary/50 bg-primary/20 text-primary font-medium hover:bg-primary/30 text-xs transition-colors shadow-sm"

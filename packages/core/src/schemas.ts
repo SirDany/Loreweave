@@ -140,15 +140,36 @@ export const SagaManifestSchema = z.object({
   tome_order: z.array(Id).optional(),
 });
 
+const StringArrayLike = z.preprocess((v) => {
+  if (typeof v === 'string') return v.trim() ? [v.trim()] : [];
+  return v;
+}, z.array(z.string()));
+
+const OrdinalLike = z.preprocess((v) => {
+  if (typeof v === 'string' && v.trim() !== '' && !Number.isNaN(Number(v))) {
+    return Number(v);
+  }
+  return v;
+}, z.number().int().nonnegative());
+
+const ChapterStatusLike = z.preprocess((v) => {
+  if (typeof v === 'string') {
+    const lower = v.trim().toLowerCase();
+    if (lower === 'draft' || lower === 'canon') return lower;
+    return undefined;
+  }
+  return v;
+}, StatusSchema);
+
 export const ChapterMetaSchema = z.object({
   title: z.string().optional(),
-  ordinal: z.number().int().nonnegative().optional(),
-  status: StatusSchema.optional(),
-  pov: z.array(z.string()).optional(),
+  ordinal: OrdinalLike.optional(),
+  status: ChapterStatusLike.optional(),
+  pov: StringArrayLike.optional(),
   voice: z.string().optional(),
   tense: z.string().optional(),
   summary: z.string().optional(),
-  linked_events: z.array(z.string()).optional(),
+  linked_events: StringArrayLike.optional(),
 });
 
 export const TraceKindSchema = z.enum([

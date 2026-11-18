@@ -67,6 +67,9 @@ export async function newCmd(
     type: kind.echoPrefix,
   };
   if (opts.name) fm.name = opts.name;
+  if (kind.echoPrefix === 'term') {
+    fm.term = opts.name ?? idArg;
+  }
   if (opts.status) fm.status = opts.status;
   if (opts.visibility) fm.visibility = opts.visibility;
   if (opts.tags) {
