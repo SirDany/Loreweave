@@ -22,9 +22,11 @@ import { Badge } from '../components/ui/badge.js';
 import { addRecentSaga } from '../lib/desktop.js';
 import { DEMO_SPLASH_DETAIL, IS_DEMO } from '../lib/env.js';
 import {
+  createSaga,
   deleteSaga,
   fetchConfig,
   gitCommit,
+  isSameSagaPath,
   listSagas,
   type DiscoveredSaga,
   type DumpEntry,
@@ -131,37 +133,79 @@ export function Shell({ app }: ShellProps) {
   const { skin } = useSkin();
   const [soundEnabled, , toggleSound] = useSoundEnabled();
 
-  if (saga.loading && !saga.data) {
-    return <Splash message="Loading Saga…" />;
-  }
-  if (saga.error) {
+  if (
+    (saga.loading && !saga.data) ||
+    saga.noSagas ||
+    saga.error ||
+    !saga.data ||
+    !catalog
+  ) {
+    const handleCreatedSaga = (createdPath: string) => {
+      selectSaga(createdPath);
+      void addRecentSaga(createdPath);
+    };
+    const splashNode =
+      saga.loading && !saga.data ? (
+        <Splash message="Loading Saga…" />
+      ) : saga.noSagas ? (
+        <Splash
+          message="Welcome to Loreweave"
+          subtitle="No Sagas found in your workspace yet. Create your first Saga, import a zip archive, or configure Discovery & AI Settings."
+          noSagas
+          discoveryRoot={loadDiscoveryRoot()}
+          onCreateSaga={IS_DEMO ? undefined : handleCreatedSaga}
+          onOpenImport={IS_DEMO ? undefined : () => openDialog('importing')}
+          onOpenSettings={() => openDialog('settings')}
+        />
+      ) : saga.error ? (
+        <Splash
+          message={
+            IS_DEMO
+              ? 'Demo mode — no Saga filesystem available'
+              : 'Failed to load Saga'
+          }
+          subtitle={
+            IS_DEMO
+              ? 'Static demo bundle could not be loaded.'
+              : 'Review the error below, retry loading, create a new Saga, or switch Saga in Settings.'
+          }
+          detail={IS_DEMO ? DEMO_SPLASH_DETAIL : saga.error}
+          discoveryRoot={loadDiscoveryRoot()}
+          onCreateSaga={IS_DEMO ? undefined : handleCreatedSaga}
+          onOpenImport={IS_DEMO ? undefined : () => openDialog('importing')}
+          onOpenSettings={() => openDialog('settings')}
+          onRetry={IS_DEMO ? undefined : () => void saga.reload()}
+          onResetDefault={
+            !IS_DEMO && saga.sagaPath !== DEFAULT_SAGA
+              ? () => saga.resetToDefaultSaga()
+              : undefined
+          }
+        />
+      ) : (
+        <Splash
+          message="No Saga loaded"
+          discoveryRoot={loadDiscoveryRoot()}
+          onCreateSaga={IS_DEMO ? undefined : handleCreatedSaga}
+          onOpenImport={IS_DEMO ? undefined : () => openDialog('importing')}
+          onOpenSettings={() => openDialog('settings')}
+          onResetDefault={
+            saga.sagaPath !== DEFAULT_SAGA
+              ? () => saga.resetToDefaultSaga()
+              : undefined
+          }
+        />
+      );
+
     return (
-      <Splash
-        message={
-          IS_DEMO
-            ? 'Demo mode — no Saga filesystem available'
-            : 'Failed to load Saga'
-        }
-        detail={IS_DEMO ? DEMO_SPLASH_DETAIL : saga.error}
-        onRetry={IS_DEMO ? undefined : () => void saga.reload()}
-        onResetDefault={
-          !IS_DEMO && saga.sagaPath !== DEFAULT_SAGA
-            ? () => saga.resetToDefaultSaga()
-            : undefined
-        }
-      />
-    );
-  }
-  if (!saga.data || !catalog) {
-    return (
-      <Splash
-        message="No Saga data."
-        onResetDefault={
-          saga.sagaPath !== DEFAULT_SAGA
-            ? () => saga.resetToDefaultSaga()
-            : undefined
-        }
-      />
+      <div
+        data-skin={skin.id}
+        data-archetype={skin.archetype}
+        className="relative flex h-full flex-col text-foreground overflow-hidden"
+      >
+        <AmbientBackground />
+        <div className="relative z-10 flex-1 min-h-0">{splashNode}</div>
+        <Dialogs app={app} data={saga.data} />
+      </div>
     );
   }
 
@@ -224,7 +268,7 @@ export function Shell({ app }: ShellProps) {
               selectSaga(path);
               void addRecentSaga(path);
             }}
-            onResetDefaultSaga={() => saga.resetToDefaultSaga()}
+            onClearSaga={() => saga.clearSaga()}
             onOpenSettings={() => openDialog('settings')}
           />
           <TomeLensMenu
@@ -532,13 +576,13 @@ function SagaSwitcherMenu({
   data,
   currentSagaPath,
   onSelectSaga,
-  onResetDefaultSaga,
+  onClearSaga,
   onOpenSettings,
 }: {
   data: DumpPayload;
   currentSagaPath: string;
   onSelectSaga: (path: string) => void;
-  onResetDefaultSaga: () => void;
+  onClearSaga: () => void;
   onOpenSettings: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -553,6 +597,10 @@ function SagaSwitcherMenu({
   );
   const [deleting, setDeleting] = useState(false);
   const [deleteErr, setDeleteErr] = useState<string | null>(null);
+  const [showNewForm, setShowNewForm] = useState(false);
+  const [newTitle, setNewTitle] = useState('');
+  const [creating, setCreating] = useState(false);
+  const [createErr, setCreateErr] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
 
   usePopoverClose(open, setOpen, ref);
@@ -562,6 +610,9 @@ function SagaSwitcherMenu({
       setQuery('');
       setPendingDelete(null);
       setDeleteErr(null);
+      setShowNewForm(false);
+      setNewTitle('');
+      setCreateErr(null);
       return;
     }
     if (IS_DEMO) return;
@@ -606,19 +657,43 @@ function SagaSwitcherMenu({
     try {
       await deleteSaga(target.path);
       removeSagaMemory(target.path);
-      const remaining = discovered.filter((s) => s.path !== target.path);
+      const remaining = discovered.filter(
+        (s) => !isSameSagaPath(s.path, target.path),
+      );
       setDiscovered(remaining);
       setPendingDelete(null);
-      if (target.path === currentSagaPath) {
+      if (isSameSagaPath(target.path, currentSagaPath, data.saga.root)) {
         setOpen(false);
         const next = remaining[0];
         if (next) onSelectSaga(next.path);
-        else onResetDefaultSaga();
+        else onClearSaga();
       }
     } catch (e) {
       setDeleteErr((e as Error).message);
     } finally {
       setDeleting(false);
+    }
+  };
+
+  const handleCreateNew = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const title = newTitle.trim();
+    if (!title || creating) return;
+    setCreating(true);
+    setCreateErr(null);
+    try {
+      const created = await createSaga({
+        title,
+        parentDir: discoveryRoot || 'sagas',
+      });
+      setOpen(false);
+      setShowNewForm(false);
+      setNewTitle('');
+      onSelectSaga(created.path);
+    } catch (err) {
+      setCreateErr(err instanceof Error ? err.message : String(err));
+    } finally {
+      setCreating(false);
     }
   };
 
@@ -707,7 +782,11 @@ function SagaSwitcherMenu({
           ) : (
             <ul className="space-y-1 max-h-64 overflow-auto scrollbar-ember pr-0.5">
               {filteredSagas.map((s) => {
-                const active = s.path === currentSagaPath;
+                const active = isSameSagaPath(
+                  s.path,
+                  currentSagaPath,
+                  data.saga.root,
+                );
                 const displayTitle = s.title ?? s.id;
                 const showSlug = !!s.title && s.title !== s.id;
                 return (
@@ -793,6 +872,55 @@ function SagaSwitcherMenu({
             </div>
           )}
 
+          {!IS_DEMO && showNewForm && (
+            <form
+              onSubmit={(e) => void handleCreateNew(e)}
+              className="rounded-xl border border-primary/35 bg-primary/5 p-2.5 space-y-2 text-xs"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-semibold text-foreground">New Saga</span>
+                <span className="font-mono text-[10px] text-muted-foreground truncate max-w-[160px]">
+                  {discoveryRoot}/
+                </span>
+              </div>
+              <input
+                type="text"
+                value={newTitle}
+                onChange={(e) => {
+                  setNewTitle(e.target.value);
+                  if (createErr) setCreateErr(null);
+                }}
+                placeholder="Saga title…"
+                disabled={creating}
+                autoFocus
+                className="w-full rounded-lg border border-border/70 bg-background/70 px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-primary/60"
+              />
+              {createErr && (
+                <p className="font-mono text-[11px] text-rose-300">{createErr}</p>
+              )}
+              <div className="flex justify-end gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowNewForm(false);
+                    setCreateErr(null);
+                  }}
+                  disabled={creating}
+                  className="rounded-lg border border-border bg-background/70 px-2.5 py-1 text-[11px] text-foreground hover:bg-muted"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={creating || !newTitle.trim()}
+                  className="rounded-lg bg-primary px-2.5 py-1 text-[11px] font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
+                >
+                  {creating ? 'Creating…' : 'Create & Open'}
+                </button>
+              </div>
+            </form>
+          )}
+
           {/* Diagnostics & Discovery Path Button */}
           <div className="pt-2 border-t border-border/70 space-y-2.5">
             <div className="flex items-center justify-between text-[11px]">
@@ -806,17 +934,32 @@ function SagaSwitcherMenu({
                 </Badge>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={() => {
-                setOpen(false);
-                onOpenSettings();
-              }}
-              className="flex w-full items-center justify-center gap-2 rounded-xl border border-primary/40 bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/20 transition-colors"
-            >
-              <FolderCog className="h-3.5 w-3.5" />
-              <span>Manage Sagas &amp; Discovery Path…</span>
-            </button>
+            <div className="flex items-center gap-2">
+              {!IS_DEMO && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPendingDelete(null);
+                    setShowNewForm((v) => !v);
+                  }}
+                  className="flex items-center justify-center gap-1.5 rounded-xl border border-primary/40 bg-primary/15 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/25 transition-colors shrink-0"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>New Saga…</span>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(false);
+                  onOpenSettings();
+                }}
+                className="flex-1 flex items-center justify-center gap-2 rounded-xl border border-border/70 bg-background/40 px-3 py-1.5 text-xs font-medium text-foreground/90 hover:bg-muted/50 transition-colors"
+              >
+                <FolderCog className="h-3.5 w-3.5" />
+                <span>Manage Sagas…</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

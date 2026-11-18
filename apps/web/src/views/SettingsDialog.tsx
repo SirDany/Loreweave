@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
+  BookPlus,
   Check,
   ExternalLink,
   FolderSearch,
@@ -8,6 +9,7 @@ import {
   Info,
   Loader2,
   Pencil,
+  Plus,
   RefreshCw,
   Search,
   Trash2,
@@ -20,10 +22,12 @@ import {
 } from '../state/useChat.js';
 import { removeSagaMemory } from '../state/useSaga.js';
 import {
+  createSaga,
   deleteSaga,
   dump,
   fetchConfig,
   fetchProviderModels,
+  isSameSagaPath,
   listSagas,
   saveConfigPatch,
   type ChatProviderId,
@@ -41,6 +45,7 @@ interface Props {
   currentSagaPath?: string;
   onPickSaga?: (path: string) => void;
   onResetDefaultSaga?: () => void;
+  onClearSaga?: () => void;
   onClose: () => void;
 }
 
@@ -217,6 +222,7 @@ export function SettingsDialog({
   currentSagaPath,
   onPickSaga,
   onResetDefaultSaga,
+  onClearSaga,
   onClose,
 }: Props) {
   const [cfg, setCfg] = useState<MaskedLoreweaveConfig | null>(null);
@@ -677,6 +683,10 @@ export function SettingsDialog({
             }}
             onResetDefaultSaga={() => {
               onResetDefaultSaga?.();
+              handleClose();
+            }}
+            onClearSaga={() => {
+              onClearSaga?.();
               handleClose();
             }}
           />
@@ -1422,11 +1432,13 @@ function SagaWorkspaceSection({
   currentSagaPath,
   onPickSaga,
   onResetDefaultSaga,
+  onClearSaga,
 }: {
   initialRoot: string;
   currentSagaPath?: string;
   onPickSaga: (path: string) => void;
   onResetDefaultSaga?: () => void;
+  onClearSaga?: () => void;
 }) {
   const [sagaRoot, setSagaRoot] = useState(initialRoot);
   const rootEditedRef = useRef(false);
@@ -1438,6 +1450,11 @@ function SagaWorkspaceSection({
   const [confirmDelete, setConfirmDelete] = useState<DiscoveredSaga | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const [showNewSaga, setShowNewSaga] = useState(false);
+  const [newSagaTitle, setNewSagaTitle] = useState('');
+  const [creatingSaga, setCreatingSaga] = useState(false);
+  const [createSagaErr, setCreateSagaErr] = useState<string | null>(null);
 
   const [directPath, setDirectPath] = useState(currentSagaPath ?? '');
   const [verifyingDirect, setVerifyingDirect] = useState(false);
@@ -1505,18 +1522,43 @@ function SagaWorkspaceSection({
     try {
       await deleteSaga(target.path);
       removeSagaMemory(target.path);
-      const remaining = (discovered ?? []).filter((s) => s.path !== target.path);
+      const remaining = (discovered ?? []).filter(
+        (s) => !isSameSagaPath(s.path, target.path),
+      );
       setDiscovered(remaining);
       setConfirmDelete(null);
-      if (target.path === currentSagaPath) {
+      if (isSameSagaPath(target.path, currentSagaPath)) {
         const next = remaining[0];
         if (next) onPickSaga(next.path);
+        else if (onClearSaga) onClearSaga();
         else onResetDefaultSaga?.();
       }
     } catch (e) {
       setDeleteError((e as Error).message);
     } finally {
       setDeleting(false);
+    }
+  };
+
+  const handleCreateSaga = async () => {
+    const title = newSagaTitle.trim();
+    if (!title || creatingSaga) return;
+    const parentDir = sagaRoot.trim() || 'sagas';
+    setCreatingSaga(true);
+    setCreateSagaErr(null);
+    try {
+      const created = await createSaga({ title, parentDir });
+      setDiscovered((prev) => [
+        ...(prev ?? []),
+        { path: created.path, id: created.id, title: created.title },
+      ]);
+      setShowNewSaga(false);
+      setNewSagaTitle('');
+      onPickSaga(created.path);
+    } catch (e) {
+      setCreateSagaErr((e as Error).message);
+    } finally {
+      setCreatingSaga(false);
     }
   };
 
@@ -1644,7 +1686,7 @@ function SagaWorkspaceSection({
 
             <ul className="space-y-1.5 max-h-48 overflow-auto scrollbar-ember">
               {filteredDiscovered.map((s) => {
-                const active = s.path === currentSagaPath;
+                const active = isSameSagaPath(s.path, currentSagaPath);
                 const displayTitle = s.title ?? s.id;
                 const showSlug = !!s.title && s.title !== s.id;
                 return (
@@ -1734,6 +1776,70 @@ function SagaWorkspaceSection({
             )}
           </div>
         )}
+
+        {/* Inline New Saga creator */}
+        <div className="pt-2 border-t border-border/50 space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs font-medium text-muted-foreground">
+              Create a fresh Saga under{' '}
+              <code className="font-mono text-foreground/80">
+                {sagaRoot.trim() || 'sagas'}
+              </code>
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                setShowNewSaga((v) => !v);
+                setCreateSagaErr(null);
+              }}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-primary/45 bg-primary/15 px-2.5 py-1 text-[11px] font-semibold text-primary hover:bg-primary/25 transition-colors shrink-0"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              <span>{showNewSaga ? 'Close' : 'New Saga'}</span>
+            </button>
+          </div>
+          {showNewSaga && (
+            <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 space-y-2 text-xs">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={newSagaTitle}
+                  onChange={(e) => {
+                    setNewSagaTitle(e.target.value);
+                    if (createSagaErr) setCreateSagaErr(null);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      void handleCreateSaga();
+                    }
+                  }}
+                  placeholder="New Saga title…"
+                  disabled={creatingSaga}
+                  className="flex-1 rounded-lg border border-border bg-background/80 px-3 py-1.5 text-xs focus:ring-1 focus:ring-primary focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => void handleCreateSaga()}
+                  disabled={creatingSaga || !newSagaTitle.trim()}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-[11px] font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50 shrink-0"
+                >
+                  {creatingSaga ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <BookPlus className="h-3.5 w-3.5" />
+                  )}
+                  <span>{creatingSaga ? 'Creating…' : 'Create & Open'}</span>
+                </button>
+              </div>
+              {createSagaErr && (
+                <p className="font-mono text-[11px] text-rose-300">
+                  {createSagaErr}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
 
         {/* Direct path verifier */}
         <label className="block text-xs pt-2 border-t border-border/50">

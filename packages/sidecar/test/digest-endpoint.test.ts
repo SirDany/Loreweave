@@ -189,4 +189,58 @@ describe('sidecar /lw/digest', () => {
     const stillExists = await stat(saga).catch(() => null);
     expect(stillExists).toBeNull();
   });
+
+  it('POST /lw/saga-create scaffolds a valid saga, rejects duplicates with 409, and deletes cleanly', async () => {
+    const h = makeHost();
+    server = h.server;
+    registerSidecar(h.host, { repoRoot: dir, cliBin });
+    const port = await h.port;
+
+    const createRes = await fetch(`http://127.0.0.1:${port}/lw/saga-create`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        title: 'The Starlit Reach',
+        parentDir: 'sagas',
+        tomeTitle: 'First Star',
+      }),
+    });
+    expect(createRes.status).toBe(201);
+    const created = (await createRes.json()) as {
+      ok: boolean;
+      path: string;
+      id: string;
+      title: string;
+    };
+    expect(created.ok).toBe(true);
+    expect(created.id).toBe('the-starlit-reach');
+    expect(created.title).toBe('The Starlit Reach');
+
+    const manifest = await readFile(path.join(created.path, 'saga.yaml'), 'utf8');
+    expect(manifest).toContain('id: the-starlit-reach');
+    expect((await stat(path.join(created.path, 'calendars', 'gregorian.yaml'))).isFile()).toBe(true);
+    expect((await stat(path.join(created.path, 'threads', 'main.yaml'))).isFile()).toBe(true);
+    expect((await stat(path.join(created.path, 'tomes', 'first-star', 'tome.yaml'))).isFile()).toBe(true);
+    expect((await stat(path.join(created.path, 'tomes', 'first-star', 'story', '01-opening', 'chapter.md'))).isFile()).toBe(true);
+
+    const dupRes = await fetch(`http://127.0.0.1:${port}/lw/saga-create`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        title: 'The Starlit Reach',
+        parentDir: 'sagas',
+        tomeTitle: 'First Star',
+      }),
+    });
+    expect(dupRes.status).toBe(409);
+
+    const delRes = await fetch(`http://127.0.0.1:${port}/lw/saga-delete`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ sagaRoot: created.path }),
+    });
+    expect(delRes.status).toBe(200);
+    const gone = await stat(created.path).catch(() => null);
+    expect(gone).toBeNull();
+  });
 });

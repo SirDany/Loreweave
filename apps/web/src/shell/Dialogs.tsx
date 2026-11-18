@@ -14,7 +14,7 @@ import { SettingsDialog } from '../views/SettingsDialog.js';
 
 interface DialogsProps {
   app: AppState;
-  data: DumpPayload;
+  data: DumpPayload | null;
 }
 
 /**
@@ -51,7 +51,7 @@ export function Dialogs({ app, data }: DialogsProps) {
         />
       )}
 
-      {dialogs.exporting && (
+      {dialogs.exporting && data && (
         <ExportDialog
           sagaPath={saga.sagaPath}
           data={data}
@@ -95,12 +95,13 @@ export function Dialogs({ app, data }: DialogsProps) {
 
       {dialogs.settings && (
         <SettingsDialog
-          currentSagaPath={saga.sagaPath}
+          currentSagaPath={saga.noSagas ? '' : saga.sagaPath}
           onPickSaga={(p) => {
             selectSaga(p);
-            void addRecentSaga(p, data?.saga?.title ?? undefined);
+            void addRecentSaga(p);
           }}
           onResetDefaultSaga={() => saga.resetToDefaultSaga()}
+          onClearSaga={() => saga.clearSaga()}
           onClose={() => closeDialog('settings')}
         />
       )}
@@ -159,7 +160,7 @@ export function Dialogs({ app, data }: DialogsProps) {
           }}
         />
       )}
-      {pendingNew && pendingNew.kind === 'chapter' && (
+      {pendingNew && pendingNew.kind === 'chapter' && data && (
         <NewChapterDialog
           sagaPath={saga.sagaPath}
           data={data}

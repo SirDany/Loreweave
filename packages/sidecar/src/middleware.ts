@@ -21,6 +21,7 @@ import { promises as fs, watch as fsWatch, type FSWatcher } from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
+import { stringify as yamlStringify } from 'yaml';
 import {
   FsAdapter,
   StorageNotFoundError,
@@ -534,6 +535,169 @@ export function registerSidecar(
       res.setHeader('content-type', 'application/json');
       res.setHeader('cache-control', 'no-store');
       res.end(JSON.stringify({ ok: true, deleted: sagaRoot.trim() }));
+    } catch (e) {
+      res.statusCode = 400;
+      res.end(String(e));
+    }
+  });
+
+  // --- /lw/saga-create -----------------------------------------------------
+  // Scaffold a valid empty Saga directory under parentDir (default "sagas")
+  // so the UI can create a new Saga even when no Sagas exist yet.
+  host.use('/lw/saga-create', async (req, res) => {
+    if (req.method !== 'POST') {
+      res.statusCode = 405;
+      res.end('method not allowed');
+      return;
+    }
+    const body = await readBody(req, res);
+    if (body == null) return;
+    try {
+      const payload = JSON.parse(body || '{}') as {
+        title?: unknown;
+        id?: unknown;
+        parentDir?: unknown;
+        tomeTitle?: unknown;
+      };
+      const title =
+        typeof payload.title === 'string' ? payload.title.trim() : '';
+      if (!title) {
+        res.statusCode = 400;
+        res.end('Saga title is required');
+        return;
+      }
+
+      const toSlug = (raw: string): string =>
+        raw
+          .toLowerCase()
+          .trim()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-+|-+$/g, '');
+
+      let slug: string;
+      if (typeof payload.id === 'string' && payload.id.trim()) {
+        const requested = payload.id.trim();
+        if (!/^[a-z0-9][a-z0-9-]*$/.test(requested)) {
+          res.statusCode = 400;
+          res.end(
+            'Saga id must use lowercase letters, digits, and hyphens only',
+          );
+          return;
+        }
+        slug = requested;
+      } else {
+        slug = toSlug(title) || 'new-saga';
+      }
+
+      const parentRel =
+        typeof payload.parentDir === 'string' && payload.parentDir.trim()
+          ? payload.parentDir.trim()
+          : 'sagas';
+      const parentAbs = path.resolve(safeRoot(parentRel));
+      const abs = path.resolve(parentAbs, slug);
+      const relToParent = path.relative(parentAbs, abs);
+      if (
+        !relToParent ||
+        relToParent.startsWith('..') ||
+        path.isAbsolute(relToParent)
+      ) {
+        res.statusCode = 400;
+        res.end('Invalid Saga target path');
+        return;
+      }
+
+      const existingManifest = await fs
+        .stat(path.join(abs, 'saga.yaml'))
+        .catch(() => null);
+      if (existingManifest) {
+        res.statusCode = 409;
+        res.end(`A Saga already exists at ${abs}`);
+        return;
+      }
+
+      const existingDir = await fs.stat(abs).catch(() => null);
+      if (existingDir && !existingDir.isDirectory()) {
+        res.statusCode = 400;
+        res.end(`Target path exists and is not a directory: ${abs}`);
+        return;
+      }
+
+      const tomeTitle =
+        typeof payload.tomeTitle === 'string' && payload.tomeTitle.trim()
+          ? payload.tomeTitle.trim()
+          : 'Book One';
+      const tomeSlug = toSlug(tomeTitle) || 'book-one';
+
+      const storyDir = path.join(abs, 'tomes', tomeSlug, 'story', '01-opening');
+      await Promise.all([
+        fs.mkdir(path.join(abs, 'codex'), { recursive: true }),
+        fs.mkdir(path.join(abs, 'lexicon'), { recursive: true }),
+        fs.mkdir(path.join(abs, 'notes'), { recursive: true }),
+        fs.mkdir(path.join(abs, 'sigils'), { recursive: true }),
+        fs.mkdir(path.join(abs, 'calendars'), { recursive: true }),
+        fs.mkdir(path.join(abs, 'threads'), { recursive: true }),
+        fs.mkdir(storyDir, { recursive: true }),
+      ]);
+
+      await Promise.all([
+        fs.writeFile(
+          path.join(abs, 'saga.yaml'),
+          yamlStringify({
+            id: slug,
+            title,
+            default_calendar: 'gregorian',
+            tome_order: [tomeSlug],
+          }),
+          'utf8',
+        ),
+        fs.writeFile(
+          path.join(abs, 'calendars', 'gregorian.yaml'),
+          yamlStringify({
+            id: 'gregorian',
+            kind: 'gregorian',
+            label: 'Gregorian (real-world)',
+          }),
+          'utf8',
+        ),
+        fs.writeFile(
+          path.join(abs, 'threads', 'main.yaml'),
+          yamlStringify({
+            id: 'main',
+            calendar: 'gregorian',
+            waypoints: [],
+          }),
+          'utf8',
+        ),
+        fs.writeFile(
+          path.join(abs, 'tomes', tomeSlug, 'tome.yaml'),
+          yamlStringify({
+            id: tomeSlug,
+            title: tomeTitle,
+            default_thread: 'main',
+            strict_slang: false,
+          }),
+          'utf8',
+        ),
+        fs.writeFile(
+          path.join(storyDir, '_meta.yaml'),
+          yamlStringify({
+            title: 'Opening',
+            ordinal: 1,
+            status: 'draft',
+          }),
+          'utf8',
+        ),
+        fs.writeFile(
+          path.join(storyDir, 'chapter.md'),
+          '# Opening\n\nBegin writing your Saga here.\n',
+          'utf8',
+        ),
+      ]);
+
+      res.statusCode = 201;
+      res.setHeader('content-type', 'application/json');
+      res.setHeader('cache-control', 'no-store');
+      res.end(JSON.stringify({ ok: true, path: abs, id: slug, title }));
     } catch (e) {
       res.statusCode = 400;
       res.end(String(e));

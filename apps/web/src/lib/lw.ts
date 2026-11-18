@@ -823,6 +823,77 @@ export function listSagas(root = 'sagas'): Promise<DiscoveredSaga[]> {
   return lwJson<DiscoveredSaga[]>(['list-sagas', root, '--json']);
 }
 
+export interface CreateSagaRequest {
+  title: string;
+  id?: string;
+  parentDir?: string;
+  tomeTitle?: string;
+}
+
+export interface CreateSagaResult {
+  ok: true;
+  path: string;
+  id: string;
+  title: string;
+}
+
+/**
+ * Scaffold a brand-new Loreweave Saga directory via the local sidecar.
+ */
+export async function createSaga(
+  req: CreateSagaRequest,
+): Promise<CreateSagaResult> {
+  const res = await fetch('/lw/saga-create', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(req),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || `/lw/saga-create ${res.status}`);
+  }
+  return (await res.json()) as CreateSagaResult;
+}
+
+function normSagaPath(p: string): string {
+  return p
+    .trim()
+    .replace(/\\/g, '/')
+    .replace(/^\.\//, '')
+    .replace(/\/+$/, '')
+    .toLowerCase();
+}
+
+function isAbsPath(norm: string): boolean {
+  return norm.startsWith('/') || /^[a-z]:\//.test(norm);
+}
+
+/**
+ * Compare two Saga paths robustly across slashes, casing, and relative vs.
+ * resolved-absolute representations (e.g. `sagas/example-saga` vs
+ * `C:\repo\sagas\example-saga`).
+ */
+export function isSameSagaPath(
+  a: string | null | undefined,
+  b: string | null | undefined,
+  resolvedRoot?: string | null,
+): boolean {
+  if (!a || !b) return false;
+  const na = normSagaPath(a);
+  const nb = normSagaPath(b);
+  if (!na || !nb) return false;
+  if (na === nb) return true;
+  if (isAbsPath(na) && !isAbsPath(nb) && na.endsWith(`/${nb}`)) return true;
+  if (isAbsPath(nb) && !isAbsPath(na) && nb.endsWith(`/${na}`)) return true;
+  if (resolvedRoot) {
+    const nr = normSagaPath(resolvedRoot);
+    if (nr && ((na === nr && nb === '.') || (nb === nr && na === '.'))) {
+      return true;
+    }
+  }
+  return false;
+}
+
 // ---------- export / import / backup ----------
 
 export type ExportFormat =
