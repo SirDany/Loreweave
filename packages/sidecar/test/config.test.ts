@@ -241,5 +241,27 @@ describe('config module', () => {
 
     const clearedRoot = await patchConfig({ sagaRoot: null });
     expect(clearedRoot.sagaRoot).toBeUndefined();
+
+    const withWorkspace = await patchConfig({
+      activeSaga: 'sagas/my-world',
+      activeTomeLens: 'book-two',
+      activeSection: 'constellation',
+    });
+    expect(withWorkspace.activeSaga).toBe('sagas/my-world');
+    expect(withWorkspace.activeTomeLens).toBe('book-two');
+    expect(withWorkspace.activeSection).toBe('constellation');
+    const maskedWorkspace = maskConfig(await loadConfig());
+    expect(maskedWorkspace.activeSaga).toBe('sagas/my-world');
+    expect(maskedWorkspace.activeTomeLens).toBe('book-two');
+    expect(maskedWorkspace.activeSection).toBe('constellation');
+
+    const clearedWorkspace = await patchConfig({
+      activeSaga: null,
+      activeTomeLens: null,
+      activeSection: null,
+    });
+    expect(clearedWorkspace.activeSaga).toBeUndefined();
+    expect(clearedWorkspace.activeTomeLens).toBeUndefined();
+    expect(clearedWorkspace.activeSection).toBeUndefined();
   });
 });

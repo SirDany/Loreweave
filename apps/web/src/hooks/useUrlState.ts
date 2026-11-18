@@ -1,14 +1,53 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Section, Selection } from '../state/types.js';
+import {
+  DEFAULT_SAGA,
+  SAGA_PATH_STORAGE_KEY,
+  loadSagaMemory,
+} from '../state/useSaga.js';
+
+export const LAST_NAV_STORAGE_KEY = 'loreweave.lastNav.v1';
 
 export interface NavLocation {
   section: Section;
   selection: Selection | null;
 }
 
+function readStoredNavFallback(): NavLocation | null {
+  try {
+    const sagaPath =
+      window.localStorage.getItem(SAGA_PATH_STORAGE_KEY)?.trim() || DEFAULT_SAGA;
+    const mem = loadSagaMemory(sagaPath);
+    if (mem && (mem.section || mem.selection !== undefined)) {
+      return {
+        section: mem.section ?? 'codex',
+        selection: mem.selection ?? null,
+      };
+    }
+    const raw = window.localStorage.getItem(LAST_NAV_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as Partial<NavLocation>;
+      if (parsed && typeof parsed.section === 'string' && parsed.section) {
+        return {
+          section: parsed.section,
+          selection: parsed.selection ?? null,
+        };
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
 function parseUrl(): NavLocation {
   try {
     const params = new URLSearchParams(window.location.search);
+    if (!params.has('section') && !params.has('key')) {
+      const restored = readStoredNavFallback();
+      if (restored) return restored;
+    }
+
     const section = (params.get('section') as Section) || 'codex';
     const key = params.get('key');
     const kind = params.get('kind') as 'entry' | 'chapter' | null;
@@ -58,14 +97,17 @@ function updateBrowserUrl(loc: NavLocation, replace = false) {
 export function useUrlState() {
   const [nav, setNav] = useState<NavLocation>(() => parseUrl());
   const isNavigatingFromPopState = useRef(false);
+  const isFirstSync = useRef(true);
 
-  // Sync state to URL on change, pushing history unless caused by popstate
+  // Sync state to URL on change, replacing on initial mount and pushing thereafter
   useEffect(() => {
     if (isNavigatingFromPopState.current) {
       isNavigatingFromPopState.current = false;
       return;
     }
-    updateBrowserUrl(nav, false);
+    const replace = isFirstSync.current;
+    isFirstSync.current = false;
+    updateBrowserUrl(nav, replace);
   }, [nav]);
 
   // Listen to popstate (browser back/forward)

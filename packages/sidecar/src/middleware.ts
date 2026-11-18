@@ -476,6 +476,70 @@ export function registerSidecar(
     }
   });
 
+  // --- /lw/saga-delete -----------------------------------------------------
+  // Permanently delete an entire Saga directory after verifying that it is a
+  // valid Loreweave Saga root (and never repoRoot or a filesystem root).
+  host.use('/lw/saga-delete', async (req, res) => {
+    if (req.method !== 'POST') {
+      res.statusCode = 405;
+      res.end('method not allowed');
+      return;
+    }
+    const body = await readBody(req, res);
+    if (body == null) return;
+    try {
+      const { sagaRoot } = JSON.parse(body || '{}');
+      if (typeof sagaRoot !== 'string' || !sagaRoot.trim()) {
+        res.statusCode = 400;
+        res.end('sagaRoot required');
+        return;
+      }
+      const abs = path.resolve(safeRoot(sagaRoot.trim()));
+      const repoAbs = path.resolve(repoRoot);
+      if (abs === repoAbs || path.dirname(abs) === abs) {
+        res.statusCode = 400;
+        res.end('Refusing to delete workspace root or filesystem root');
+        return;
+      }
+
+      const st = await fs.stat(abs).catch(() => null);
+      if (!st || !st.isDirectory()) {
+        res.statusCode = 400;
+        res.end('Target Saga directory does not exist');
+        return;
+      }
+
+      const markers = await Promise.all([
+        fs.stat(path.join(abs, 'saga.yaml')).catch(() => null),
+        fs.stat(path.join(abs, 'codex')).catch(() => null),
+        fs.stat(path.join(abs, 'tomes')).catch(() => null),
+      ]);
+      if (!markers.some(Boolean)) {
+        res.statusCode = 400;
+        res.end('Target directory is not a valid Loreweave Saga');
+        return;
+      }
+
+      const watcher = watchers.get(abs);
+      if (watcher) {
+        watcher.close();
+        watchers.delete(abs);
+      }
+      adapters.delete(abs);
+      await invalidateDigest(abs).catch(() => {});
+
+      await fs.rm(abs, { recursive: true, force: true });
+
+      res.statusCode = 200;
+      res.setHeader('content-type', 'application/json');
+      res.setHeader('cache-control', 'no-store');
+      res.end(JSON.stringify({ ok: true, deleted: sagaRoot.trim() }));
+    } catch (e) {
+      res.statusCode = 400;
+      res.end(String(e));
+    }
+  });
+
   // --- /lw/rules -----------------------------------------------------------
   // List the Saga-level "House rules" markdown files that get prepended to
   // every agent system prompt. Body: `?sagaRoot=…`. Returns

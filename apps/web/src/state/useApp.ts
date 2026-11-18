@@ -1,7 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useUrlState } from '../hooks/useUrlState.js';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { LAST_NAV_STORAGE_KEY, useUrlState } from '../hooks/useUrlState.js';
 import { buildCatalog } from '../lib/catalog.js';
-import type { DumpEntry } from '../lib/lw.js';
+import {
+  fetchConfig,
+  saveConfigPatch,
+  type DumpEntry,
+} from '../lib/lw.js';
 import {
   applyTomeFilter,
   entryTypeToSection,
@@ -13,7 +17,7 @@ import {
 } from '../lib/saga-helpers.js';
 import type { Section, Selection } from './types.js';
 import type { ChatContextAttachment } from './useChat.js';
-import { useSaga } from './useSaga.js';
+import { loadSagaMemory, saveSagaMemory, useSaga } from './useSaga.js';
 
 export interface AssistantSeed {
   prompt?: string;
@@ -145,7 +149,110 @@ export function useApp() {
     setInspectorOpen(false);
   }, []);
 
+  const prevSagaRef = useRef<string>(saga.sagaPath);
+  const userNavigatedRef = useRef<boolean>(false);
+
+  const changeSelection = useCallback(
+    (
+      sel:
+        | Selection
+        | null
+        | ((prev: Selection | null) => Selection | null),
+    ) => {
+      userNavigatedRef.current = true;
+      setSelection(sel);
+    },
+    [setSelection],
+  );
+
+  const selectSaga = useCallback(
+    (nextPath: string) => {
+      const trimmed = nextPath.trim();
+      if (!trimmed) return;
+      userNavigatedRef.current = true;
+      prevSagaRef.current = trimmed;
+      saga.setSagaPath(trimmed);
+      const mem = loadSagaMemory(trimmed);
+      setNavLocation({
+        section: mem?.section ?? 'codex',
+        selection: mem?.selection ?? null,
+      });
+    },
+    [saga, setNavLocation],
+  );
+
+  // Hydrate initial section from user config when localStorage and URL both lack prior navigation.
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      if (params.has('section') || params.has('key')) return;
+      if (loadSagaMemory(saga.sagaPath)?.section) return;
+      if (window.localStorage.getItem(LAST_NAV_STORAGE_KEY)) return;
+    } catch {
+      return;
+    }
+    let active = true;
+    fetchConfig()
+      .then((cfg) => {
+        if (!active || userNavigatedRef.current) return;
+        if (cfg.activeSection) {
+          setNavLocation({ section: cfg.activeSection, selection: null });
+        }
+      })
+      .catch(() => {
+        /* ignore offline/demo */
+      });
+    return () => {
+      active = false;
+    };
+    // Run once on initial mount for cold-start config restoration.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Persist per-Saga memory & restore when sagaPath changes externally (e.g. server hydrate / reset).
+  useEffect(() => {
+    if (prevSagaRef.current !== saga.sagaPath) {
+      prevSagaRef.current = saga.sagaPath;
+      const mem = loadSagaMemory(saga.sagaPath);
+      setNavLocation({
+        section: mem?.section ?? 'codex',
+        selection: mem?.selection ?? null,
+      });
+      return;
+    }
+    saveSagaMemory(saga.sagaPath, {
+      tomeLens: saga.tomeLens,
+      section,
+      selection,
+    });
+    try {
+      window.localStorage.setItem(
+        LAST_NAV_STORAGE_KEY,
+        JSON.stringify({ section, selection }),
+      );
+    } catch {
+      /* ignore */
+    }
+    saveConfigPatch({ activeSection: section }).catch(() => {
+      /* ignore */
+    });
+  }, [saga.sagaPath, saga.tomeLens, section, selection, setNavLocation]);
+
+  // Clear stale selection only once dump() for the active sagaPath has landed.
+  useEffect(() => {
+    const data = saga.data;
+    if (!data || saga.loadedPath !== saga.sagaPath || !selection) return;
+    const valid =
+      selection.kind === 'entry'
+        ? data.entries.some((e) => `${e.type}/${e.id}` === selection.key)
+        : !!findChapter(data, selection.key);
+    if (!valid) {
+      setSelection(null);
+    }
+  }, [saga.data, saga.loadedPath, saga.sagaPath, selection, setSelection]);
+
   const handleJump = useCallback<Jumper>((loc) => {
+    userNavigatedRef.current = true;
     const targetSection =
       loc.kind === 'chapter' ? 'story' : entryTypeToSection(loc.key);
     setNavLocation({
@@ -155,6 +262,7 @@ export function useApp() {
   }, [setNavLocation]);
 
   const handleJumpToTarget = useCallback((target: string) => {
+    userNavigatedRef.current = true;
     jumpToTarget(target, setSelection, setSection);
   }, [setSelection, setSection]);
 
@@ -165,6 +273,7 @@ export function useApp() {
    */
   const changeSection = useCallback(
     (s: Section) => {
+      userNavigatedRef.current = true;
       setNavLocation({
         section: s,
         selection:
@@ -204,10 +313,11 @@ export function useApp() {
 
   return {
     saga,
+    selectSaga,
     section,
     setSection: changeSection,
     selection,
-    setSelection,
+    setSelection: changeSelection,
     dialogs,
     openDialog,
     closeDialog,

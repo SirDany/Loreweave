@@ -1,21 +1,86 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   dump,
+  fetchConfig,
   fetchDigest,
   kinds as fetchKinds,
   lenses as fetchLenses,
+  saveConfigPatch,
   type CanonDigestPayload,
   type DumpPayload,
   type KindInfo,
   type LensManifestPayload,
 } from "../lib/lw.js";
 import { registerLensManifest } from "../loom/registry.js";
+import type { Section, Selection } from "./types.js";
 
 export const DEFAULT_SAGA = "sagas/example-saga";
-const STORAGE_KEY = "loreweave.sagaPath";
+export const SAGA_PATH_STORAGE_KEY = "loreweave.sagaPath";
+const SAGA_MEMORY_STORAGE_KEY = "loreweave.sagaMemory.v1";
+
+export interface SagaWorkspaceMemory {
+  tomeLens: string | null;
+  section?: Section;
+  selection?: Selection | null;
+  updatedAt: number;
+}
+
+function readAllSagaMemory(): Record<string, SagaWorkspaceMemory> {
+  try {
+    const raw = window.localStorage.getItem(SAGA_MEMORY_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as unknown;
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? (parsed as Record<string, SagaWorkspaceMemory>)
+      : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeAllSagaMemory(map: Record<string, SagaWorkspaceMemory>): void {
+  try {
+    window.localStorage.setItem(SAGA_MEMORY_STORAGE_KEY, JSON.stringify(map));
+  } catch {
+    /* ignore */
+  }
+}
+
+export function loadSagaMemory(sagaPath: string): SagaWorkspaceMemory | null {
+  const key = sagaPath.trim();
+  if (!key) return null;
+  return readAllSagaMemory()[key] ?? null;
+}
+
+export function saveSagaMemory(
+  sagaPath: string,
+  patch: Partial<SagaWorkspaceMemory>,
+): void {
+  const key = sagaPath.trim();
+  if (!key) return;
+  const all = readAllSagaMemory();
+  const prev = all[key] ?? { tomeLens: null, updatedAt: Date.now() };
+  all[key] = {
+    ...prev,
+    ...patch,
+    updatedAt: Date.now(),
+  };
+  writeAllSagaMemory(all);
+}
+
+export function removeSagaMemory(sagaPath: string): void {
+  const key = sagaPath.trim();
+  if (!key) return;
+  const all = readAllSagaMemory();
+  if (key in all) {
+    delete all[key];
+    writeAllSagaMemory(all);
+  }
+}
 
 export interface SagaState {
   sagaPath: string;
+  loadedPath: string | null;
   data: DumpPayload | null;
   /**
    * Canon digest (phone book + resolved weaves + thread summaries). Lags
@@ -39,10 +104,19 @@ export interface SagaState {
   resetToDefaultSaga: () => void;
 }
 
+function hasStoredSagaPath(): boolean {
+  try {
+    const stored = window.localStorage.getItem(SAGA_PATH_STORAGE_KEY);
+    return !!(stored && stored.trim());
+  } catch {
+    return false;
+  }
+}
+
 function readInitialPath(initial: string): string {
   try {
-    const stored = window.localStorage.getItem(STORAGE_KEY);
-    if (stored && stored.trim()) return stored;
+    const stored = window.localStorage.getItem(SAGA_PATH_STORAGE_KEY);
+    if (stored && stored.trim()) return stored.trim();
   } catch {
     // localStorage unavailable (SSR / privacy mode) — fall through.
   }
@@ -54,41 +128,89 @@ export function useSaga(initialPath: string = DEFAULT_SAGA): SagaState {
     readInitialPath(initialPath),
   );
   const lastValidPathRef = useRef<string>(DEFAULT_SAGA);
+  const userChangedSagaRef = useRef<boolean>(false);
+  const [loadedPath, setLoadedPath] = useState<string | null>(null);
   const [data, setData] = useState<DumpPayload | null>(null);
   const [digest, setDigest] = useState<CanonDigestPayload | null>(null);
   const [kinds, setKinds] = useState<KindInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [switchError, setSwitchError] = useState<string | null>(null);
-  const [tomeLens, setTomeLens] = useState<string | null>(null);
+  const [tomeLens, setTomeLensState] = useState<string | null>(
+    () => loadSagaMemory(readInitialPath(initialPath))?.tomeLens ?? null,
+  );
 
   const clearSwitchError = useCallback(() => setSwitchError(null), []);
 
-  // Only update state here; localStorage is updated once `dump()` succeeds so
+  const setTomeLens = useCallback(
+    (next: string | null) => {
+      setTomeLensState(next);
+      saveSagaMemory(sagaPath, { tomeLens: next });
+      saveConfigPatch({ activeTomeLens: next }).catch(() => {
+        /* ignore offline/demo */
+      });
+    },
+    [sagaPath],
+  );
+
+  // Restore last active Saga from user config when localStorage has no saved path yet.
+  useEffect(() => {
+    if (hasStoredSagaPath()) return;
+    let active = true;
+    fetchConfig()
+      .then((cfg) => {
+        if (!active || userChangedSagaRef.current) return;
+        if (cfg.activeSaga && cfg.activeSaga !== sagaPath) {
+          const restored = cfg.activeSaga;
+          const mem = loadSagaMemory(restored);
+          setSagaPathState(restored);
+          setTomeLensState(mem?.tomeLens ?? cfg.activeTomeLens ?? null);
+        } else if (cfg.activeTomeLens) {
+          setTomeLensState((curr) => curr ?? cfg.activeTomeLens ?? null);
+        }
+      })
+      .catch(() => {
+        /* demo mode or offline sidecar */
+      });
+    return () => {
+      active = false;
+    };
+    // Run once on initial mount when localStorage is unseeded.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Only update state here; localStorage + config.json are updated once `dump()` succeeds so
   // an invalid directory path can never lock the app across reloads.
   const setSagaPath = useCallback((p: string) => {
     const trimmed = p.trim();
     if (!trimmed) return;
+    userChangedSagaRef.current = true;
+    const mem = loadSagaMemory(trimmed);
     setSwitchError(null);
     setSagaPathState(trimmed);
-    setTomeLens(null);
+    setTomeLensState(mem?.tomeLens ?? null);
     setDigest(null);
     setKinds([]);
   }, []);
 
   const resetToDefaultSaga = useCallback(() => {
+    userChangedSagaRef.current = true;
     setSwitchError(null);
     setError(null);
     lastValidPathRef.current = DEFAULT_SAGA;
     try {
-      window.localStorage.removeItem(STORAGE_KEY);
+      window.localStorage.removeItem(SAGA_PATH_STORAGE_KEY);
     } catch {
       /* ignore */
     }
+    const mem = loadSagaMemory(DEFAULT_SAGA);
     setSagaPathState(DEFAULT_SAGA);
-    setTomeLens(null);
+    setTomeLensState(mem?.tomeLens ?? null);
     setDigest(null);
     setKinds([]);
+    saveConfigPatch({ activeSaga: DEFAULT_SAGA, activeTomeLens: mem?.tomeLens ?? null }).catch(() => {
+      /* ignore */
+    });
   }, []);
 
   const reload = useCallback(async () => {
@@ -98,12 +220,24 @@ export function useSaga(initialPath: string = DEFAULT_SAGA): SagaState {
     try {
       const payload = await dump(targetPath);
       setData(payload);
+      setLoadedPath(targetPath);
       lastValidPathRef.current = targetPath;
+      setTomeLensState((curr) => {
+        if (curr && !payload.tomes.some((t) => t.id === curr)) {
+          saveSagaMemory(targetPath, { tomeLens: null });
+          saveConfigPatch({ activeTomeLens: null }).catch(() => {});
+          return null;
+        }
+        return curr;
+      });
       try {
-        window.localStorage.setItem(STORAGE_KEY, targetPath);
+        window.localStorage.setItem(SAGA_PATH_STORAGE_KEY, targetPath);
       } catch {
         // best effort
       }
+      saveConfigPatch({ activeSaga: targetPath }).catch(() => {
+        /* demo/offline */
+      });
       // Digest + kinds are optimizations — never block the reload on them.
       fetchDigest(targetPath).then(
         (d) => setDigest(d),
@@ -139,9 +273,9 @@ export function useSaga(initialPath: string = DEFAULT_SAGA): SagaState {
             : DEFAULT_SAGA;
         try {
           if (fallback === DEFAULT_SAGA) {
-            window.localStorage.removeItem(STORAGE_KEY);
+            window.localStorage.removeItem(SAGA_PATH_STORAGE_KEY);
           } else {
-            window.localStorage.setItem(STORAGE_KEY, fallback);
+            window.localStorage.setItem(SAGA_PATH_STORAGE_KEY, fallback);
           }
         } catch {
           /* ignore */
@@ -149,7 +283,9 @@ export function useSaga(initialPath: string = DEFAULT_SAGA): SagaState {
         setSwitchError(
           `Could not open Saga at "${targetPath}" (${msg}). Kept "${fallback}".`,
         );
+        const fallbackMem = loadSagaMemory(fallback);
         setSagaPathState(fallback);
+        setTomeLensState(fallbackMem?.tomeLens ?? null);
       } else {
         setError(msg);
       }
@@ -219,6 +355,7 @@ export function useSaga(initialPath: string = DEFAULT_SAGA): SagaState {
 
   return {
     sagaPath,
+    loadedPath,
     data,
     digest,
     kinds,

@@ -108,6 +108,21 @@ export async function lwDelete(
   }
 }
 
+/**
+ * Permanently delete an entire Saga directory on disk after validating on the
+ * sidecar that it is a genuine Loreweave Saga root.
+ */
+export async function deleteSaga(sagaRoot: string): Promise<void> {
+  const res = await fetch('/lw/saga-delete', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ sagaRoot }),
+  });
+  if (!res.ok) {
+    throw new Error(`/lw/saga-delete ${res.status}: ${await res.text()}`);
+  }
+}
+
 async function lwJson<T>(args: string[]): Promise<T> {
   const r = await lw(args);
   if (r.code !== 0 && !r.stdout) {
@@ -468,6 +483,9 @@ export type EmbeddingsProviderId =
 export interface MaskedLoreweaveConfig {
   skin?: string;
   sagaRoot?: string;
+  activeSaga?: string;
+  activeTomeLens?: string;
+  activeSection?: string;
   chat: {
     provider?: ChatProviderId;
     model?: string;
@@ -497,6 +515,9 @@ export interface MaskedLoreweaveConfig {
 export type ConfigPatch = {
   skin?: string | null;
   sagaRoot?: string | null;
+  activeSaga?: string | null;
+  activeTomeLens?: string | null;
+  activeSection?: string | null;
   chat?: Partial<{
     provider: ChatProviderId | null;
     model: string | null;

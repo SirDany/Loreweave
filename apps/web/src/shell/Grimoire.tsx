@@ -10,7 +10,11 @@ import type { DumpEntry, DumpPayload } from '../lib/lw.js';
 import type { Jumper } from '../lib/saga-helpers.js';
 import { playRadialTick, playSwitch } from '../lib/sound.js';
 import { cn } from '../lib/utils.js';
-import { getSections, type SectionMeta } from '../state/sections.js';
+import {
+  getSectionCount,
+  getSections,
+  type SectionMeta,
+} from '../state/sections.js';
 import type { Section, Selection } from '../state/types.js';
 import { SectionList } from '../views/SectionList.js';
 
@@ -37,37 +41,6 @@ function loadCollapsed(): boolean {
     return window.localStorage.getItem(COLLAPSED_STORAGE_KEY) === '1';
   } catch {
     return false;
-  }
-}
-
-function getSectionCount(
-  id: Section,
-  data: DumpPayload,
-  visibleEntries: DumpEntry[],
-): number | null {
-  switch (id) {
-    case 'story':
-      return data.tomes.reduce((acc, t) => acc + t.chapters.length, 0);
-    case 'codex':
-      return visibleEntries.filter((e) =>
-        ['character', 'location', 'concept', 'lore', 'waypoint'].includes(e.type),
-      ).length;
-    case 'lexicon':
-      return visibleEntries.filter((e) => e.type === 'term').length;
-    case 'sigils':
-      return visibleEntries.filter((e) => e.type === 'sigil').length;
-    case 'threads':
-      return data.threads.length;
-    case 'traces':
-      return data.traces.length;
-    case 'constellation':
-      return data.entries.length;
-    case 'integrity':
-      return data.diagnostics.length;
-    case 'versions':
-      return null;
-    default:
-      return null;
   }
 }
 

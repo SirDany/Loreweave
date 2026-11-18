@@ -25,9 +25,9 @@ interface DialogsProps {
 export function Dialogs({ app, data }: DialogsProps) {
   const {
     saga,
+    selectSaga,
     dialogs,
     closeDialog,
-    setSelection,
     pendingRename,
     setPendingRename,
     pendingNew,
@@ -63,8 +63,7 @@ export function Dialogs({ app, data }: DialogsProps) {
         <ImportDialog
           onClose={() => closeDialog('importing')}
           onImported={(target) => {
-            saga.setSagaPath(target);
-            setSelection(null);
+            selectSaga(target);
           }}
         />
       )}
@@ -98,10 +97,10 @@ export function Dialogs({ app, data }: DialogsProps) {
         <SettingsDialog
           currentSagaPath={saga.sagaPath}
           onPickSaga={(p) => {
-            saga.setSagaPath(p);
-            setSelection(null);
+            selectSaga(p);
             void addRecentSaga(p, data?.saga?.title ?? undefined);
           }}
+          onResetDefaultSaga={() => saga.resetToDefaultSaga()}
           onClose={() => closeDialog('settings')}
         />
       )}

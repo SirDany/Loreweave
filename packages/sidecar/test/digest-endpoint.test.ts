@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { cp, mkdtemp, readFile, rm } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, readFile, rm, stat } from 'node:fs/promises';
 import { createServer, type Server } from 'node:http';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
@@ -154,5 +154,39 @@ describe('sidecar /lw/digest', () => {
     } finally {
       await rm(path.dirname(json.zipPath), { recursive: true, force: true });
     }
+  });
+
+  it('POST /lw/saga-delete deletes a valid saga directory and rejects non-sagas', async () => {
+    const h = makeHost();
+    server = h.server;
+    registerSidecar(h.host, { repoRoot: dir, cliBin });
+    const port = await h.port;
+
+    const notASaga = path.join(dir, 'plain-dir');
+    await mkdir(notASaga, { recursive: true });
+    const badRes = await fetch(`http://127.0.0.1:${port}/lw/saga-delete`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ sagaRoot: notASaga }),
+    });
+    expect(badRes.status).toBe(400);
+
+    const rootRes = await fetch(`http://127.0.0.1:${port}/lw/saga-delete`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ sagaRoot: dir }),
+    });
+    expect(rootRes.status).toBe(400);
+
+    const okRes = await fetch(`http://127.0.0.1:${port}/lw/saga-delete`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ sagaRoot: saga }),
+    });
+    expect(okRes.status).toBe(200);
+    const json = (await okRes.json()) as { ok: boolean };
+    expect(json.ok).toBe(true);
+    const stillExists = await stat(saga).catch(() => null);
+    expect(stillExists).toBeNull();
   });
 });

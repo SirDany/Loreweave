@@ -1,35 +1,42 @@
 import {
   AlertTriangle,
+  BookOpen,
   Bot,
   Check,
   ChevronDown,
   FolderCog,
-  Globe,
+  Layers,
   Palette,
   PanelRight,
+  Plus,
   Search,
   Settings,
+  Trash2,
   Volume2,
   VolumeX,
   X,
 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { AmbientBackground } from '../components/AmbientBackground.js';
 import { Badge } from '../components/ui/badge.js';
 import { addRecentSaga } from '../lib/desktop.js';
 import { DEMO_SPLASH_DETAIL, IS_DEMO } from '../lib/env.js';
 import {
+  deleteSaga,
   fetchConfig,
   gitCommit,
   listSagas,
   type DiscoveredSaga,
+  type DumpEntry,
   type DumpPayload,
 } from '../lib/lw.js';
 import { useSoundEnabled } from '../lib/sound.js';
 import { cn } from '../lib/utils.js';
 import { usePanelResize } from '../hooks/usePanelResize.js';
 import { useSkin } from '../theme/SkinProvider.js';
-import { DEFAULT_SAGA } from '../state/useSaga.js';
+import { getSectionCount, getSections } from '../state/sections.js';
+import { BUILTIN_SECTIONS, type Section } from '../state/types.js';
+import { DEFAULT_SAGA, removeSagaMemory } from '../state/useSaga.js';
 import type { AppState } from '../state/useApp.js';
 import { useShortcuts } from '../state/useShortcuts.js';
 import { AssistantPanel } from '../views/AssistantPanel.js';
@@ -67,6 +74,7 @@ function loadDiscoveryRoot(): string {
 export function Shell({ app }: ShellProps) {
   const {
     saga,
+    selectSaga,
     section,
     setSection,
     selection,
@@ -207,27 +215,34 @@ export function Shell({ app }: ShellProps) {
 
       {/* Floating Command Deck Header */}
       <header className="relative z-40 mx-1.5 mt-1.5 h-11 header-glass px-3 flex items-center justify-between gap-2.5 shrink-0 select-none">
-        {/* Left: Top-Left Saga Switcher Dropdown + Section Breadcrumb + Live Telemetry */}
-        <div className="flex items-center gap-2 min-w-0 shrink-0">
+        {/* Left: Scalable Saga Switcher, Tome Lens Switcher & View/Lens Breadcrumb */}
+        <div className="flex items-center gap-1.5 min-w-0 shrink-0">
           <SagaSwitcherMenu
             data={data}
             currentSagaPath={saga.sagaPath}
-            tomeLens={saga.tomeLens}
-            onSelectTomeLens={saga.setTomeLens}
             onSelectSaga={(path) => {
-              saga.setSagaPath(path);
-              setSelection(null);
+              selectSaga(path);
               void addRecentSaga(path);
             }}
+            onResetDefaultSaga={() => saga.resetToDefaultSaga()}
             onOpenSettings={() => openDialog('settings')}
           />
-          <span className="hidden md:inline text-muted-foreground/40 font-mono text-xs">
+          <TomeLensMenu
+            data={data}
+            tomeLens={saga.tomeLens}
+            onSelectTomeLens={saga.setTomeLens}
+          />
+          <span className="hidden md:inline text-muted-foreground/40 font-mono text-xs px-0.5">
             /
           </span>
-          <span className="hidden md:inline-flex items-center rounded-md border border-border/70 bg-background/50 px-2 py-0.5 text-[11px] font-mono text-muted-foreground capitalize">
-            {section}
-          </span>
-          <span className="hidden xl:inline-flex items-center rounded-md border border-border/60 bg-background/40 px-2 py-0.5 text-[10px] font-mono text-muted-foreground">
+          <SectionLensMenu
+            section={section}
+            onSelectSection={setSection}
+            data={data}
+            visibleEntries={visibleEntries}
+            onComposeLens={() => openDialog('composing')}
+          />
+          <span className="hidden 2xl:inline-flex items-center rounded-md border border-border/60 bg-background/40 px-2 py-0.5 text-[10px] font-mono text-muted-foreground ml-1">
             {data.entries.length} entries · {chapterCount} ch
           </span>
         </div>
@@ -456,29 +471,11 @@ export function Shell({ app }: ShellProps) {
 
 // ---------- Header Popover Subcomponents -----------------------------------
 
-function SagaSwitcherMenu({
-  data,
-  currentSagaPath,
-  tomeLens,
-  onSelectTomeLens,
-  onSelectSaga,
-  onOpenSettings,
-}: {
-  data: DumpPayload;
-  currentSagaPath: string;
-  tomeLens: string | null;
-  onSelectTomeLens: (id: string | null) => void;
-  onSelectSaga: (path: string) => void;
-  onOpenSettings: () => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const [scanning, setScanning] = useState(false);
-  const [discovered, setDiscovered] = useState<DiscoveredSaga[]>([]);
-  const [discoveryRoot, setDiscoveryRoot] = useState<string>(() =>
-    loadDiscoveryRoot(),
-  );
-  const ref = useRef<HTMLDivElement>(null);
-
+function usePopoverClose(
+  open: boolean,
+  setOpen: (v: boolean) => void,
+  ref: React.RefObject<HTMLDivElement | null>,
+) {
   useEffect(() => {
     if (!open) return;
     const onDoc = (e: MouseEvent) => {
@@ -495,10 +492,79 @@ function SagaSwitcherMenu({
       window.removeEventListener('mousedown', onDoc);
       window.removeEventListener('keydown', onKey);
     };
-  }, [open]);
+  }, [open, setOpen, ref]);
+}
+
+function PopoverSearchInput({
+  value,
+  onChange,
+  placeholder,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder: string;
+}) {
+  return (
+    <div className="relative">
+      <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="w-full rounded-xl border border-border/70 bg-background/60 pl-8 pr-7 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+      />
+      {value && (
+        <button
+          type="button"
+          onClick={() => onChange('')}
+          aria-label="Clear filter"
+          className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+        >
+          <X className="h-3 w-3" />
+        </button>
+      )}
+    </div>
+  );
+}
+
+function SagaSwitcherMenu({
+  data,
+  currentSagaPath,
+  onSelectSaga,
+  onResetDefaultSaga,
+  onOpenSettings,
+}: {
+  data: DumpPayload;
+  currentSagaPath: string;
+  onSelectSaga: (path: string) => void;
+  onResetDefaultSaga: () => void;
+  onOpenSettings: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [scanning, setScanning] = useState(false);
+  const [discovered, setDiscovered] = useState<DiscoveredSaga[]>([]);
+  const [discoveryRoot, setDiscoveryRoot] = useState<string>(() =>
+    loadDiscoveryRoot(),
+  );
+  const [query, setQuery] = useState('');
+  const [pendingDelete, setPendingDelete] = useState<DiscoveredSaga | null>(
+    null,
+  );
+  const [deleting, setDeleting] = useState(false);
+  const [deleteErr, setDeleteErr] = useState<string | null>(null);
+  const ref = useRef<HTMLDivElement>(null);
+
+  usePopoverClose(open, setOpen, ref);
 
   useEffect(() => {
-    if (!open || IS_DEMO) return;
+    if (!open) {
+      setQuery('');
+      setPendingDelete(null);
+      setDeleteErr(null);
+      return;
+    }
+    if (IS_DEMO) return;
     let cancelled = false;
     setScanning(true);
     fetchConfig()
@@ -522,6 +588,40 @@ function SagaSwitcherMenu({
     };
   }, [open]);
 
+  const filteredSagas = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return discovered;
+    return discovered.filter(
+      (s) =>
+        (s.title ?? '').toLowerCase().includes(q) ||
+        s.id.toLowerCase().includes(q),
+    );
+  }, [discovered, query]);
+
+  const handleConfirmDelete = async () => {
+    if (!pendingDelete || deleting) return;
+    setDeleting(true);
+    setDeleteErr(null);
+    const target = pendingDelete;
+    try {
+      await deleteSaga(target.path);
+      removeSagaMemory(target.path);
+      const remaining = discovered.filter((s) => s.path !== target.path);
+      setDiscovered(remaining);
+      setPendingDelete(null);
+      if (target.path === currentSagaPath) {
+        setOpen(false);
+        const next = remaining[0];
+        if (next) onSelectSaga(next.path);
+        else onResetDefaultSaga();
+      }
+    } catch (e) {
+      setDeleteErr((e as Error).message);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const errors = data.diagnostics.filter((d) => d.severity === 'error').length;
   const warnings = data.diagnostics.filter(
     (d) => d.severity === 'warning',
@@ -538,20 +638,15 @@ function SagaSwitcherMenu({
           'flex items-center gap-2 rounded-xl border border-transparent px-2.5 py-1 text-left transition-all duration-200 hover:bg-muted/40 hover:border-border/70',
           open && 'active-theme-pill',
         )}
-        title={`Current Saga: ${currentSagaPath}`}
+        title={`Switch Saga — active: ${data.saga.title ?? data.saga.id}`}
       >
         <span className="relative flex h-2.5 w-2.5 shrink-0">
           <span className="animate-pulse-ring absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
           <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-primary shadow-sm shadow-primary/60" />
         </span>
-        <span className="font-semibold text-xs sm:text-sm tracking-tight text-foreground truncate max-w-[160px] sm:max-w-[210px]">
+        <span className="font-semibold text-xs sm:text-sm tracking-tight text-foreground truncate max-w-[140px] sm:max-w-[190px]">
           {data.saga.title ?? data.saga.id}
         </span>
-        {tomeLens && (
-          <span className="hidden lg:inline-flex items-center rounded-full border border-primary/35 bg-primary/15 px-2 py-0.2 text-[10px] font-mono text-primary">
-            {tomeLens}
-          </span>
-        )}
         {(errors > 0 || warnings > 0) && (
           <span
             className={cn(
@@ -575,98 +670,128 @@ function SagaSwitcherMenu({
       {open && (
         <div
           role="menu"
-          className="absolute left-0 top-full mt-2 w-80 rounded-2xl popover-glass p-3.5 shadow-2xl z-[70] animate-modal-pop space-y-3.5"
+          className="absolute left-0 top-full mt-2 w-80 sm:w-96 rounded-2xl popover-glass p-3.5 shadow-2xl z-[70] animate-modal-pop space-y-3"
         >
-          {/* Detected Sagas */}
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="label-rune">Detected Sagas</span>
-              <span className="font-mono text-[10px] text-muted-foreground truncate max-w-[150px]">
-                {discoveryRoot}
-              </span>
-            </div>
-            {IS_DEMO ? (
-              <div className="text-xs text-muted-foreground py-1">
-                Demo mode — static bundle active.
-              </div>
-            ) : scanning ? (
-              <div className="text-xs text-muted-foreground py-1.5">
-                Scanning for Sagas…
-              </div>
-            ) : discovered.length === 0 ? (
-              <div className="text-xs text-muted-foreground py-1">
-                No Sagas found in <code className="font-mono">{discoveryRoot}</code>.
-              </div>
-            ) : (
-              <ul className="space-y-1 max-h-44 overflow-auto scrollbar-ember">
-                {discovered.map((s) => {
-                  const active = s.path === currentSagaPath;
-                  return (
-                    <li key={s.path}>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setOpen(false);
-                          if (!active) onSelectSaga(s.path);
-                        }}
-                        className={cn(
-                          'w-full flex items-center justify-between gap-2 rounded-xl border px-2.5 py-2 text-left text-xs transition-all',
-                          active
-                            ? 'active-theme-pill font-semibold'
-                            : 'border-border/60 bg-background/40 hover:bg-muted/50 text-foreground/85 hover:text-foreground',
-                        )}
-                      >
-                        <div className="min-w-0">
-                          <div className="truncate">{s.title ?? s.id}</div>
-                          <div className="font-mono text-[10px] opacity-75 truncate">
-                            {s.path}
-                          </div>
-                        </div>
-                        {active && <Check className="h-3.5 w-3.5 shrink-0" />}
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
+          <div className="flex items-center justify-between gap-2">
+            <span className="label-rune">Sagas ({discovered.length})</span>
+            <span className="font-mono text-[10px] text-muted-foreground truncate max-w-[160px]">
+              {discoveryRoot}
+            </span>
           </div>
 
-          {/* Tome Lens Filter */}
-          <div>
-            <div className="flex items-center gap-1.5 mb-1.5">
-              <Globe className="h-3 w-3 text-primary" />
-              <span className="label-rune">Tome Lens</span>
+          {!IS_DEMO && discovered.length > 0 && (
+            <PopoverSearchInput
+              value={query}
+              onChange={setQuery}
+              placeholder="Filter sagas…"
+            />
+          )}
+
+          {IS_DEMO ? (
+            <div className="text-xs text-muted-foreground py-1">
+              Demo mode — static bundle active.
             </div>
-            <div className="flex flex-wrap gap-1.5">
-              <button
-                type="button"
-                onClick={() => onSelectTomeLens(null)}
-                className={cn(
-                  'rounded-lg border px-2 py-1 text-[11px] font-medium transition-colors',
-                  tomeLens === null
-                    ? 'active-theme-pill font-semibold'
-                    : 'border-border/70 bg-background/40 text-muted-foreground hover:text-foreground',
-                )}
-              >
-                All Tomes
-              </button>
-              {data.tomes.map((t) => (
+          ) : scanning ? (
+            <div className="text-xs text-muted-foreground py-1.5">
+              Scanning for Sagas…
+            </div>
+          ) : discovered.length === 0 ? (
+            <div className="text-xs text-muted-foreground py-1">
+              No Sagas found in{' '}
+              <code className="font-mono">{discoveryRoot}</code>.
+            </div>
+          ) : filteredSagas.length === 0 ? (
+            <div className="text-xs text-muted-foreground italic py-2 px-1">
+              No Sagas match "{query}".
+            </div>
+          ) : (
+            <ul className="space-y-1 max-h-64 overflow-auto scrollbar-ember pr-0.5">
+              {filteredSagas.map((s) => {
+                const active = s.path === currentSagaPath;
+                const displayTitle = s.title ?? s.id;
+                const showSlug = !!s.title && s.title !== s.id;
+                return (
+                  <li
+                    key={s.path}
+                    className={cn(
+                      'group flex items-center gap-1.5 rounded-xl border p-1 transition-all',
+                      active
+                        ? 'active-theme-pill font-semibold'
+                        : 'border-border/60 bg-background/40 hover:bg-muted/50 text-foreground/85 hover:text-foreground',
+                    )}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setOpen(false);
+                        if (!active) onSelectSaga(s.path);
+                      }}
+                      className="flex-1 min-w-0 flex items-center justify-between gap-2 px-2 py-1.5 text-left text-xs"
+                    >
+                      <span className="flex items-center gap-2 min-w-0">
+                        <span className="truncate">{displayTitle}</span>
+                        {showSlug && (
+                          <span className="rounded border border-border/60 bg-background/40 px-1.5 py-0.2 font-mono text-[10px] opacity-75 shrink-0">
+                            {s.id}
+                          </span>
+                        )}
+                      </span>
+                      {active && <Check className="h-3.5 w-3.5 shrink-0" />}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setDeleteErr(null);
+                        setPendingDelete(s);
+                      }}
+                      title={`Delete "${displayTitle}"`}
+                      aria-label={`Delete ${displayTitle}`}
+                      className="shrink-0 rounded-lg p-1.5 text-muted-foreground/75 opacity-80 group-hover:opacity-100 hover:bg-rose-500/15 hover:text-rose-400 transition-colors"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+
+          {pendingDelete && (
+            <div className="rounded-xl border border-rose-500/40 bg-rose-500/10 p-3 space-y-2 text-xs">
+              <p className="text-foreground leading-snug">
+                Permanently delete{' '}
+                <strong>{pendingDelete.title ?? pendingDelete.id}</strong> and
+                all of its files from disk?
+              </p>
+              {deleteErr && (
+                <p className="font-mono text-[11px] text-rose-300">
+                  {deleteErr}
+                </p>
+              )}
+              <div className="flex justify-end gap-2">
                 <button
-                  key={t.id}
                   type="button"
-                  onClick={() => onSelectTomeLens(t.id)}
-                  className={cn(
-                    'rounded-lg border px-2 py-1 text-[11px] font-medium transition-colors',
-                    tomeLens === t.id
-                      ? 'active-theme-pill font-semibold'
-                      : 'border-border/70 bg-background/40 text-muted-foreground hover:text-foreground',
-                  )}
+                  onClick={() => {
+                    setPendingDelete(null);
+                    setDeleteErr(null);
+                  }}
+                  disabled={deleting}
+                  className="rounded-lg border border-border bg-background/70 px-2.5 py-1 text-[11px] text-foreground hover:bg-muted"
                 >
-                  {t.title}
+                  Cancel
                 </button>
-              ))}
+                <button
+                  type="button"
+                  onClick={() => void handleConfirmDelete()}
+                  disabled={deleting}
+                  className="rounded-lg bg-rose-700 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-rose-600 disabled:opacity-50"
+                >
+                  {deleting ? 'Deleting…' : 'Delete Saga'}
+                </button>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Diagnostics & Discovery Path Button */}
           <div className="pt-2 border-t border-border/70 space-y-2.5">
@@ -690,7 +815,350 @@ function SagaSwitcherMenu({
               className="flex w-full items-center justify-center gap-2 rounded-xl border border-primary/40 bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/20 transition-colors"
             >
               <FolderCog className="h-3.5 w-3.5" />
-              <span>Configure Saga Discovery Path…</span>
+              <span>Manage Sagas &amp; Discovery Path…</span>
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TomeLensMenu({
+  data,
+  tomeLens,
+  onSelectTomeLens,
+}: {
+  data: DumpPayload;
+  tomeLens: string | null;
+  onSelectTomeLens: (id: string | null) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const ref = useRef<HTMLDivElement>(null);
+
+  usePopoverClose(open, setOpen, ref);
+
+  useEffect(() => {
+    if (!open) setQuery('');
+  }, [open]);
+
+  const activeTome = useMemo(
+    () => (tomeLens ? data.tomes.find((t) => t.id === tomeLens) ?? null : null),
+    [data.tomes, tomeLens],
+  );
+
+  const totalChapters = useMemo(
+    () => data.tomes.reduce((sum, t) => sum + t.chapters.length, 0),
+    [data.tomes],
+  );
+
+  const filteredTomes = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return data.tomes;
+    return data.tomes.filter(
+      (t) =>
+        t.title.toLowerCase().includes(q) || t.id.toLowerCase().includes(q),
+    );
+  }, [data.tomes, query]);
+
+  return (
+    <div ref={ref} className="relative">
+      <div
+        className={cn(
+          'inline-flex items-center rounded-xl border text-xs transition-all',
+          tomeLens
+            ? 'border-primary/45 bg-primary/15 text-primary'
+            : 'border-border/70 bg-background/50 text-foreground/85 hover:border-primary/40',
+          open && 'ring-1 ring-primary/40',
+        )}
+      >
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-haspopup="menu"
+          aria-expanded={open}
+          title={
+            activeTome
+              ? `Tome filter: ${activeTome.title} (${activeTome.chapters.length} ch)`
+              : 'Filter workspace by Tome'
+          }
+          className="flex items-center gap-1.5 px-2.5 py-1 font-medium max-w-[160px]"
+        >
+          <BookOpen className="h-3.5 w-3.5 shrink-0 text-primary" />
+          <span className="truncate">
+            {activeTome ? activeTome.title : 'All Tomes'}
+          </span>
+          <ChevronDown
+            className={cn(
+              'h-3 w-3 opacity-75 shrink-0 transition-transform duration-200',
+              open && 'rotate-180',
+            )}
+          />
+        </button>
+        {tomeLens && (
+          <button
+            type="button"
+            onClick={() => onSelectTomeLens(null)}
+            title="Clear Tome filter (show All Tomes)"
+            aria-label="Clear Tome filter"
+            className="pr-2 pl-0.5 py-1 opacity-75 hover:opacity-100"
+          >
+            <X className="h-3 w-3" />
+          </button>
+        )}
+      </div>
+
+      {open && (
+        <div
+          role="menu"
+          className="absolute left-0 top-full mt-2 w-72 rounded-2xl popover-glass p-3 shadow-2xl z-[70] animate-modal-pop space-y-2.5"
+        >
+          <div className="flex items-center justify-between">
+            <span className="label-rune">Tome Filter</span>
+            <span className="font-mono text-[10px] text-muted-foreground">
+              {data.tomes.length} tome{data.tomes.length === 1 ? '' : 's'}
+            </span>
+          </div>
+
+          {data.tomes.length > 0 && (
+            <PopoverSearchInput
+              value={query}
+              onChange={setQuery}
+              placeholder="Filter tomes…"
+            />
+          )}
+
+          <div className="space-y-1 max-h-60 overflow-auto scrollbar-ember pr-0.5">
+            <button
+              type="button"
+              onClick={() => {
+                onSelectTomeLens(null);
+                setOpen(false);
+              }}
+              className={cn(
+                'w-full flex items-center justify-between gap-2 rounded-xl border px-2.5 py-1.5 text-left text-xs transition-colors',
+                tomeLens === null
+                  ? 'active-theme-pill font-semibold'
+                  : 'border-border/60 bg-background/40 hover:bg-muted/50 text-foreground/85',
+              )}
+            >
+              <span className="truncate">All Tomes (Full Saga)</span>
+              <span className="flex items-center gap-1.5 shrink-0 font-mono text-[10px] opacity-75">
+                <span>{totalChapters} ch</span>
+                {tomeLens === null && <Check className="h-3.5 w-3.5" />}
+              </span>
+            </button>
+
+            {filteredTomes.map((t) => {
+              const active = tomeLens === t.id;
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => {
+                    onSelectTomeLens(t.id);
+                    setOpen(false);
+                  }}
+                  className={cn(
+                    'w-full flex items-center justify-between gap-2 rounded-xl border px-2.5 py-1.5 text-left text-xs transition-colors',
+                    active
+                      ? 'active-theme-pill font-semibold'
+                      : 'border-border/60 bg-background/40 hover:bg-muted/50 text-foreground/85',
+                  )}
+                >
+                  <span className="truncate">{t.title}</span>
+                  <span className="flex items-center gap-1.5 shrink-0 font-mono text-[10px] opacity-75">
+                    <span>{t.chapters.length} ch</span>
+                    {active && <Check className="h-3.5 w-3.5" />}
+                  </span>
+                </button>
+              );
+            })}
+
+            {data.tomes.length > 0 && filteredTomes.length === 0 && (
+              <div className="px-2 py-2 text-xs text-muted-foreground italic">
+                No Tomes match "{query}".
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SectionLensMenu({
+  section,
+  onSelectSection,
+  data,
+  visibleEntries,
+  onComposeLens,
+}: {
+  section: Section;
+  onSelectSection: (s: Section) => void;
+  data: DumpPayload;
+  visibleEntries: DumpEntry[];
+  onComposeLens: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const ref = useRef<HTMLDivElement>(null);
+
+  usePopoverClose(open, setOpen, ref);
+
+  useEffect(() => {
+    if (!open) setQuery('');
+  }, [open]);
+
+  const sections = getSections();
+  const activeMeta =
+    sections.find((s) => s.id === section) ?? sections[0]!;
+  const ActiveIcon = activeMeta.icon;
+  const activeCount = getSectionCount(activeMeta.id, data, visibleEntries);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return sections;
+    return sections.filter(
+      (s) =>
+        s.label.toLowerCase().includes(q) ||
+        s.id.toLowerCase().includes(q) ||
+        s.hint.toLowerCase().includes(q),
+    );
+  }, [sections, query]);
+
+  const builtinSet = useMemo(
+    () => new Set<string>(BUILTIN_SECTIONS),
+    [],
+  );
+  const coreSections = filtered.filter((s) => builtinSet.has(s.id));
+  const customSections = filtered.filter((s) => !builtinSet.has(s.id));
+
+  const renderItem = (s: (typeof sections)[number]) => {
+    const Icon = s.icon;
+    const active = s.id === section;
+    const count = getSectionCount(s.id, data, visibleEntries);
+    return (
+      <button
+        key={s.id}
+        type="button"
+        onClick={() => {
+          onSelectSection(s.id);
+          setOpen(false);
+        }}
+        className={cn(
+          'w-full flex items-center gap-2 rounded-xl border px-2.5 py-1.5 text-left text-xs transition-colors',
+          active
+            ? 'active-theme-pill font-semibold'
+            : 'border-transparent hover:border-border/60 hover:bg-muted/50 text-foreground/85',
+        )}
+      >
+        <Icon className="h-3.5 w-3.5 shrink-0 opacity-85" />
+        <div className="flex-1 min-w-0">
+          <div className="truncate">{s.label}</div>
+          {s.hint && (
+            <div className="text-[10px] opacity-70 truncate">{s.hint}</div>
+          )}
+        </div>
+        {count !== null && (
+          <span className="font-mono text-[10px] opacity-75 shrink-0">
+            {count}
+          </span>
+        )}
+        {active && <Check className="h-3.5 w-3.5 shrink-0" />}
+      </button>
+    );
+  };
+
+  return (
+    <div ref={ref} className="relative hidden md:block">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        title={`Active view/lens: ${activeMeta.label}`}
+        className={cn(
+          'inline-flex items-center gap-1.5 rounded-xl border px-2.5 py-1 text-xs font-medium transition-all',
+          open
+            ? 'active-theme-pill'
+            : 'border-border/70 bg-background/50 text-foreground/85 hover:border-primary/40 hover:text-foreground',
+        )}
+      >
+        <ActiveIcon className="h-3.5 w-3.5 text-primary shrink-0" />
+        <span className="truncate max-w-[120px]">{activeMeta.label}</span>
+        {activeCount !== null && (
+          <span className="font-mono text-[10px] text-muted-foreground">
+            {activeCount}
+          </span>
+        )}
+        <ChevronDown
+          className={cn(
+            'h-3 w-3 opacity-75 shrink-0 transition-transform duration-200',
+            open && 'rotate-180',
+          )}
+        />
+      </button>
+
+      {open && (
+        <div
+          role="menu"
+          className="absolute left-0 top-full mt-2 w-72 rounded-2xl popover-glass p-3 shadow-2xl z-[70] animate-modal-pop space-y-2.5"
+        >
+          <div className="flex items-center justify-between">
+            <span className="label-rune inline-flex items-center gap-1.5">
+              <Layers className="h-3 w-3 text-primary" />
+              <span>Views &amp; Lenses</span>
+            </span>
+            <span className="font-mono text-[10px] text-muted-foreground">
+              {sections.length}
+            </span>
+          </div>
+
+          <PopoverSearchInput
+            value={query}
+            onChange={setQuery}
+            placeholder="Filter views & lenses…"
+          />
+
+          <div className="space-y-2 max-h-72 overflow-auto scrollbar-ember pr-0.5">
+            {coreSections.length > 0 && (
+              <div className="space-y-0.5">
+                <div className="px-1.5 text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">
+                  Core Views
+                </div>
+                {coreSections.map(renderItem)}
+              </div>
+            )}
+
+            {customSections.length > 0 && (
+              <div className="space-y-0.5 pt-1 border-t border-border/50">
+                <div className="px-1.5 text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">
+                  Custom Saga Lenses
+                </div>
+                {customSections.map(renderItem)}
+              </div>
+            )}
+
+            {filtered.length === 0 && (
+              <div className="px-2 py-2 text-xs text-muted-foreground italic">
+                No views match "{query}".
+              </div>
+            )}
+          </div>
+
+          <div className="pt-2 border-t border-border/70">
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                onComposeLens();
+              }}
+              className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-primary/40 bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/20 transition-colors"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              <span>Compose New Lens…</span>
             </button>
           </div>
         </div>

@@ -65,6 +65,9 @@ export interface EmbeddingsConfig {
 export interface LoreweaveConfig {
   skin?: string;
   sagaRoot?: string;
+  activeSaga?: string;
+  activeTomeLens?: string;
+  activeSection?: string;
   chat?: ChatConfig;
   embeddings?: EmbeddingsConfig;
 }
@@ -73,6 +76,9 @@ export interface LoreweaveConfig {
 export interface MaskedConfig {
   skin?: string;
   sagaRoot?: string;
+  activeSaga?: string;
+  activeTomeLens?: string;
+  activeSection?: string;
   chat: {
     provider?: ChatProvider;
     model?: string;
@@ -181,6 +187,16 @@ export async function saveConfig(cfg: LoreweaveConfig): Promise<void> {
   await fs.writeFile(p, JSON.stringify(clean, null, 2), { mode: 0o600 });
 }
 
+const TOP_STRING_KEYS = [
+  'skin',
+  'sagaRoot',
+  'activeSaga',
+  'activeTomeLens',
+  'activeSection',
+] as const;
+
+type TopStringKey = (typeof TOP_STRING_KEYS)[number];
+
 /**
  * Merge a partial patch into the existing config. Keys set to `null` or `""`
  * are deleted; keys omitted are left untouched.
@@ -189,6 +205,9 @@ export async function patchConfig(
   patch: Partial<{
     skin: string | null;
     sagaRoot: string | null;
+    activeSaga: string | null;
+    activeTomeLens: string | null;
+    activeSection: string | null;
     chat: Partial<Record<keyof ChatConfig, string | null>>;
     embeddings: Partial<Record<keyof EmbeddingsConfig, string | null>>;
   }>,
@@ -197,22 +216,21 @@ export async function patchConfig(
   const next: LoreweaveConfig = {
     skin: current.skin,
     sagaRoot: current.sagaRoot,
+    activeSaga: current.activeSaga,
+    activeTomeLens: current.activeTomeLens,
+    activeSection: current.activeSection,
     chat: { ...current.chat },
     embeddings: { ...current.embeddings },
   };
-  if (patch.skin === null || patch.skin === '') {
-    delete next.skin;
-  } else if (typeof patch.skin === 'string') {
-    const trimmed = patch.skin.trim();
-    if (!trimmed) delete next.skin;
-    else next.skin = trimmed;
-  }
-  if (patch.sagaRoot === null || patch.sagaRoot === '') {
-    delete next.sagaRoot;
-  } else if (typeof patch.sagaRoot === 'string') {
-    const trimmed = patch.sagaRoot.trim();
-    if (!trimmed) delete next.sagaRoot;
-    else next.sagaRoot = trimmed;
+  for (const key of TOP_STRING_KEYS) {
+    const val = patch[key as TopStringKey];
+    if (val === null || val === '') {
+      delete next[key];
+    } else if (typeof val === 'string') {
+      const trimmed = val.trim();
+      if (!trimmed) delete next[key];
+      else next[key] = trimmed;
+    }
   }
   if (patch.chat) {
     for (const [k, v] of Object.entries(patch.chat)) {
@@ -250,6 +268,9 @@ export function maskConfig(cfg: LoreweaveConfig): MaskedConfig {
   return {
     skin: cfg.skin,
     sagaRoot: cfg.sagaRoot,
+    activeSaga: cfg.activeSaga,
+    activeTomeLens: cfg.activeTomeLens,
+    activeSection: cfg.activeSection,
     chat: {
       provider: cfg.chat?.provider,
       model: cfg.chat?.model,
@@ -327,13 +348,12 @@ export async function applyConfigToEnv(): Promise<void> {
 
 function sanitize(cfg: LoreweaveConfig): LoreweaveConfig {
   const out: LoreweaveConfig = {};
-  if (typeof cfg.skin === 'string') {
-    const trimmed = cfg.skin.trim();
-    if (trimmed) out.skin = trimmed;
-  }
-  if (typeof cfg.sagaRoot === 'string') {
-    const trimmed = cfg.sagaRoot.trim();
-    if (trimmed) out.sagaRoot = trimmed;
+  for (const key of TOP_STRING_KEYS) {
+    const val = cfg[key];
+    if (typeof val === 'string') {
+      const trimmed = val.trim();
+      if (trimmed) out[key] = trimmed;
+    }
   }
   if (cfg.chat && typeof cfg.chat === 'object') {
     const c: ChatConfig = {};

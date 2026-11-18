@@ -10,6 +10,7 @@ import {
   Waypoints,
 } from 'lucide-react';
 import type { ComponentType } from 'react';
+import type { DumpEntry, DumpPayload } from '../lib/lw.js';
 import type { LensManifest } from '../loom/manifest.js';
 import { listLensManifests } from '../loom/registry.js';
 import type { Section } from './types.js';
@@ -89,3 +90,35 @@ export function getSections(): SectionMeta[] {
  * `getSections()` so newly-registered Lenses are reflected.
  */
 export const SECTIONS: SectionMeta[] = getSections();
+
+/** Live item count badge shown for built-in Grimoire/Header sections. */
+export function getSectionCount(
+  id: Section,
+  data: DumpPayload,
+  visibleEntries: DumpEntry[],
+): number | null {
+  switch (id) {
+    case 'story':
+      return data.tomes.reduce((acc, t) => acc + t.chapters.length, 0);
+    case 'codex':
+      return visibleEntries.filter((e) =>
+        ['character', 'location', 'concept', 'lore', 'waypoint'].includes(e.type),
+      ).length;
+    case 'lexicon':
+      return visibleEntries.filter((e) => e.type === 'term').length;
+    case 'sigils':
+      return visibleEntries.filter((e) => e.type === 'sigil').length;
+    case 'threads':
+      return data.threads.length;
+    case 'traces':
+      return data.traces.length;
+    case 'constellation':
+      return data.entries.length;
+    case 'integrity':
+      return data.diagnostics.length;
+    case 'versions':
+      return null;
+    default:
+      return null;
+  }
+}

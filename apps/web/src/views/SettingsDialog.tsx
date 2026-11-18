@@ -9,6 +9,8 @@ import {
   Loader2,
   Pencil,
   RefreshCw,
+  Search,
+  Trash2,
   X,
 } from 'lucide-react';
 import {
@@ -16,7 +18,9 @@ import {
   computeUsageWindow,
   type UsageWindowStats,
 } from '../state/useChat.js';
+import { removeSagaMemory } from '../state/useSaga.js';
 import {
+  deleteSaga,
   dump,
   fetchConfig,
   fetchProviderModels,
@@ -36,6 +40,7 @@ import { cn } from '../lib/utils.js';
 interface Props {
   currentSagaPath?: string;
   onPickSaga?: (path: string) => void;
+  onResetDefaultSaga?: () => void;
   onClose: () => void;
 }
 
@@ -211,6 +216,7 @@ function loadStoredDiscoveryRoot(): string {
 export function SettingsDialog({
   currentSagaPath,
   onPickSaga,
+  onResetDefaultSaga,
   onClose,
 }: Props) {
   const [cfg, setCfg] = useState<MaskedLoreweaveConfig | null>(null);
@@ -667,6 +673,10 @@ export function SettingsDialog({
             currentSagaPath={currentSagaPath}
             onPickSaga={(p) => {
               onPickSaga?.(p);
+              handleClose();
+            }}
+            onResetDefaultSaga={() => {
+              onResetDefaultSaga?.();
               handleClose();
             }}
           />
@@ -1411,10 +1421,12 @@ function SagaWorkspaceSection({
   initialRoot,
   currentSagaPath,
   onPickSaga,
+  onResetDefaultSaga,
 }: {
   initialRoot: string;
   currentSagaPath?: string;
   onPickSaga: (path: string) => void;
+  onResetDefaultSaga?: () => void;
 }) {
   const [sagaRoot, setSagaRoot] = useState(initialRoot);
   const rootEditedRef = useRef(false);
@@ -1422,6 +1434,10 @@ function SagaWorkspaceSection({
   const [scanError, setScanError] = useState<string | null>(null);
   const [discovered, setDiscovered] = useState<DiscoveredSaga[] | null>(null);
   const [scanSuccessMsg, setScanSuccessMsg] = useState<string | null>(null);
+  const [sagaFilter, setSagaFilter] = useState('');
+  const [confirmDelete, setConfirmDelete] = useState<DiscoveredSaga | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const [directPath, setDirectPath] = useState(currentSagaPath ?? '');
   const [verifyingDirect, setVerifyingDirect] = useState(false);
@@ -1431,6 +1447,22 @@ function SagaWorkspaceSection({
     if (!rootEditedRef.current) {
       setSagaRoot(initialRoot);
     }
+  }, [initialRoot]);
+
+  // Initial silent discovery so detected Sagas can be browsed or deleted right away.
+  useEffect(() => {
+    let active = true;
+    const dir = initialRoot.trim() || 'sagas';
+    listSagas(dir)
+      .then((list) => {
+        if (active) setDiscovered(list);
+      })
+      .catch(() => {
+        /* ignore initial silent scan failure */
+      });
+    return () => {
+      active = false;
+    };
   }, [initialRoot]);
 
   const scanRoot = async () => {
@@ -1466,6 +1498,38 @@ function SagaWorkspaceSection({
       setScanning(false);
     }
   };
+
+  const confirmAndDeleteSaga = async (target: DiscoveredSaga) => {
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await deleteSaga(target.path);
+      removeSagaMemory(target.path);
+      const remaining = (discovered ?? []).filter((s) => s.path !== target.path);
+      setDiscovered(remaining);
+      setConfirmDelete(null);
+      if (target.path === currentSagaPath) {
+        const next = remaining[0];
+        if (next) onPickSaga(next.path);
+        else onResetDefaultSaga?.();
+      }
+    } catch (e) {
+      setDeleteError((e as Error).message);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const filteredDiscovered = useMemo(() => {
+    const list = discovered ?? [];
+    const q = sagaFilter.trim().toLowerCase();
+    if (!q) return list;
+    return list.filter(
+      (s) =>
+        (s.title ?? '').toLowerCase().includes(q) ||
+        s.id.toLowerCase().includes(q),
+    );
+  }, [discovered, sagaFilter]);
 
   const verifyAndOpenDirect = async () => {
     const target = directPath.trim();
@@ -1548,11 +1612,41 @@ function SagaWorkspaceSection({
         )}
 
         {discovered && discovered.length > 0 && (
-          <div className="space-y-1.5 pt-1">
-            <div className="label-rune">Detected Sagas</div>
-            <ul className="space-y-1.5 max-h-40 overflow-auto scrollbar-ember">
-              {discovered.map((s) => {
+          <div className="space-y-2 pt-1">
+            <div className="flex items-center justify-between gap-2">
+              <span className="label-rune">
+                Detected Sagas ({discovered.length})
+              </span>
+            </div>
+
+            {discovered.length > 4 && (
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                <input
+                  type="text"
+                  value={sagaFilter}
+                  onChange={(e) => setSagaFilter(e.target.value)}
+                  placeholder="Filter sagas…"
+                  className="w-full rounded-lg border border-border bg-background/80 pl-8 pr-7 py-1.5 text-xs focus:ring-1 focus:ring-primary focus:outline-none"
+                />
+                {sagaFilter && (
+                  <button
+                    type="button"
+                    onClick={() => setSagaFilter('')}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    aria-label="Clear filter"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                )}
+              </div>
+            )}
+
+            <ul className="space-y-1.5 max-h-48 overflow-auto scrollbar-ember">
+              {filteredDiscovered.map((s) => {
                 const active = s.path === currentSagaPath;
+                const displayTitle = s.title ?? s.id;
+                const showSlug = !!s.title && s.title !== s.id;
                 return (
                   <li
                     key={s.path}
@@ -1563,26 +1657,81 @@ function SagaWorkspaceSection({
                         : 'border-border/60 bg-background/50',
                     )}
                   >
-                    <div className="min-w-0">
-                      <div className="font-medium truncate">
-                        {s.title ?? s.id}
-                      </div>
-                      <div className="font-mono text-[10px] text-muted-foreground truncate">
-                        {s.path}
-                      </div>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="font-medium truncate">{displayTitle}</span>
+                      {showSlug && (
+                        <span className="rounded border border-border/60 bg-background/40 px-1.5 py-0.2 font-mono text-[10px] text-muted-foreground shrink-0">
+                          {s.id}
+                        </span>
+                      )}
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => onPickSaga(s.path)}
-                      disabled={active}
-                      className="shrink-0 rounded-lg border border-primary/40 bg-primary/15 px-2.5 py-1 text-[11px] font-medium text-primary hover:bg-primary/25 disabled:opacity-50"
-                    >
-                      {active ? 'Active' : 'Load Saga'}
-                    </button>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => onPickSaga(s.path)}
+                        disabled={active}
+                        className="rounded-lg border border-primary/40 bg-primary/15 px-2.5 py-1 text-[11px] font-medium text-primary hover:bg-primary/25 disabled:opacity-50"
+                      >
+                        {active ? 'Active' : 'Load Saga'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDeleteError(null);
+                          setConfirmDelete(s);
+                        }}
+                        title={`Delete "${displayTitle}"`}
+                        aria-label={`Delete ${displayTitle}`}
+                        className="rounded-lg border border-border/70 bg-background/60 p-1.5 text-muted-foreground hover:border-rose-500/50 hover:bg-rose-500/15 hover:text-rose-400 transition-colors"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                   </li>
                 );
               })}
+              {filteredDiscovered.length === 0 && (
+                <li className="px-2 py-2 text-xs text-muted-foreground italic">
+                  No Sagas match "{sagaFilter}".
+                </li>
+              )}
             </ul>
+
+            {confirmDelete && (
+              <div className="rounded-xl border border-rose-500/40 bg-rose-500/10 p-3 space-y-2 text-xs">
+                <p className="text-foreground">
+                  Permanently delete{' '}
+                  <strong>{confirmDelete.title ?? confirmDelete.id}</strong> and
+                  all of its files from disk?
+                </p>
+                {deleteError && (
+                  <p className="font-mono text-[11px] text-rose-300">
+                    {deleteError}
+                  </p>
+                )}
+                <div className="flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setConfirmDelete(null);
+                      setDeleteError(null);
+                    }}
+                    disabled={deleting}
+                    className="rounded-lg border border-border bg-background/70 px-2.5 py-1 text-[11px] text-foreground hover:bg-muted"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void confirmAndDeleteSaga(confirmDelete)}
+                    disabled={deleting}
+                    className="rounded-lg bg-rose-700 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-rose-600 disabled:opacity-50"
+                  >
+                    {deleting ? 'Deleting…' : 'Confirm Delete'}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
