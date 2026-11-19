@@ -7,8 +7,13 @@ import { fileURLToPath } from 'node:url';
 import { registerSidecar, compactToolResultForModel, type MiddlewareHost } from '../src/middleware.js';
 import { runTool } from '../src/tools.js';
 
+import { existsSync } from 'node:fs';
+
 const here = path.dirname(fileURLToPath(import.meta.url));
-const exampleSaga = path.resolve(here, '../../../sagas/example-saga');
+const fixtureSaga = path.resolve(here, '../../../fixtures/example-saga');
+const exampleSaga = existsSync(fixtureSaga)
+  ? fixtureSaga
+  : path.resolve(here, '../../../sagas/example-saga');
 const cliBin = path.resolve(here, '../../cli/dist/bin.js');
 
 /**

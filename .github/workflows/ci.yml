@@ -31,7 +31,7 @@ jobs:
       - run: pnpm -r build
       - run: pnpm -r typecheck
       - run: pnpm -r test
-      - run: node packages/cli/dist/bin.js validate sagas/example-saga
+      - run: node packages/cli/dist/bin.js validate fixtures/example-saga
 
   # Fail the build if any production dep has a known high/critical CVE.
   # Dev deps are excluded — vitest/typescript advisories don't ship to users.

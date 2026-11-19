@@ -636,15 +636,46 @@ export function registerSidecar(
         return;
       }
 
-      const watcher = watchers.get(abs);
-      if (watcher) {
-        watcher.close();
-        watchers.delete(abs);
+      const normAbs = abs.toLowerCase();
+      for (const [key, w] of Array.from(watchers.entries())) {
+        const normKey = path.resolve(key).toLowerCase();
+        if (normKey === normAbs || normKey.startsWith(normAbs + path.sep)) {
+          try {
+            w.close();
+          } catch {
+            /* ignore */
+          }
+          watchers.delete(key);
+        }
       }
-      adapters.delete(abs);
+      for (const key of Array.from(adapters.keys())) {
+        if (path.resolve(key).toLowerCase() === normAbs) {
+          adapters.delete(key);
+        }
+      }
       await invalidateDigest(abs).catch(() => {});
 
-      await fs.rm(abs, { recursive: true, force: true });
+      // Allow file handles to close on Windows before removal
+      await new Promise((r) => setTimeout(r, 60));
+      await fs.rm(abs, {
+        recursive: true,
+        force: true,
+        maxRetries: 5,
+        retryDelay: 100,
+      });
+
+      // Clear activeSaga from persisted config if it was pointing to this deleted saga
+      try {
+        const currentCfg = await loadConfig();
+        if (currentCfg.activeSaga) {
+          const cfgAbs = path.resolve(safeRoot(currentCfg.activeSaga)).toLowerCase();
+          if (cfgAbs === normAbs) {
+            await patchConfig({ activeSaga: null, activeTomeLens: null });
+          }
+        }
+      } catch {
+        /* ignore */
+      }
 
       res.statusCode = 200;
       res.setHeader('content-type', 'application/json');

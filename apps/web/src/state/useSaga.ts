@@ -238,27 +238,49 @@ export function useSaga(initialPath: string = DEFAULT_SAGA): SagaState {
     setKinds([]);
   }, []);
 
-  const resetToDefaultSaga = useCallback(() => {
+  const resetToDefaultSaga = useCallback(async () => {
     userChangedSagaRef.current = true;
     noSagasRef.current = false;
     setNoSagas(false);
     setSwitchError(null);
     setError(null);
-    lastValidPathRef.current = DEFAULT_SAGA;
     try {
       window.localStorage.removeItem(SAGA_PATH_STORAGE_KEY);
     } catch {
       /* ignore */
     }
-    const mem = loadSagaMemory(DEFAULT_SAGA);
-    setSagaPathState(DEFAULT_SAGA);
-    setTomeLensState(mem?.tomeLens ?? null);
-    setDigest(null);
-    setKinds([]);
-    saveConfigPatch({ activeSaga: DEFAULT_SAGA, activeTomeLens: mem?.tomeLens ?? null }).catch(() => {
+
+    try {
+      const cfg = await fetchConfig().catch(() => null);
+      let storedRoot = 'sagas';
+      try {
+        const raw = window.localStorage.getItem(DISCOVERY_ROOT_STORAGE_KEY);
+        if (raw && raw.trim()) storedRoot = raw.trim();
+      } catch {
+        /* ignore */
+      }
+      const root = cfg?.sagaRoot?.trim() || storedRoot;
+      const discovered = await listSagas(root);
+      if (discovered.length > 0) {
+        const first = discovered[0]!;
+        lastValidPathRef.current = first.path;
+        setSagaPathState(first.path);
+        const mem = loadSagaMemory(first.path);
+        setTomeLensState(mem?.tomeLens ?? null);
+        setDigest(null);
+        setKinds([]);
+        saveConfigPatch({
+          activeSaga: first.path,
+          activeTomeLens: mem?.tomeLens ?? null,
+        }).catch(() => {});
+        return;
+      }
+    } catch {
       /* ignore */
-    });
-  }, []);
+    }
+
+    enterEmptyWorkspace();
+  }, [enterEmptyWorkspace]);
 
   const reload = useCallback(async () => {
     const targetPath = sagaPath.trim();

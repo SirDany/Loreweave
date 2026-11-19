@@ -31,31 +31,34 @@ export async function resolveSagaRoot(explicitRoot?: string): Promise<string> {
   if (explicitRoot) {
     return path.resolve(explicitRoot);
   }
-  // Try default sagas/example-saga or first saga in sagas/
-  const defaultPath = path.resolve('sagas/example-saga');
-  try {
-    await fs.access(path.join(defaultPath, 'saga.yaml'));
-    return defaultPath;
-  } catch {
-    // Look inside sagas/
+  // Try default sagas/example-saga or fixtures/example-saga or first saga in sagas/
+  for (const p of ['sagas/example-saga', 'fixtures/example-saga']) {
+    const candidate = path.resolve(p);
     try {
-      const entries = await fs.readdir(path.resolve('sagas'), { withFileTypes: true });
-      for (const e of entries) {
-        if (e.isDirectory()) {
-          const candidate = path.resolve('sagas', e.name);
-          try {
-            await fs.access(path.join(candidate, 'saga.yaml'));
-            return candidate;
-          } catch {
-            // continue
-          }
-        }
-      }
+      await fs.access(path.join(candidate, 'saga.yaml'));
+      return candidate;
     } catch {
-      // fallback
+      /* try next */
     }
   }
-  return defaultPath;
+  // Look inside sagas/
+  try {
+    const entries = await fs.readdir(path.resolve('sagas'), { withFileTypes: true });
+    for (const e of entries) {
+      if (e.isDirectory()) {
+        const candidate = path.resolve('sagas', e.name);
+        try {
+          await fs.access(path.join(candidate, 'saga.yaml'));
+          return candidate;
+        } catch {
+          // continue
+        }
+      }
+    }
+  } catch {
+    // fallback
+  }
+  return path.resolve('fixtures/example-saga');
 }
 
 /**

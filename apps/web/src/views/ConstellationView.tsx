@@ -8,6 +8,7 @@ import {
   Plus,
   RotateCcw,
   Sparkles,
+  Tag,
   X,
 } from "lucide-react";
 import { cn } from "../lib/utils.js";
@@ -74,6 +75,7 @@ export function ConstellationView({ data, onJump }: Props) {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [pinnedId, setPinnedId] = useState<string | null>(null);
   const [drift, setDrift] = useState(true);
+  const [labelDensity, setLabelDensity] = useState<"all" | "connected" | "focus">("all");
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
 
@@ -380,6 +382,27 @@ export function ConstellationView({ data, onJump }: Props) {
             >
               <Orbit className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">Drift</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() =>
+                setLabelDensity((d) =>
+                  d === "all" ? "connected" : d === "connected" ? "focus" : "all",
+                )
+              }
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium transition-all interactive-lift",
+                labelDensity !== "all"
+                  ? "border-primary/45 bg-primary/15 text-primary"
+                  : "border-border/60 bg-card/50 text-muted-foreground hover:text-foreground",
+              )}
+              title="Cycle label visibility: All, Connected only, or Focused only"
+            >
+              <Tag className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">
+                Labels: {labelDensity === "all" ? "All" : labelDensity === "connected" ? "Connected" : "Focused"}
+              </span>
             </button>
 
             <div className="inline-flex items-center rounded-lg border border-border/70 bg-card/50 p-0.5">
@@ -705,23 +728,61 @@ export function ConstellationView({ data, onJump }: Props) {
                     fillOpacity="0.95"
                   />
 
-                  {/* Crisp Label */}
-                  <text
-                    y={isFocused ? 24 : 19}
-                    textAnchor="middle"
-                    fill={isFocused ? "hsl(var(--foreground))" : "hsl(var(--foreground))"}
-                    fillOpacity={isFocused ? 1 : 0.85}
-                    fontSize={isFocused ? 11.5 : 10}
-                    fontWeight={isFocused ? 600 : 500}
-                    style={{
-                      paintOrder: "stroke",
-                      stroke: "hsl(var(--background))",
-                      strokeWidth: "3px",
-                      strokeLinejoin: "round",
-                    }}
-                  >
-                    {node.entry.name}
-                  </text>
+                  {/* Soft, readable label with clean contrast */}
+                  {(isFocused ||
+                    (labelDensity === "focus"
+                      ? false
+                      : labelDensity === "connected"
+                        ? isNeighbor
+                        : zoom >= 0.72 || isNeighbor)) && (
+                    isFocused ? (
+                      <g className="pointer-events-none select-none">
+                        <rect
+                          x={(-Math.max(40, node.entry.name.length * 6.6 + 14) / 2).toFixed(1)}
+                          y="13"
+                          width={Math.max(40, node.entry.name.length * 6.6 + 14).toFixed(1)}
+                          height="18"
+                          rx="5"
+                          className="fill-card/95"
+                          stroke={node.color}
+                          strokeOpacity="0.65"
+                          style={{
+                            strokeWidth: "1.2px",
+                            filter: "drop-shadow(0 2px 8px hsl(var(--background) / 0.8))",
+                          }}
+                        />
+                        <text
+                          y="25.5"
+                          textAnchor="middle"
+                          fill="hsl(var(--foreground))"
+                          fontSize="11"
+                          fontWeight="600"
+                          className="select-none"
+                        >
+                          {node.entry.name}
+                        </text>
+                      </g>
+                    ) : (
+                      <text
+                        y={19}
+                        textAnchor="middle"
+                        fill={isNeighbor ? "hsl(var(--foreground))" : "hsl(var(--muted-foreground))"}
+                        fillOpacity={isNeighbor ? 0.95 : 0.72}
+                        fontSize={10.5}
+                        fontWeight={isNeighbor ? 500 : 400}
+                        className="select-none"
+                        style={{
+                          paintOrder: "stroke",
+                          stroke: "hsl(var(--background) / 0.85)",
+                          strokeWidth: "1.5px",
+                          strokeLinejoin: "round",
+                          filter: "drop-shadow(0 1px 2px hsl(var(--background) / 0.6))",
+                        }}
+                      >
+                        {node.entry.name}
+                      </text>
+                    )
+                  )}
                 </g>
               );
             })}

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import YAML from "yaml";
 import {
   AlertTriangle,
@@ -13,6 +13,10 @@ import {
   GitBranch,
   GitCompare,
   Layers,
+  Minus,
+  Plus,
+  RotateCcw,
+  Route,
   Sparkles,
 } from "lucide-react";
 import { cn } from "../lib/utils.js";
@@ -409,7 +413,12 @@ interface PositionedPoint {
   yPct: number;
   svgX: number;
   svgY: number;
+  row?: number;
+  col?: number;
+  isRowEven?: boolean;
 }
+
+type StreamStyle = "winding" | "linear";
 
 function EtherealChronologyStream({
   waypoints,
@@ -434,6 +443,28 @@ function EtherealChronologyStream({
   onHover: (id: string | null) => void;
   onJump?: Jumper;
 }) {
+  const [streamStyle, setStreamStyle] = useState<StreamStyle>("winding");
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef<{
+    startX: number;
+    startY: number;
+    origX: number;
+    origY: number;
+    moved: boolean;
+  } | null>(null);
+
+  const adjustZoom = (delta: number) => {
+    setZoom((z) => Math.min(2.5, Math.max(0.5, Number((z + delta).toFixed(2)))));
+  };
+
+  const resetZoomAndPan = () => {
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+  };
+
   const layout = useMemo(() => {
     const n = waypoints.length;
     if (n === 0) {
@@ -443,6 +474,9 @@ function EtherealChronologyStream({
         hasDualLane: false,
         minLabel: "",
         maxLabel: "",
+        svgHeight: 240,
+        itemsPerRow: 4,
+        numRows: 1,
       };
     }
 
@@ -464,8 +498,6 @@ function EtherealChronologyStream({
       return n === 1 ? 0.5 : idx / (n - 1);
     });
 
-    const relaxed = relaxNormalizedPositions(rawNormalized);
-
     const isOwnList = waypoints.map((w) => {
       if (w.thread) return w.thread === activeThread.id;
       return ownIds.has(w.id);
@@ -473,47 +505,111 @@ function EtherealChronologyStream({
 
     const hasInherited = isOwnList.some((o) => !o);
     const hasOwn = isOwnList.some((o) => o);
-    const hasDualLane = Boolean(withBranches && hasInherited && hasOwn);
+    const hasDualLane = Boolean(withBranches && hasInherited && hasOwn && streamStyle === "linear");
 
-    const points: PositionedPoint[] = waypoints.map((w, idx) => {
-      const t = relaxed[idx]!;
-      // Strictly keep waypoints inside [10%, 90%] to guarantee zero left/right clipping.
-      const xPct = 10 + t * 80;
-      const svgX = xPct * 10; // out of 1000
-      const isOwn = isOwnList[idx]!;
+    let svgHeight = 240;
+    let itemsPerRow = 4;
+    let numRows = 1;
+    let points: PositionedPoint[];
 
-      let svgY: number;
-      if (hasDualLane) {
-        svgY = isOwn
-          ? 162 + Math.sin(t * Math.PI * 1.4) * 10
-          : 64 + Math.cos(t * Math.PI * 1.4) * 8;
-      } else {
-        svgY = 120 + Math.sin(t * Math.PI * 1.6 - 0.5) * 20;
-      }
-      const yPct = (svgY / 240) * 100;
+    if (streamStyle === "winding") {
+      itemsPerRow = n > 14 ? 5 : n <= 4 ? Math.max(1, n) : 4;
+      numRows = Math.ceil(n / itemsPerRow);
+      const rowHeight = 160;
+      svgHeight = Math.max(260, 60 + numRows * rowHeight);
 
-      const threadLabel =
-        w.thread ??
-        (isOwn ? activeThread.id : activeThread.branches_from?.thread ?? "ancestor");
+      points = waypoints.map((w, idx) => {
+        const row = Math.floor(idx / itemsPerRow);
+        const col = idx % itemsPerRow;
+        const isRowEven = row % 2 === 0;
+        const countInRow = Math.min(itemsPerRow, n - row * itemsPerRow);
+        const colFrac = countInRow > 1 ? col / (countInRow - 1) : 0.5;
 
-      return {
-        waypoint: w,
-        index: idx,
-        isOwn,
-        threadLabel,
-        xPct,
-        yPct,
-        svgX,
-        svgY,
-      };
-    });
+        // X coordinate (spans 140 to 860)
+        const svgX = isRowEven
+          ? 140 + colFrac * 720
+          : 860 - colFrac * 720;
+
+        // Y coordinate with slight wave
+        const baseY = 80 + row * rowHeight;
+        const wave = Math.sin(colFrac * Math.PI) * 10;
+        const svgY = baseY + wave;
+
+        const xPct = (svgX / 1000) * 100;
+        const yPct = (svgY / svgHeight) * 100;
+        const isOwn = isOwnList[idx]!;
+        const threadLabel =
+          w.thread ??
+          (isOwn ? activeThread.id : activeThread.branches_from?.thread ?? "ancestor");
+
+        return {
+          waypoint: w,
+          index: idx,
+          isOwn,
+          threadLabel,
+          xPct,
+          yPct,
+          svgX,
+          svgY,
+          row,
+          col,
+          isRowEven,
+        };
+      });
+    } else {
+      // Linear single-ribbon stream
+      const relaxed = relaxNormalizedPositions(rawNormalized);
+      points = waypoints.map((w, idx) => {
+        const t = relaxed[idx]!;
+        const xPct = 10 + t * 80;
+        const svgX = xPct * 10;
+        const isOwn = isOwnList[idx]!;
+
+        let svgY: number;
+        if (hasDualLane) {
+          svgY = isOwn
+            ? 162 + Math.sin(t * Math.PI * 1.4) * 10
+            : 64 + Math.cos(t * Math.PI * 1.4) * 8;
+        } else {
+          svgY = 120 + Math.sin(t * Math.PI * 1.6 - 0.5) * 20;
+        }
+        const yPct = (svgY / 240) * 100;
+
+        const threadLabel =
+          w.thread ??
+          (isOwn ? activeThread.id : activeThread.branches_from?.thread ?? "ancestor");
+
+        return {
+          waypoint: w,
+          index: idx,
+          isOwn,
+          threadLabel,
+          xPct,
+          yPct,
+          svgX,
+          svgY,
+          row: 0,
+          col: idx,
+          isRowEven: true,
+        };
+      });
+    }
 
     const datedPoints = waypoints.filter((w) => Boolean(w.at));
     const minLabel = datedPoints[0]?.at ?? `#1`;
     const maxLabel = datedPoints[datedPoints.length - 1]?.at ?? `#${n}`;
 
-    return { points, isDated, hasDualLane, minLabel, maxLabel };
-  }, [waypoints, activeThread, ownIds, withBranches]);
+    return {
+      points,
+      isDated,
+      hasDualLane,
+      minLabel,
+      maxLabel,
+      svgHeight,
+      itemsPerRow,
+      numRows,
+    };
+  }, [waypoints, activeThread, ownIds, withBranches, streamStyle]);
 
   const activePoint =
     layout.points.find((p) => p.waypoint.id === focusedId) ??
@@ -535,8 +631,31 @@ function EtherealChronologyStream({
     for (let i = 1; i < pts.length; i++) {
       const prev = pts[i - 1]!;
       const curr = pts[i]!;
-      const midX = ((prev.svgX + curr.svgX) / 2).toFixed(1);
-      d += ` C ${midX} ${prev.svgY.toFixed(1)}, ${midX} ${curr.svgY.toFixed(1)}, ${curr.svgX.toFixed(1)} ${curr.svgY.toFixed(1)}`;
+
+      if (
+        streamStyle === "winding" &&
+        prev.row !== undefined &&
+        curr.row !== undefined &&
+        prev.row !== curr.row
+      ) {
+        // Curve downwards and wrap to the next row (serpentine U-turn)
+        if (prev.isRowEven) {
+          // Turning on the RIGHT side
+          const loopX = Math.min(965, Math.max(prev.svgX, curr.svgX) + 85);
+          d += ` C ${loopX.toFixed(1)} ${(prev.svgY + 22).toFixed(1)}, ${loopX.toFixed(1)} ${(curr.svgY - 22).toFixed(1)}, ${curr.svgX.toFixed(1)} ${curr.svgY.toFixed(1)}`;
+        } else {
+          // Turning on the LEFT side
+          const loopX = Math.max(35, Math.min(prev.svgX, curr.svgX) - 85);
+          d += ` C ${loopX.toFixed(1)} ${(prev.svgY + 22).toFixed(1)}, ${loopX.toFixed(1)} ${(curr.svgY - 22).toFixed(1)}, ${curr.svgX.toFixed(1)} ${curr.svgY.toFixed(1)}`;
+        }
+      } else {
+        // Regular in-row curve
+        const midX = ((prev.svgX + curr.svgX) / 2).toFixed(1);
+        const waveOffset =
+          streamStyle === "winding" ? (prev.isRowEven ? 6 : -6) : 0;
+        const midY = ((prev.svgY + curr.svgY) / 2 + waveOffset).toFixed(1);
+        d += ` C ${midX} ${prev.svgY.toFixed(1)}, ${midX} ${midY}, ${curr.svgX.toFixed(1)} ${curr.svgY.toFixed(1)}`;
+      }
     }
     return d;
   };
@@ -586,8 +705,8 @@ function EtherealChronologyStream({
           }}
         />
 
-        {/* Stream Header Metadata */}
-        <div className="relative z-10 flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-border/40">
+        {/* Stream Header Metadata & Exploration Toolbar */}
+        <div className="relative z-10 flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-border/40">
           <div className="flex flex-wrap items-center gap-2 text-xs">
             <span className="inline-flex items-center gap-1.5 font-semibold text-foreground">
               <Layers className="h-3.5 w-3.5 text-primary" />
@@ -608,238 +727,382 @@ function EtherealChronologyStream({
                 </span>
               </span>
             )}
+            <div className="text-[11px] font-mono text-muted-foreground pl-1">
+              {layout.isDated
+                ? `${layout.minLabel} → ${layout.maxLabel}`
+                : `Sequence · 1 → ${layout.points.length}`}
+            </div>
           </div>
-          <div className="text-[11px] font-mono text-muted-foreground">
-            {layout.isDated
-              ? `${layout.minLabel} → ${layout.maxLabel}`
-              : `Relative Sequence · 1 → ${layout.points.length}`}
+
+          {/* Interactive Flow Style & Zoom Controls */}
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Winding S-Curve vs Linear Ribbon Mode Toggle */}
+            <div className="inline-flex items-center rounded-lg border border-border/70 bg-card/50 p-0.5">
+              <button
+                type="button"
+                onClick={() => setStreamStyle("winding")}
+                className={cn(
+                  "inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md transition-all",
+                  streamStyle === "winding"
+                    ? "active-theme-pill font-semibold shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+                title="Winding Serpentine River (S-curves across multiple rows for scalable clarity)"
+              >
+                <Route className="h-3.5 w-3.5" />
+                <span>Winding River</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setStreamStyle("linear")}
+                className={cn(
+                  "inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md transition-all",
+                  streamStyle === "linear"
+                    ? "active-theme-pill font-semibold shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+                title="Single Linear Ribbon (Left to Right stream)"
+              >
+                <ArrowRight className="h-3.5 w-3.5" />
+                <span>Linear</span>
+              </button>
+            </div>
+
+            {/* Zoom Controls */}
+            <div className="inline-flex items-center rounded-lg border border-border/70 bg-card/50 p-0.5">
+              <button
+                type="button"
+                onClick={() => adjustZoom(-0.15)}
+                className="p-1 text-muted-foreground hover:text-foreground rounded"
+                aria-label="Zoom out"
+                title="Zoom out"
+              >
+                <Minus className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={resetZoomAndPan}
+                className="px-1.5 text-[10px] font-mono text-muted-foreground hover:text-foreground min-w-[36px] text-center"
+                title="Click to reset zoom and pan"
+              >
+                {Math.round(zoom * 100)}%
+              </button>
+              <button
+                type="button"
+                onClick={() => adjustZoom(0.15)}
+                className="p-1 text-muted-foreground hover:text-foreground rounded"
+                aria-label="Zoom in"
+                title="Zoom in"
+              >
+                <Plus className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={resetZoomAndPan}
+                className="p-1 text-muted-foreground hover:text-foreground rounded border-l border-border/50 ml-0.5"
+                aria-label="Reset stream view"
+                title="Reset zoom and position"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* Non-Clipping Centered Interactive Stage */}
-        <div className="relative z-10 mt-2.5 h-56 sm:h-60 w-full select-none">
-          {/* SVG Ethereal River & Bifurcation Curves */}
-          <svg
-            viewBox="0 0 1000 240"
-            preserveAspectRatio="none"
-            className="absolute inset-0 h-full w-full pointer-events-none"
-            aria-hidden="true"
+        {/* Scalable Interactive Stage with Zoom & Pan */}
+        <div
+          ref={containerRef}
+          className={cn(
+            "relative z-10 mt-3 w-full select-none rounded-xl border border-border/40 bg-background/25 overflow-hidden transition-all",
+            streamStyle === "winding"
+              ? layout.numRows > 2
+                ? "h-[540px] sm:h-[620px]"
+                : "h-[360px] sm:h-[420px]"
+              : "h-56 sm:h-64",
+            isDragging ? "cursor-grabbing" : "cursor-grab",
+          )}
+          onWheel={(e) => {
+            e.preventDefault();
+            adjustZoom(e.deltaY < 0 ? 0.12 : -0.12);
+          }}
+          onMouseDown={(e) => {
+            if (e.button !== 0) return;
+            dragRef.current = {
+              startX: e.clientX,
+              startY: e.clientY,
+              origX: pan.x,
+              origY: pan.y,
+              moved: false,
+            };
+            setIsDragging(true);
+          }}
+          onMouseMove={(e) => {
+            const drag = dragRef.current;
+            if (!drag) return;
+            const dx = e.clientX - drag.startX;
+            const dy = e.clientY - drag.startY;
+            if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+              drag.moved = true;
+              setPan({ x: drag.origX + dx, y: drag.origY + dy });
+            }
+          }}
+          onMouseUp={() => {
+            dragRef.current = null;
+            setIsDragging(false);
+          }}
+          onMouseLeave={() => {
+            dragRef.current = null;
+            setIsDragging(false);
+          }}
+        >
+          {/* Zoomable & Pannable Canvas Wrapper */}
+          <div
+            style={{
+              transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+              transformOrigin: "center center",
+              transition: isDragging ? "none" : "transform 140ms ease-out",
+              width: "100%",
+              height: "100%",
+            }}
+            className="relative w-full h-full"
           >
-            <defs>
-              <linearGradient id="lw-thread-stream" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" stopColor="hsl(var(--ring))" stopOpacity="0.45" />
-                <stop offset="50%" stopColor="hsl(var(--primary))" stopOpacity="0.95" />
-                <stop offset="100%" stopColor="hsl(var(--ring))" stopOpacity="0.65" />
-              </linearGradient>
-              <linearGradient id="lw-branch-stream" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" stopColor="hsl(var(--muted-foreground))" stopOpacity="0.4" />
-                <stop offset="100%" stopColor="hsl(var(--ring))" stopOpacity="0.85" />
-              </linearGradient>
-              <filter id="lw-stream-bloom" x="-20%" y="-40%" width="140%" height="180%">
-                <feGaussianBlur stdDeviation="4" result="blur" />
-                <feMerge>
-                  <feMergeNode in="blur" />
-                  <feMergeNode in="SourceGraphic" />
-                </feMerge>
-              </filter>
-            </defs>
+            {/* SVG Ethereal River & Bifurcation Curves */}
+            <svg
+              viewBox={`0 0 1000 ${layout.svgHeight}`}
+              preserveAspectRatio={streamStyle === "winding" ? "xMidYMid meet" : "none"}
+              className="absolute inset-0 h-full w-full pointer-events-none"
+              aria-hidden="true"
+            >
+              <defs>
+                <linearGradient id="lw-thread-stream" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="hsl(var(--ring))" stopOpacity="0.45" />
+                  <stop offset="50%" stopColor="hsl(var(--primary))" stopOpacity="0.95" />
+                  <stop offset="100%" stopColor="hsl(var(--ring))" stopOpacity="0.65" />
+                </linearGradient>
+                <linearGradient id="lw-branch-stream" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="hsl(var(--muted-foreground))" stopOpacity="0.4" />
+                  <stop offset="100%" stopColor="hsl(var(--ring))" stopOpacity="0.85" />
+                </linearGradient>
+                <filter id="lw-stream-bloom" x="-20%" y="-40%" width="140%" height="180%">
+                  <feGaussianBlur stdDeviation="4" result="blur" />
+                  <feMerge>
+                    <feMergeNode in="blur" />
+                    <feMergeNode in="SourceGraphic" />
+                  </feMerge>
+                </filter>
+              </defs>
 
-            {/* Subtle Safe Horizon Guide Lines inside [10%, 90%] */}
-            <line
-              x1="100"
-              y1="20"
-              x2="100"
-              y2="220"
-              stroke="hsl(var(--border))"
-              strokeOpacity="0.25"
-              strokeDasharray="3 5"
-            />
-            <line
-              x1="900"
-              y1="20"
-              x2="900"
-              y2="220"
-              stroke="hsl(var(--border))"
-              strokeOpacity="0.25"
-              strokeDasharray="3 5"
-            />
+              {streamStyle === "linear" && (
+                <>
+                  <line
+                    x1="100"
+                    y1="20"
+                    x2="100"
+                    y2="220"
+                    stroke="hsl(var(--border))"
+                    strokeOpacity="0.25"
+                    strokeDasharray="3 5"
+                  />
+                  <line
+                    x1="900"
+                    y1="20"
+                    x2="900"
+                    y2="220"
+                    stroke="hsl(var(--border))"
+                    strokeOpacity="0.25"
+                    strokeDasharray="3 5"
+                  />
+                </>
+              )}
 
-            {ancestorStreamPath && (
-              <>
+              {ancestorStreamPath && (
+                <>
+                  <path
+                    d={ancestorStreamPath}
+                    fill="none"
+                    stroke="hsl(var(--ring))"
+                    strokeOpacity="0.2"
+                    strokeWidth="6"
+                  />
+                  <path
+                    d={ancestorStreamPath}
+                    fill="none"
+                    stroke="url(#lw-branch-stream)"
+                    strokeWidth="2.2"
+                    strokeDasharray="6 6"
+                    className="animate-stream-flow"
+                  />
+                </>
+              )}
+
+              {branchBridgePath && (
                 <path
-                  d={ancestorStreamPath}
+                  d={branchBridgePath}
                   fill="none"
                   stroke="hsl(var(--ring))"
-                  strokeOpacity="0.2"
-                  strokeWidth="6"
-                />
-                <path
-                  d={ancestorStreamPath}
-                  fill="none"
-                  stroke="url(#lw-branch-stream)"
-                  strokeWidth="2.2"
-                  strokeDasharray="6 6"
-                  className="animate-stream-flow"
-                />
-              </>
-            )}
-
-            {branchBridgePath && (
-              <path
-                d={branchBridgePath}
-                fill="none"
-                stroke="hsl(var(--ring))"
-                strokeOpacity="0.65"
-                strokeWidth="2"
-                strokeDasharray="5 5"
-                className="animate-stream-flow"
-                filter="url(#lw-stream-bloom)"
-              />
-            )}
-
-            {primaryStreamPath && (
-              <>
-                <path
-                  d={primaryStreamPath}
-                  fill="none"
-                  stroke="hsl(var(--primary))"
-                  strokeOpacity="0.18"
-                  strokeWidth="9"
-                  strokeLinecap="round"
-                />
-                <path
-                  d={primaryStreamPath}
-                  fill="none"
-                  stroke="hsl(var(--border))"
-                  strokeOpacity="0.45"
+                  strokeOpacity="0.65"
                   strokeWidth="2"
-                  strokeLinecap="round"
-                />
-                <path
-                  d={primaryStreamPath}
-                  fill="none"
-                  stroke="url(#lw-thread-stream)"
-                  strokeWidth="2.75"
-                  strokeLinecap="round"
-                  strokeDasharray="12 8"
+                  strokeDasharray="5 5"
                   className="animate-stream-flow"
                   filter="url(#lw-stream-bloom)"
                 />
-              </>
-            )}
-          </svg>
+              )}
 
-          {/* Interactive Waypoint Orbs (bounded inside 10%-90% safe corridor) */}
-          {layout.points.map((pt) => {
-            const { waypoint: w, index, isOwn, xPct, yPct } = pt;
-            const entry = resolveWaypointEntry(w, entriesByKey);
-            const title = entry?.name || w.label || w.id;
-            const isSelected = activePoint?.waypoint.id === w.id;
-            const isHovered = hoveredId === w.id;
-            const labelAbove = layout.hasDualLane ? !isOwn : index % 2 === 0;
-            // Smart edge-aware label alignment so outermost nodes tuck cleanly inward.
-            const labelAlign =
-              xPct < 22
-                ? "-translate-x-1/4"
-                : xPct > 78
-                  ? "-translate-x-3/4"
-                  : "-translate-x-1/2";
+              {primaryStreamPath && (
+                <>
+                  <path
+                    d={primaryStreamPath}
+                    fill="none"
+                    stroke="hsl(var(--primary))"
+                    strokeOpacity="0.18"
+                    strokeWidth="9"
+                    strokeLinecap="round"
+                  />
+                  <path
+                    d={primaryStreamPath}
+                    fill="none"
+                    stroke="hsl(var(--border))"
+                    strokeOpacity="0.45"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                  />
+                  <path
+                    d={primaryStreamPath}
+                    fill="none"
+                    stroke="url(#lw-thread-stream)"
+                    strokeWidth="2.75"
+                    strokeLinecap="round"
+                    strokeDasharray="12 8"
+                    className="animate-stream-flow"
+                    filter="url(#lw-stream-bloom)"
+                  />
+                </>
+              )}
+            </svg>
 
-            return (
-              <div
-                key={`${pt.threadLabel}:${w.id}`}
-                style={{ left: `${xPct}%`, top: `${yPct}%` }}
-                className={cn(
-                  "absolute -translate-x-1/2 -translate-y-1/2",
-                  isHovered ? "z-40" : isSelected ? "z-30" : "z-20",
-                )}
-              >
-                <button
-                  type="button"
-                  data-sound="hover"
-                  onClick={() => onSelect(w.id)}
-                  onDoubleClick={() => {
-                    if (onJump && entry) {
-                      onJump({ kind: "entry", key: `${entry.type}/${entry.id}` });
-                    }
-                  }}
-                  onMouseEnter={() => onHover(w.id)}
-                  onMouseLeave={() => onHover(null)}
+            {/* Interactive Waypoint Orbs */}
+            {layout.points.map((pt) => {
+              const { waypoint: w, index, isOwn, xPct, yPct } = pt;
+              const entry = resolveWaypointEntry(w, entriesByKey);
+              const title = entry?.name || w.label || w.id;
+              const isSelected = activePoint?.waypoint.id === w.id;
+              const isHovered = hoveredId === w.id;
+
+              const labelAbove =
+                streamStyle === "winding"
+                  ? (pt.isRowEven ? (pt.col ?? index) % 2 === 1 : (pt.col ?? index) % 2 === 0)
+                  : (layout.hasDualLane ? !isOwn : index % 2 === 0);
+
+              // Smart edge-aware label alignment so outermost nodes tuck cleanly inward.
+              const labelAlign =
+                xPct < 22
+                  ? "-translate-x-1/4"
+                  : xPct > 78
+                    ? "-translate-x-3/4"
+                    : "-translate-x-1/2";
+
+              return (
+                <div
+                  key={`${pt.threadLabel}:${w.id}`}
+                  style={{ left: `${xPct}%`, top: `${yPct}%` }}
                   className={cn(
-                    "group relative flex items-center justify-center rounded-full transition-transform duration-300 focus:outline-none",
-                    isSelected
-                      ? "h-6 w-6 scale-115"
-                      : isHovered
-                        ? "h-5 w-5 scale-125"
-                        : "h-4 w-4 hover:scale-125",
+                    "absolute -translate-x-1/2 -translate-y-1/2",
+                    isHovered ? "z-40" : isSelected ? "z-30" : "z-20",
                   )}
-                  aria-label={`Select waypoint ${title}`}
                 >
-                  {/* Animated Outer Orbital Halo */}
-                  {isSelected && (
+                  <button
+                    type="button"
+                    data-sound="hover"
+                    onClick={() => onSelect(w.id)}
+                    onDoubleClick={() => {
+                      if (onJump && entry) {
+                        onJump({ kind: "entry", key: `${entry.type}/${entry.id}` });
+                      }
+                    }}
+                    onMouseEnter={() => onHover(w.id)}
+                    onMouseLeave={() => onHover(null)}
+                    className={cn(
+                      "group relative flex items-center justify-center rounded-full transition-transform duration-300 focus:outline-none",
+                      isSelected
+                        ? "h-6 w-6 scale-115"
+                        : isHovered
+                          ? "h-5 w-5 scale-125"
+                          : "h-4 w-4 hover:scale-125",
+                    )}
+                    aria-label={`Select waypoint ${title}`}
+                  >
+                    {/* Animated Outer Orbital Halo */}
+                    {isSelected && (
+                      <span
+                        aria-hidden="true"
+                        className="absolute -inset-2.5 rounded-full animate-ping opacity-30 bg-primary"
+                      />
+                    )}
                     <span
                       aria-hidden="true"
-                      className="absolute -inset-2.5 rounded-full animate-ping opacity-30 bg-primary"
+                      className={cn(
+                        "absolute -inset-1.5 rounded-full border transition-all duration-300",
+                        isSelected
+                          ? "border-primary/80 scale-100 opacity-100"
+                          : "border-primary/40 scale-75 opacity-0 group-hover:scale-100 group-hover:opacity-100",
+                      )}
                     />
-                  )}
-                  <span
-                    aria-hidden="true"
-                    className={cn(
-                      "absolute -inset-1.5 rounded-full border transition-all duration-300",
-                      isSelected
-                        ? "border-primary/80 scale-100 opacity-100"
-                        : "border-primary/40 scale-75 opacity-0 group-hover:scale-100 group-hover:opacity-100",
-                    )}
-                  />
-                  {/* Luminous Core */}
-                  <span
-                    className={cn(
-                      "relative block rounded-full transition-all duration-300 shadow-lg",
-                      isSelected ? "h-3.5 w-3.5" : "h-2.5 w-2.5",
-                      isOwn ? "bg-primary" : "bg-ring",
-                    )}
-                    style={{
-                      boxShadow: isSelected || isHovered
-                        ? "0 0 18px hsl(var(--primary) / 0.85)"
-                        : "0 0 10px hsl(var(--primary) / 0.45)",
-                    }}
-                  />
-                </button>
+                    {/* Luminous Core */}
+                    <span
+                      className={cn(
+                        "relative block rounded-full transition-all duration-300 shadow-lg",
+                        isSelected ? "h-3.5 w-3.5" : "h-2.5 w-2.5",
+                        isOwn ? "bg-primary" : "bg-ring",
+                      )}
+                      style={{
+                        boxShadow: isSelected || isHovered
+                          ? "0 0 18px hsl(var(--primary) / 0.85)"
+                          : "0 0 10px hsl(var(--primary) / 0.45)",
+                      }}
+                    />
+                  </button>
 
-                {/* Staggered Floating Label Pill */}
-                <div
-                  className={cn(
-                    "pointer-events-none absolute left-1/2 w-max max-w-[136px] transition-all duration-200",
-                    labelAlign,
-                    labelAbove ? "bottom-full mb-3.5" : "top-full mt-3.5",
-                  )}
-                >
+                  {/* Staggered Floating Label Pill */}
                   <div
                     className={cn(
-                      "rounded-xl border px-2.5 py-1 text-center backdrop-blur-md transition-all",
-                      isSelected
-                        ? "border-primary/70 bg-card/90 shadow-lg shadow-primary/15"
-                        : isHovered
-                          ? "border-primary/45 bg-card/85 shadow-md"
-                          : "border-border/60 bg-card/65",
+                      "pointer-events-none absolute left-1/2 w-max max-w-[140px] transition-all duration-200",
+                      labelAlign,
+                      labelAbove ? "bottom-full mb-3.5" : "top-full mt-3.5",
                     )}
                   >
-                    <div className="text-[10px] font-mono text-primary/90 leading-tight truncate">
-                      {w.at ?? `#${index + 1}`}
-                    </div>
                     <div
                       className={cn(
-                        "text-[11px] font-medium leading-tight truncate",
-                        isSelected ? "text-foreground" : "text-foreground/85",
+                        "rounded-xl border px-2.5 py-1 text-center backdrop-blur-md transition-all shadow-sm",
+                        isSelected
+                          ? "border-primary/70 bg-card/95 shadow-lg shadow-primary/15"
+                          : isHovered
+                            ? "border-primary/45 bg-card/90 shadow-md"
+                            : "border-border/60 bg-card/75",
                       )}
                     >
-                      {title}
+                      <div className="text-[10px] font-mono text-primary/90 leading-tight truncate">
+                        {w.at ?? `#${index + 1}`}
+                      </div>
+                      <div
+                        className={cn(
+                          "text-[11px] font-medium leading-tight truncate",
+                          isSelected ? "text-foreground" : "text-foreground/85",
+                        )}
+                      >
+                        {title}
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
+
+          {/* Bottom-Left Stage Navigation Hint */}
+          <div className="pointer-events-none absolute bottom-2.5 left-3 hidden sm:flex items-center gap-1.5 rounded-full border border-border/40 bg-card/65 backdrop-blur-md px-2.5 py-1 text-[10px] text-muted-foreground">
+            <Compass className="h-3 w-3 text-primary/80" />
+            <span>Scroll to zoom ({Math.round(zoom * 100)}%) · Drag to explore stream · Click waypoint to spotlight</span>
+          </div>
         </div>
       </section>
 

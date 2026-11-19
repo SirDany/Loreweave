@@ -5,14 +5,12 @@ import { buildDigest, renderPhoneBook } from '../src/digest.js';
 import { loadSaga } from '../src/loader.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const EXAMPLE_SAGA = path.resolve(
-  __dirname,
-  '..',
-  '..',
-  '..',
-  'sagas',
-  'example-saga',
-);
+import { existsSync } from 'node:fs';
+
+const FIXTURE_SAGA = path.resolve(__dirname, '..', '..', '..', 'fixtures', 'example-saga');
+const EXAMPLE_SAGA = existsSync(FIXTURE_SAGA)
+  ? FIXTURE_SAGA
+  : path.resolve(__dirname, '..', '..', '..', 'sagas', 'example-saga');
 
 describe('canon digest', () => {
   it('builds a phone book covering every entry', async () => {

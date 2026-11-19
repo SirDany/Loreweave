@@ -5,14 +5,12 @@ import { loadSaga } from "../src/loader.js";
 import { hasErrors, validateSaga } from "../src/validator.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const EXAMPLE_SAGA = path.resolve(
-  __dirname,
-  "..",
-  "..",
-  "..",
-  "sagas",
-  "example-saga",
-);
+import { existsSync } from "node:fs";
+
+const FIXTURE_SAGA = path.resolve(__dirname, "..", "..", "..", "fixtures", "example-saga");
+const EXAMPLE_SAGA = existsSync(FIXTURE_SAGA)
+  ? FIXTURE_SAGA
+  : path.resolve(__dirname, "..", "..", "..", "sagas", "example-saga");
 
 describe("example saga", () => {
   it("loads and validates with zero errors", async () => {

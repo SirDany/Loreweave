@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Section, Selection } from '../state/types.js';
 import {
-  DEFAULT_SAGA,
   SAGA_PATH_STORAGE_KEY,
   loadSagaMemory,
 } from '../state/useSaga.js';
@@ -16,13 +15,15 @@ export interface NavLocation {
 function readStoredNavFallback(): NavLocation | null {
   try {
     const sagaPath =
-      window.localStorage.getItem(SAGA_PATH_STORAGE_KEY)?.trim() || DEFAULT_SAGA;
-    const mem = loadSagaMemory(sagaPath);
-    if (mem && (mem.section || mem.selection !== undefined)) {
-      return {
-        section: mem.section ?? 'codex',
-        selection: mem.selection ?? null,
-      };
+      window.localStorage.getItem(SAGA_PATH_STORAGE_KEY)?.trim() || '';
+    if (sagaPath) {
+      const mem = loadSagaMemory(sagaPath);
+      if (mem && (mem.section || mem.selection !== undefined)) {
+        return {
+          section: mem.section ?? 'codex',
+          selection: mem.selection ?? null,
+        };
+      }
     }
     const raw = window.localStorage.getItem(LAST_NAV_STORAGE_KEY);
     if (raw) {

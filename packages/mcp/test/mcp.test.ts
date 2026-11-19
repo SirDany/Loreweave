@@ -9,8 +9,13 @@ import {
   queryCanon,
 } from '../src/tools.js';
 
+import { existsSync } from 'node:fs';
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const EXAMPLE_SAGA = path.resolve(__dirname, '../../../sagas/example-saga');
+const FIXTURE_SAGA = path.resolve(__dirname, '../../../fixtures/example-saga');
+const EXAMPLE_SAGA = existsSync(FIXTURE_SAGA)
+  ? FIXTURE_SAGA
+  : path.resolve(__dirname, '../../../sagas/example-saga');
 
 describe('Loreweave MCP Tools', () => {
   it('loreweave_get_overview returns dense saga overview', async () => {

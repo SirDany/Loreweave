@@ -20,8 +20,13 @@ import {
   revisionFor,
 } from '../src/digest-cache.js';
 
+import { existsSync } from 'node:fs';
+
 const here = path.dirname(fileURLToPath(import.meta.url));
-const exampleSaga = path.resolve(here, '../../../sagas/example-saga');
+const fixtureSaga = path.resolve(here, '../../../fixtures/example-saga');
+const exampleSaga = existsSync(fixtureSaga)
+  ? fixtureSaga
+  : path.resolve(here, '../../../sagas/example-saga');
 
 describe('sidecar digest cache', () => {
   let dir: string;

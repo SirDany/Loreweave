@@ -34,9 +34,9 @@ jobs:
       - name: Bake demo saga snapshot
         run: |
           mkdir -p apps/web/public/demo
-          node packages/cli/dist/bin.js dump sagas/example-saga > apps/web/public/demo/dump.json
-          node packages/cli/dist/bin.js kinds sagas/example-saga --json > apps/web/public/demo/kinds.json
-          node packages/cli/dist/bin.js lenses sagas/example-saga --json > apps/web/public/demo/lenses.json
+          node packages/cli/dist/bin.js dump fixtures/example-saga > apps/web/public/demo/dump.json
+          node packages/cli/dist/bin.js kinds fixtures/example-saga --json > apps/web/public/demo/kinds.json
+          node packages/cli/dist/bin.js lenses fixtures/example-saga --json > apps/web/public/demo/lenses.json
       - name: Build web (demo mode)
         env:
           # Repo-scoped base path — GitHub Pages serves project sites at

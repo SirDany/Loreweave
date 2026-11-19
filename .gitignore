@@ -54,6 +54,7 @@ tmp/
 # --- Loreweave local state --------------------------------------------------
 # Ingest staging and other per-saga runtime scratch.
 sagas/**/.loreweave/
+fixtures/**/.loreweave/
 
 # --- Rust / Tauri ----------------------------------------------------------
 apps/desktop/src-tauri/target/
