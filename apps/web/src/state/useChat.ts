@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 export type ChatRole = 'user' | 'assistant' | 'system';
-export type ApprovalPolicy = 'auto-reads' | 'writes-approval' | 'approve-all';
+export type ApprovalPolicy = 'standard' | 'auto';
 
 export interface ChatMessage {
   id: string;
@@ -105,6 +105,8 @@ interface UseChatOptions {
    * No-ops silently if the Saga isn't in a git repo.
    */
   autoCommit?: boolean;
+  /** Fire after a pending action is applied so the app can refresh. */
+  onApplied?: () => void;
 }
 
 interface PersistedThread {
@@ -247,8 +249,12 @@ function buildCommitMessage(agentId: string, action: PendingAction): string {
  * to `localStorage` so switching agents preserves each personality's
  * context, and offers retry + handoff handling.
  */
-export function useChat({ sagaRoot, approvalPolicy: _policy = 'writes-approval', autoCommit = false }: UseChatOptions) {
-  void _policy;
+export function useChat({
+  sagaRoot,
+  approvalPolicy = 'standard',
+  autoCommit = false,
+  onApplied,
+}: UseChatOptions) {
   const [agents, setAgents] = useState<AgentMeta[]>([]);
   const [agentsError, setAgentsError] = useState<string | null>(null);
   const [agentId, setAgentIdState] = useState<string>('');
@@ -365,6 +371,90 @@ export function useChat({ sagaRoot, approvalPolicy: _policy = 'writes-approval',
     lastUserMessageRef.current = null;
   }, [agentId, cancel]);
 
+  const executeApply = useCallback(
+    async (action: PendingAction): Promise<void> => {
+      // Mark applying eagerly; revert on error.
+      updateThread((t) => ({
+        ...t,
+        pending: t.pending.map((p) =>
+          p.id === action.id ? { ...p, status: 'applied', error: undefined } : p,
+        ),
+      }));
+      try {
+        const commitMessage = autoCommit
+          ? buildCommitMessage(agentId, action)
+          : null;
+        const resp = await fetch('/lw/apply', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            sagaRoot: action.sagaRoot,
+            relPath: action.relPath,
+            content: action.next,
+            originalHash: action.originalHash,
+            ...(commitMessage ? { commit: { message: commitMessage } } : {}),
+          }),
+        });
+        if (resp.status === 409) {
+          updateThread((t) => ({
+            ...t,
+            pending: t.pending.map((p) =>
+              p.id === action.id
+                ? {
+                    ...p,
+                    status: 'stale',
+                    error:
+                      'File changed on disk since proposal. Ask the agent to re-propose.',
+                  }
+                : p,
+            ),
+          }));
+          return;
+        }
+        if (!resp.ok) {
+          throw new Error(`/lw/apply ${resp.status}`);
+        }
+        try {
+          const body = (await resp.json()) as {
+            newHash?: string;
+            commit?: { sha?: string; shortSha?: string; error?: string } | null;
+          };
+          if (body?.newHash || body?.commit) {
+            updateThread((t) => ({
+              ...t,
+              pending: t.pending.map((p) =>
+                p.id === action.id
+                  ? {
+                      ...p,
+                      appliedHash: body.newHash ?? p.appliedHash,
+                      commitShortSha: body.commit?.shortSha,
+                      commitError: body.commit?.error,
+                    }
+                  : p,
+              ),
+            }));
+          }
+        } catch {
+          /* ignore */
+        }
+        onApplied?.();
+      } catch (e) {
+        updateThread((t) => ({
+          ...t,
+          pending: t.pending.map((p) =>
+            p.id === action.id
+              ? { ...p, status: 'pending', error: (e as Error).message }
+              : p,
+          ),
+        }));
+      }
+    },
+    [agentId, autoCommit, onApplied, updateThread],
+  );
+
+  const executeApplyRef = useRef(executeApply);
+  executeApplyRef.current = executeApply;
+
   const sendInternal = useCallback(
     async (content: string, context?: ChatContextAttachment) => {
       if (!content.trim()) return;
@@ -414,6 +504,7 @@ export function useChat({ sagaRoot, approvalPolicy: _policy = 'writes-approval',
             sagaRoot,
             messages: history,
             context,
+            approvalPolicy,
           }),
           signal: ctrl.signal,
         });
@@ -484,6 +575,14 @@ export function useChat({ sagaRoot, approvalPolicy: _policy = 'writes-approval',
                 | (PendingAction & { relPath: string })
                 | undefined;
               if (d && (d.kind === 'edit' || d.kind === 'new')) {
+                const actionId = nextId();
+                const newAction: PendingAction = {
+                  ...d,
+                  id: actionId,
+                  messageId: assistantId,
+                  source: parsed.name,
+                  status: 'pending',
+                };
                 updateThread((t) => {
                   const filtered = t.pending.filter(
                     (p) =>
@@ -493,18 +592,12 @@ export function useChat({ sagaRoot, approvalPolicy: _policy = 'writes-approval',
                   );
                   return {
                     ...t,
-                    pending: [
-                      ...filtered,
-                      {
-                        ...d,
-                        id: nextId(),
-                        messageId: assistantId,
-                        source: parsed.name,
-                        status: 'pending',
-                      },
-                    ],
+                    pending: [...filtered, newAction],
                   };
                 });
+                if (approvalPolicy === 'auto') {
+                  void executeApplyRef.current?.(newAction);
+                }
               }
             }
             // Handoff recommendations go on the assistant message.
@@ -645,84 +738,9 @@ export function useChat({ sagaRoot, approvalPolicy: _policy = 'writes-approval',
         (p) => p.id === id,
       );
       if (!action) return;
-      // Mark applying eagerly; revert on error.
-      updateThread((t) => ({
-        ...t,
-        pending: t.pending.map((p) =>
-          p.id === id ? { ...p, status: 'applied', error: undefined } : p,
-        ),
-      }));
-      try {
-        const commitMessage = autoCommit
-          ? buildCommitMessage(agentId, action)
-          : null;
-        const resp = await fetch('/lw/apply', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({
-            sagaRoot: action.sagaRoot,
-            relPath: action.relPath,
-            content: action.next,
-            originalHash: action.originalHash,
-            ...(commitMessage ? { commit: { message: commitMessage } } : {}),
-          }),
-        });
-        if (resp.status === 409) {
-          updateThread((t) => ({
-            ...t,
-            pending: t.pending.map((p) =>
-              p.id === id
-                ? {
-                    ...p,
-                    status: 'stale',
-                    error:
-                      'File changed on disk since proposal. Ask the agent to re-propose.',
-                  }
-                : p,
-            ),
-          }));
-          return;
-        }
-        if (!resp.ok) {
-          throw new Error(`/lw/apply ${resp.status}`);
-        }
-        // Capture the new hash so Revert can validate it hasn't drifted, and
-        // the short commit SHA (if the sidecar auto-committed) for display.
-        try {
-          const body = (await resp.json()) as {
-            newHash?: string;
-            commit?: { sha?: string; shortSha?: string; error?: string } | null;
-          };
-          if (body?.newHash || body?.commit) {
-            updateThread((t) => ({
-              ...t,
-              pending: t.pending.map((p) =>
-                p.id === id
-                  ? {
-                      ...p,
-                      appliedHash: body.newHash ?? p.appliedHash,
-                      commitShortSha: body.commit?.shortSha,
-                      commitError: body.commit?.error,
-                    }
-                  : p,
-              ),
-            }));
-          }
-        } catch {
-          /* ignore */
-        }
-      } catch (e) {
-        updateThread((t) => ({
-          ...t,
-          pending: t.pending.map((p) =>
-            p.id === id
-              ? { ...p, status: 'pending', error: (e as Error).message }
-              : p,
-          ),
-        }));
-      }
+      await executeApply(action);
     },
-    [agentId, autoCommit, updateThread],
+    [agentId, executeApply],
   );
 
   const discardPending = useCallback(

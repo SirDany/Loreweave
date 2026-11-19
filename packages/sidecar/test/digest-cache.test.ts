@@ -90,8 +90,9 @@ describe('sidecar digest cache', () => {
     run(['init', '-q', '-b', 'main']);
     run(['config', 'user.name', 'Loreweave Test']);
     run(['config', 'user.email', 'test@loreweave.local']);
+    run(['config', 'commit.gpgsign', 'false']);
     run(['add', '.']);
-    run(['commit', '-q', '-m', 'seed']);
+    run(['commit', '-q', '--no-gpg-sign', '-m', 'seed']);
 
     const rev = await revisionFor(saga);
     const head = run(['rev-parse', 'HEAD']).trim();

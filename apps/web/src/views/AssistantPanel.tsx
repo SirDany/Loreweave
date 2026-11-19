@@ -61,15 +61,15 @@ const AUTOCOMMIT_KEY = (sagaRoot: string) => `lw.chat.autoCommit.${sagaRoot}`;
 function loadPolicy(sagaRoot: string): ApprovalPolicy {
   try {
     const v =
-      (localStorage.getItem(POLICY_KEY(sagaRoot)) as ApprovalPolicy | null) ??
-      (localStorage.getItem(LEGACY_POLICY_KEY) as ApprovalPolicy | null);
-    if (v === 'auto-reads' || v === 'writes-approval' || v === 'approve-all') {
-      return v;
+      (localStorage.getItem(POLICY_KEY(sagaRoot)) as string | null) ??
+      (localStorage.getItem(LEGACY_POLICY_KEY) as string | null);
+    if (v === 'auto') {
+      return 'auto';
     }
   } catch {
     /* ignore */
   }
-  return 'writes-approval';
+  return 'standard';
 }
 
 function loadAutoCommit(sagaRoot: string): boolean {
@@ -178,7 +178,12 @@ export function AssistantPanel({
     }
   }, [sagaRoot, autoCommit]);
 
-  const chat = useChat({ sagaRoot, approvalPolicy: policy, autoCommit });
+  const chat = useChat({
+    sagaRoot,
+    approvalPolicy: policy,
+    autoCommit,
+    onApplied,
+  });
   const [draft, setDraft] = useState(initialPrompt ?? '');
   const [attachment, setAttachment] = useState<ChatContextAttachment | undefined>(
     initialContext,
@@ -316,6 +321,33 @@ export function AssistantPanel({
         >
           <Gauge className="h-3 w-3" />
           <span>{formatTokens(tokenTotal)}</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setPolicy((p) => (p === 'auto' ? 'standard' : 'auto'))}
+          title={
+            policy === 'auto'
+              ? 'Auto Mode: File proposals are applied automatically to disk. Click to switch to Standard Mode.'
+              : 'Standard Mode: File proposals require your explicit approval. Click to switch to Auto Mode.'
+          }
+          className={cn(
+            'inline-flex items-center gap-1 rounded border px-2 py-0.5 text-[10px] font-medium mr-1 transition-colors',
+            policy === 'auto'
+              ? 'border-amber-500/50 bg-amber-500/15 text-amber-500 dark:text-amber-400 hover:bg-amber-500/25'
+              : 'border-border bg-muted/40 text-muted-foreground hover:border-primary/40 hover:text-foreground',
+          )}
+        >
+          {policy === 'auto' ? (
+            <>
+              <Sparkles className="h-3 w-3 text-amber-500 shrink-0" />
+              <span>Auto</span>
+            </>
+          ) : (
+            <>
+              <Check className="h-3 w-3 shrink-0" />
+              <span>Standard</span>
+            </>
+          )}
         </button>
         <Button
           variant="ghost"
@@ -634,26 +666,21 @@ function SettingsPanel({
           <X className="h-3.5 w-3.5" />
         </button>
       </div>
-      <div className="space-y-1 text-xs">
-        <div className="label-rune text-[10px] text-muted-foreground">Approval policy</div>
+      <div className="space-y-1.5 text-xs">
+        <div className="label-rune text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">
+          Execution &amp; Approval Mode
+        </div>
         <PolicyOption
-          id="auto-reads"
-          label="Auto-allow reads, approve writes"
-          hint="Default. Read tools run freely; propose_* always asks."
+          id="standard"
+          label="Standard (Review Edits)"
+          hint="Default. Read tools run freely. All edits and new entries produce review cards that require your approval before saving to disk."
           current={policy}
           onPick={onPolicyChange}
         />
         <PolicyOption
-          id="writes-approval"
-          label="Approve writes (stricter confirm)"
-          hint="Same as default today; kept for future per-tool confirmation."
-          current={policy}
-          onPick={onPolicyChange}
-        />
-        <PolicyOption
-          id="approve-all"
-          label="Approve every tool call"
-          hint="Future: prompt before running any tool. Not yet enforced."
+          id="auto"
+          label="Auto (Autonomous)"
+          hint="Full write rights. Edits and new entries are applied automatically to disk; narrative conflicts and questions are recorded as Traces."
           current={policy}
           onPick={onPolicyChange}
         />

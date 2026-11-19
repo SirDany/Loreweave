@@ -5,6 +5,16 @@ applyTo: "sagas/**/{codex,wiki,kinds}/**"
 # Codex rules
 
 - **Frontmatter is canonical.** Every entry needs `id`, `type`, `name`. `id` must be the filename stem. Never edit `id` without updating every Echo.
+- **Strict Frontmatter vs. Body Separation:**
+  - `properties: { ... }` is strictly for scalar metadata key-values (e.g. `source: ...`, `role: ...`, `archetype: ...`, short strings or numbers).
+  - **NEVER** dump paragraphs, narrative traits, bulleted summaries, or relationship descriptions into frontmatter `properties:`.
+  - **NEVER** duplicate markdown body content inside `properties:`.
+- **Mandatory Canonical Echoes in Markdown Body:**
+  - Lore, character traits, descriptions, and relationships MUST reside in the markdown body using rich prose and canonical `@type/id` Echoes (`@character/kell`, `@faction/the-collective`, `@location/the-facility`, `@waypoint/the-blackout`).
+  - **NEVER degrade references to plain text.**
+- **Freedom to Declare Future / Non-Existent References:**
+  - Agents **may freely use and declare references and sigils that do not exist yet on disk** (e.g. `inherits: [ai]`, `@character/kell`, `@location/facility`) when planning to create them during the session or in upcoming batches.
+  - Never downgrade references to plain text or panic-create 1-sentence placeholder stubs just because a file is not yet written.
 - **Categorization & Best-Match Hierarchy (Concept is Last Resort):**
   - `character` (`codex/characters/`): Beings, personas, autonomous AIs, persons.
   - `location` (`codex/locations/`): Physical locations, facilities, structures, stations, settlements.
@@ -16,9 +26,9 @@ applyTo: "sagas/**/{codex,wiki,kinds}/**"
 - **Dynamic Custom Kinds (`kinds/<id>.md`):**
   - When multiple entities share a domain that lacks a built-in kind (e.g., **factions / organizations**, **quests / missions**, **relics / artifacts**), create a Kind definition at `kinds/<id>.md` with `type: kind`, `storage: codex/<id>s`, `echoPrefix: <id>`, and `display: { icon: ..., color: ... }`.
   - Author the domain entries under `codex/<storage>/` with `type: <id>` and echo them as `@<id>/<slug>`.
-- **Quality Bar — No 1-Sentence Stubs:**
+- **Quality Bar — No 1-Sentence Stubs or Hollow Boilerplate:**
   - Every proposed entry must be substantial and informative (minimum 1–3 well-developed paragraphs covering overview, context, capabilities, and narrative significance).
-  - Never generate shallow placeholder one-liners simply to satisfy a missing reference.
+  - Never generate shallow placeholder one-liners or hollow entries with 'unknown' lines.
 - **Inheritance & overrides.**
   - `inherits: [<sigil-id>, ...]` — Sigil-level defaults merged BFS.
   - `overrides: { key: value, ... }` — **always** wins over inheritance.

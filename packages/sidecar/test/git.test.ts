@@ -19,10 +19,11 @@ describe('sidecar git helper', () => {
     // Local identity so commits work in CI regardless of global config.
     git(dir, ['config', 'user.name', 'Loreweave Test']);
     git(dir, ['config', 'user.email', 'test@loreweave.local']);
+    git(dir, ['config', 'commit.gpgsign', 'false']);
     // Seed an empty root commit so HEAD exists for the author tests.
     await fs.writeFile(path.join(dir, '.gitkeep'), '');
     git(dir, ['add', '.gitkeep']);
-    git(dir, ['commit', '-q', '-m', 'root']);
+    git(dir, ['commit', '-q', '--no-gpg-sign', '-m', 'root']);
   });
 
   afterEach(async () => {
