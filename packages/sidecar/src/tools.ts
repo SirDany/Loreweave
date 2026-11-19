@@ -110,14 +110,23 @@ export const toolSchemas = {
       .int()
       .min(1)
       .optional()
-      .describe('1-based line number to start reading from.'),
+      .describe('1-based line number to start reading from (defaults to 1).'),
     maxLines: z
       .number()
       .int()
       .min(1)
-      .max(1000)
+      .max(500)
       .optional()
-      .describe('Maximum number of lines to read (defaults to 400).'),
+      .describe('Maximum number of lines to read (defaults to 100, max 300).'),
+    maxChars: z
+      .number()
+      .int()
+      .min(500)
+      .max(50000)
+      .optional()
+      .describe(
+        'Maximum characters to return (defaults to 8000). Always read large files in sequential sections using startLine to stay within model context limits.',
+      ),
   }),
   semantic_search: z.object({
     sagaRoot: sagaRootSchema,
@@ -617,32 +626,59 @@ export async function runTool(
         const content = await readSagaFile(ctx, sagaRootRel, sagaRoot, rel);
         const lines = content.split('\n');
         const startLine = Math.max(1, (args.startLine as number | undefined) ?? 1);
-        const maxLines = (args.maxLines as number | undefined) ?? 400;
+        const requestedMaxLines = (args.maxLines as number | undefined) ?? 100;
+        const maxLines = Math.min(300, Math.max(1, requestedMaxLines));
+        const maxChars = Math.min(
+          25000,
+          Math.max(500, (args.maxChars as number | undefined) ?? 8000),
+        );
 
-        let slicedContent = content;
-        let isTruncated = false;
-        if (lines.length > maxLines || startLine > 1) {
-          const slice = lines.slice(startLine - 1, startLine - 1 + maxLines);
-          slicedContent = slice.join('\n');
-          isTruncated = true;
+        const collected: string[] = [];
+        let accumulatedChars = 0;
+        let lineIdx = startLine - 1;
+
+        while (lineIdx < lines.length && collected.length < maxLines) {
+          const line = lines[lineIdx]!;
+          const lineLen = line.length + (collected.length > 0 ? 1 : 0);
+          if (collected.length > 0 && accumulatedChars + lineLen > maxChars) {
+            break;
+          }
+          if (line.length > maxChars) {
+            collected.push(line.slice(0, maxChars));
+            accumulatedChars += maxChars;
+            lineIdx++;
+            break;
+          }
+          collected.push(line);
+          accumulatedChars += lineLen;
+          lineIdx++;
         }
 
-        const sliceEnd = Math.min(
-          lines.length,
-          startLine + (slicedContent ? slicedContent.split('\n').length : 0) - 1,
-        );
+        const endLine = Math.max(startLine, lineIdx);
+        const hasMore = endLine < lines.length;
+        const isTruncated = hasMore || startLine > 1;
+
+        let slicedContent = collected.join('\n');
+        if (hasMore) {
+          slicedContent += `\n\n[Loreweave: Content truncated at line ${endLine} of ${lines.length} (${slicedContent.length}/${content.length} characters) to fit model context budget. Call \`read_file\` with startLine: ${endLine + 1} to read the next section.]`;
+        }
+
         return {
           ok: true,
           data: {
             relPath: rel,
             totalLines: lines.length,
+            totalChars: content.length,
+            returnedChars: slicedContent.length,
             startLine,
-            endLine: sliceEnd,
+            endLine,
+            hasMore,
+            nextStartLine: hasMore ? endLine + 1 : undefined,
             isTruncated,
             content: sanitizeForModel(
               slicedContent,
               isTruncated
-                ? `${rel} (lines ${startLine}-${sliceEnd} of ${lines.length})`
+                ? `${rel} (lines ${startLine}-${endLine} of ${lines.length})`
                 : rel,
             ),
             rawHash: hashContent(content),

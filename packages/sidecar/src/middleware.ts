@@ -174,7 +174,7 @@ export function compactChatHistory(
   messages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>,
   profile: ModelCapabilityProfile,
 ): Array<{ role: 'user' | 'assistant' | 'system'; content: string }> {
-  if (messages.length <= 2) return messages;
+  if (messages.length === 0) return messages;
 
   const maxHistoryChars =
     profile.tier === 'local-compact'
@@ -186,14 +186,25 @@ export function compactChatHistory(
   const lastIndex = messages.length - 1;
   const lastMsg = messages[lastIndex]!;
 
-  let usedChars = lastMsg.content.length;
-  const result: Array<{ role: 'user' | 'assistant' | 'system'; content: string }> = [lastMsg];
+  // Protect model context even if the single user message is enormous
+  let trimmedLastContent = lastMsg.content;
+  if (trimmedLastContent.length > maxHistoryChars) {
+    const head = Math.floor(maxHistoryChars * 0.7);
+    const tail = Math.floor(maxHistoryChars * 0.2);
+    trimmedLastContent = `${lastMsg.content.slice(0, head)}\n\n[... ${lastMsg.content.length - head - tail} characters truncated to fit context budget ...]\n\n${lastMsg.content.slice(lastMsg.content.length - tail)}`;
+  }
+  const safeLastMsg = { ...lastMsg, content: trimmedLastContent };
+
+  if (messages.length === 1) return [safeLastMsg];
+
+  let usedChars = safeLastMsg.content.length;
+  const result: Array<{ role: 'user' | 'assistant' | 'system'; content: string }> = [safeLastMsg];
 
   for (let i = lastIndex - 1; i >= 0; i--) {
     const msg = messages[i]!;
     const remaining = maxHistoryChars - usedChars;
 
-    if (remaining <= 0) {
+    if (remaining <= 500) {
       if (i === 0 && result.length > 1) {
         result.unshift({
           role: 'system',
@@ -213,6 +224,47 @@ export function compactChatHistory(
       result.unshift(msg);
       usedChars += msg.content.length;
     }
+  }
+
+  return result;
+}
+
+/**
+ * Condense tool results fed back to the model during multi-step execution.
+ * While the full diff/content is streamed to the UI via SSE for the writer,
+ * the model itself only needs an acknowledgment to prevent prompt explosion.
+ */
+export function compactToolResultForModel(
+  name: string,
+  result: { ok: boolean; data?: unknown; error?: string },
+): unknown {
+  if (!result.ok || !result.data || typeof result.data !== 'object') {
+    return result;
+  }
+  const d = result.data as Record<string, unknown>;
+
+  if (name === 'propose_new_entry') {
+    return {
+      ok: true,
+      data: {
+        kind: 'new',
+        relPath: d.relPath,
+        action: 'proposal_created',
+        message: `Proposal for new entry "${d.relPath}" created successfully. It has been queued as a pending action for the writer (or auto-applied in Auto mode). You may continue referencing it or proceed with next items.`,
+      },
+    };
+  }
+
+  if (name === 'propose_edit' || name === 'propose_patch') {
+    return {
+      ok: true,
+      data: {
+        kind: 'edit',
+        relPath: d.relPath,
+        action: 'proposal_created',
+        message: `Proposal for edit to "${d.relPath}" created successfully. It has been queued as a pending action for the writer.`,
+      },
+    };
   }
 
   return result;
@@ -1396,7 +1448,7 @@ export function registerSidecar(
               ok: result.ok,
               error: result.error?.slice(0, 400),
             });
-            return result;
+            return compactToolResultForModel(name, result);
           },
         } as never);
       }

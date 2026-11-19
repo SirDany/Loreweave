@@ -7,6 +7,7 @@
  *      (managed from the web UI's Settings dialog; applied to
  *      `process.env` at sidecar startup and on save by `applyConfigToEnv()`).
  */
+import { Agent as UndiciAgent } from 'undici';
 import type { ChatProvider } from './config.js';
 
 export interface ModelDescriptor {
@@ -63,6 +64,13 @@ export interface ModelCapabilityProfile {
 const DISCOVERY_TIMEOUT_MS = 6000;
 const OLLAMA_TIMEOUT_MS = 900_000; // 15 minutes to prevent Headers Timeout Error on slow local inference
 
+// Shared agent with generous header and body timeouts to avoid premature Node/undici timeouts
+const resilientDispatcher = new UndiciAgent({
+  headersTimeout: OLLAMA_TIMEOUT_MS,
+  bodyTimeout: OLLAMA_TIMEOUT_MS,
+  keepAliveTimeout: 60_000,
+});
+
 export function createResilientFetch(timeoutMs = OLLAMA_TIMEOUT_MS): typeof fetch {
   return (async (
     input: Parameters<typeof fetch>[0],
@@ -82,11 +90,15 @@ export function createResilientFetch(timeoutMs = OLLAMA_TIMEOUT_MS): typeof fetc
       );
     }
     try {
-      return await fetch(input, {
+      const fetchOpts: RequestInit & { dispatcher?: unknown } = {
         ...init,
         signal: controller.signal,
         keepalive: true,
-      });
+      };
+      if (!fetchOpts.dispatcher) {
+        fetchOpts.dispatcher = resilientDispatcher as never;
+      }
+      return await fetch(input, fetchOpts);
     } finally {
       clearTimeout(timeout);
     }

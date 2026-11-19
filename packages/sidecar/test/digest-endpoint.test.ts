@@ -4,7 +4,7 @@ import { createServer, type Server } from 'node:http';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { registerSidecar, type MiddlewareHost } from '../src/middleware.js';
+import { registerSidecar, compactToolResultForModel, type MiddlewareHost } from '../src/middleware.js';
 import { runTool } from '../src/tools.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -293,5 +293,109 @@ describe('sidecar /lw/digest', () => {
     const weaveData = weaveRes.data as { exists: boolean; ref: string; message: string };
     expect(weaveData.exists).toBe(false);
     expect(weaveData.ref).toBe('sigil/nonexistent');
+  });
+
+  it('runTool read_file respects maxChars and provides truncation paging metadata', async () => {
+    const toolCtx = {
+      repoRoot: dir,
+      cliBin,
+      defaultSagaRoot: saga,
+      safeJoin: (root: string, rel: string) => path.resolve(root, rel),
+    };
+
+    // Create a large mock markdown document (e.g., 20KB, 200 lines)
+    const largeDocPath = path.resolve(saga, 'codex/lore/large-chronicle.md');
+    await mkdir(path.dirname(largeDocPath), { recursive: true });
+    const paragraph = 'The deep void hummed with resonant energy across distant sectors.\n';
+    const largeText = paragraph.repeat(300); // ~20,000 characters
+    const fs = await import('node:fs/promises');
+    await fs.writeFile(largeDocPath, largeText, 'utf8');
+
+    // Call read_file with default maxChars (8000)
+    const readRes = await runTool(
+      'read_file',
+      { sagaRoot: saga, relPath: 'codex/lore/large-chronicle.md' },
+      toolCtx,
+    );
+    expect(readRes.ok).toBe(true);
+    const data = readRes.data as {
+      totalLines: number;
+      totalChars: number;
+      returnedChars: number;
+      startLine: number;
+      endLine: number;
+      hasMore: boolean;
+      nextStartLine?: number;
+      isTruncated: boolean;
+      content: string;
+    };
+
+    expect(data.isTruncated).toBe(true);
+    expect(data.hasMore).toBe(true);
+    expect(data.nextStartLine).toBe(data.endLine + 1);
+    expect(data.returnedChars).toBeLessThanOrEqual(8500);
+    expect(data.content).toContain('[Loreweave: Content truncated at line');
+    expect(data.content).toContain(`startLine: ${data.nextStartLine}`);
+
+    // Read the next chunk starting at nextStartLine
+    const chunk2 = await runTool(
+      'read_file',
+      {
+        sagaRoot: saga,
+        relPath: 'codex/lore/large-chronicle.md',
+        startLine: data.nextStartLine,
+      },
+      toolCtx,
+    );
+    expect(chunk2.ok).toBe(true);
+    const data2 = chunk2.data as typeof data;
+    expect(data2.startLine).toBe(data.nextStartLine);
+    expect(data2.startLine).toBeGreaterThan(1);
+  });
+
+  it('compactToolResultForModel strips full content and diffs while preserving metadata', () => {
+    const rawNewProposal = {
+      ok: true,
+      data: {
+        kind: 'new',
+        sagaRoot: 'sagas/example',
+        relPath: 'codex/characters/aaron.md',
+        content: '# Aaron\n\n'.repeat(500), // Huge 4KB payload
+        original: '',
+        diff: '+# Aaron\n'.repeat(500),
+      },
+    };
+
+    const compacted = compactToolResultForModel('propose_new_entry', rawNewProposal) as {
+      ok: boolean;
+      data: { kind: string; relPath: string; message: string; content?: unknown; diff?: unknown };
+    };
+
+    expect(compacted.ok).toBe(true);
+    expect(compacted.data.kind).toBe('new');
+    expect(compacted.data.relPath).toBe('codex/characters/aaron.md');
+    expect(compacted.data.content).toBeUndefined();
+    expect(compacted.data.diff).toBeUndefined();
+    expect(compacted.data.message).toContain('Proposal for new entry');
+
+    const rawEditProposal = {
+      ok: true,
+      data: {
+        kind: 'edit',
+        sagaRoot: 'sagas/example',
+        relPath: 'codex/characters/aaron.md',
+        original: 'old content',
+        next: 'new content',
+        diff: '--- old\n+++ new',
+      },
+    };
+
+    const compactedEdit = compactToolResultForModel('propose_edit', rawEditProposal) as {
+      ok: boolean;
+      data: { kind: string; relPath: string; message: string; diff?: unknown };
+    };
+    expect(compactedEdit.ok).toBe(true);
+    expect(compactedEdit.data.kind).toBe('edit');
+    expect(compactedEdit.data.diff).toBeUndefined();
   });
 });

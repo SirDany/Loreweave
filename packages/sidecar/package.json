@@ -11,7 +11,9 @@
       "import": "./dist/index.js"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
@@ -23,6 +25,7 @@
     "@ai-sdk/openai": "^3.0.53",
     "@loreweave/core": "workspace:*",
     "ai": "^6.0.333",
+    "undici": "^8.12.4",
     "yaml": "2.8.3",
     "zod": "^3.25.28"
   },
