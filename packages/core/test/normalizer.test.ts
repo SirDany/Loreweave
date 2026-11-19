@@ -4,8 +4,11 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { loadSaga } from '../src/loader.js';
 import {
+  autoRouteTaxonomy,
+  cleanFrontmatterTabs,
   normalizeEntryMarkdown,
   normalizeSagaFileContent,
+  weaveEchoesInMarkdown,
 } from '../src/normalizer.js';
 import { ChapterMetaSchema } from '../src/schemas.js';
 
@@ -78,6 +81,62 @@ describe('normalizer & resilient saga loading', () => {
   it('preserves already-valid entries byte-for-byte via normalizeSagaFileContent', () => {
     const valid = '---\nid: aaron\ntype: character\nname: Aaron\nstatus: canon\n---\n\n# Aaron\n\nQuiet soldier.\n';
     expect(normalizeSagaFileContent('codex/characters/aaron.md', valid)).toBe(valid);
+  });
+
+  it('cleans frontmatter tabs and auto-routes taxonomy for misclassified AI/comrade locations', () => {
+    const raw = [
+      '---',
+      '\tid: location/caul',
+      '\ttype: location',
+      '\tname: "Caul"',
+      '\tstatus: draft',
+      '\tinherits:',
+      '\t  - sigil/ai',
+      '\tproperties:',
+      '\t  role: "Captured AI"',
+      '---',
+      '',
+      '# Caul',
+      '',
+      'Caul was preserved by Kell after the blackout.',
+    ].join('\n');
+
+    const routed = autoRouteTaxonomy('codex/locations/caul.md', raw);
+    expect(routed.relPath).toBe('codex/characters/caul.md');
+    expect(routed.rerouted).toContain('Auto-routed');
+
+    const normalized = normalizeSagaFileContent(routed.relPath, routed.content, {
+      knownEntities: [
+        { id: 'kell', name: 'Kell', type: 'character' },
+      ],
+    });
+
+    expect(normalized).toContain('id: caul');
+    expect(normalized).toContain('type: character');
+    expect(normalized).toContain('@character/kell');
+  });
+
+  it('weaves canonical echoes into body markdown while skipping code and existing links', () => {
+    const body = [
+      '# Absalom',
+      '',
+      'Absalom is an ancient AI. He was friends with Kell and visited Caldera.',
+      'He also spoke with [Jonah](@character/jonah).',
+      '```',
+      'Kell in code block should not be touched',
+      '```',
+    ].join('\n');
+
+    const woven = weaveEchoesInMarkdown(body, [
+      { id: 'kell', name: 'Kell', type: 'character' },
+      { id: 'caldera', name: 'Caldera', type: 'location' },
+      { id: 'jonah', name: 'Jonah', type: 'character' },
+    ], 'absalom');
+
+    expect(woven).toContain('@character/kell');
+    expect(woven).toContain('@location/caldera');
+    expect(woven).toContain('[Jonah](@character/jonah)');
+    expect(woven).toContain('Kell in code block should not be touched');
   });
 
   it('coerces LLM-friendly ChapterMeta values', () => {

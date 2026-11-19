@@ -3,6 +3,17 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 export type ChatRole = 'user' | 'assistant' | 'system';
 export type ApprovalPolicy = 'standard' | 'auto';
 
+export interface ModelCapabilityProfile {
+  provider: string;
+  modelId: string;
+  contextWindow: number;
+  maxOutputTokens: number;
+  maxToolStepsPerTurn: number;
+  recommendedBatchSize: number;
+  tier: 'local-compact' | 'standard' | 'high-capacity';
+  supportsStreaming: boolean;
+}
+
 export interface ChatMessage {
   id: string;
   role: ChatRole;
@@ -263,6 +274,7 @@ export function useChat({
   );
   const [streaming, setStreaming] = useState(false);
   const [streamError, setStreamError] = useState<string | null>(null);
+  const [modelProfile, setModelProfile] = useState<ModelCapabilityProfile | null>(null);
   const [usageWindow, setUsageWindow] = useState<UsageWindowStats>(() =>
     computeUsageWindow(),
   );
@@ -286,6 +298,12 @@ export function useChat({
   // Reload threads when saga changes.
   useEffect(() => {
     setThreads(loadThreads(sagaRoot));
+    fetch('/lw/model-profile')
+      .then((r) => r.json())
+      .then((res: { ok?: boolean; profile?: ModelCapabilityProfile }) => {
+        if (res?.ok && res.profile) setModelProfile(res.profile);
+      })
+      .catch(() => {});
   }, [sagaRoot]);
 
   // Persist threads.
@@ -525,6 +543,11 @@ export function useChat({
         };
 
         const handleEvent = (event: string, data: string) => {
+          if (event === 'profile') {
+            const parsed = safeParse<ModelCapabilityProfile>(data);
+            if (parsed) setModelProfile(parsed);
+            return;
+          }
           if (event === 'token') {
             let token: string;
             try {
@@ -832,6 +855,7 @@ export function useChat({
     pending: currentThread.pending,
     usageTotal: currentThread.usageTotal,
     usageWindow,
+    modelProfile,
     streaming,
     streamError,
     send,

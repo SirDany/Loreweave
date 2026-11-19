@@ -37,6 +37,7 @@ export {
 export {
   resolveModel,
   discoverModels,
+  getModelProfile,
   PROVIDER_CATALOG,
   normalizeOllamaBase,
   detectActiveProvider,
@@ -45,6 +46,8 @@ export {
   type ProviderMeta,
   type DiscoverModelsOptions,
   type ModelsDiscoveryResult,
+  type ModelCapabilityProfile,
+  type ModelTier,
 } from './model.js';
 export { safeJoin } from './paths.js';
 export { loadSagaRules, type SagaRulesResult } from './saga-rules.js';

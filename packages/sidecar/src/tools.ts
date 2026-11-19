@@ -11,9 +11,12 @@ import path from 'node:path';
 import { z } from 'zod';
 import {
   StorageNotFoundError,
+  autoRouteTaxonomy,
   normalizeSagaFileContent,
+  type KnownEntitySummary,
   type StorageAdapter,
 } from '@loreweave/core';
+import { getDigest } from './digest-cache.js';
 import { providerFromEnv, searchIndex } from './embeddings.js';
 
 export interface ToolContext {
@@ -102,6 +105,19 @@ export const toolSchemas = {
       .string()
       .min(1)
       .describe('Path relative to the Saga root (e.g. "codex/characters/aaron.md").'),
+    startLine: z
+      .number()
+      .int()
+      .min(1)
+      .optional()
+      .describe('1-based line number to start reading from.'),
+    maxLines: z
+      .number()
+      .int()
+      .min(1)
+      .max(1000)
+      .optional()
+      .describe('Maximum number of lines to read (defaults to 400).'),
   }),
   semantic_search: z.object({
     sagaRoot: sagaRootSchema,
@@ -599,11 +615,36 @@ export async function runTool(
       case 'read_file': {
         const rel = normalizeSagaRelPath(sagaRoot, sagaRootRel, args.relPath as string);
         const content = await readSagaFile(ctx, sagaRootRel, sagaRoot, rel);
+        const lines = content.split('\n');
+        const startLine = Math.max(1, (args.startLine as number | undefined) ?? 1);
+        const maxLines = (args.maxLines as number | undefined) ?? 400;
+
+        let slicedContent = content;
+        let isTruncated = false;
+        if (lines.length > maxLines || startLine > 1) {
+          const slice = lines.slice(startLine - 1, startLine - 1 + maxLines);
+          slicedContent = slice.join('\n');
+          isTruncated = true;
+        }
+
+        const sliceEnd = Math.min(
+          lines.length,
+          startLine + (slicedContent ? slicedContent.split('\n').length : 0) - 1,
+        );
         return {
           ok: true,
           data: {
             relPath: rel,
-            content: sanitizeForModel(content, rel),
+            totalLines: lines.length,
+            startLine,
+            endLine: sliceEnd,
+            isTruncated,
+            content: sanitizeForModel(
+              slicedContent,
+              isTruncated
+                ? `${rel} (lines ${startLine}-${sliceEnd} of ${lines.length})`
+                : rel,
+            ),
             rawHash: hashContent(content),
           },
         };
@@ -638,7 +679,19 @@ export async function runTool(
           if (!isMissing(e)) throw e;
           original = '';
         }
-        const next = normalizeSagaFileContent(rel, args.newContent as string);
+        let knownEntities: KnownEntitySummary[] | undefined;
+        try {
+          const digest = await getDigest(sagaRoot);
+          if (digest?.phoneBook) {
+            knownEntities = Object.entries(digest.phoneBook).map(([ref, item]) => {
+              const [type, id] = ref.split('/');
+              return { id: id ?? ref, type: type ?? 'entry', name: item.name };
+            });
+          }
+        } catch {
+          /* ignore */
+        }
+        const next = normalizeSagaFileContent(rel, args.newContent as string, { knownEntities });
         return {
           ok: true,
           data: {
@@ -698,10 +751,27 @@ export async function runTool(
         };
       }
       case 'propose_new_entry': {
-        const rel = normalizeSagaRelPath(sagaRoot, sagaRootRel, args.relPath as string);
+        const rawRel = normalizeSagaRelPath(sagaRoot, sagaRootRel, args.relPath as string);
+        const routed = autoRouteTaxonomy(rawRel, args.content as string);
+        const rel = routed.relPath;
+
+        let knownEntities: KnownEntitySummary[] | undefined;
+        try {
+          const digest = await getDigest(sagaRoot);
+          if (digest?.phoneBook) {
+            knownEntities = Object.entries(digest.phoneBook).map(([ref, item]) => {
+              const [type, id] = ref.split('/');
+              return { id: id ?? ref, type: type ?? 'entry', name: item.name };
+            });
+          }
+        } catch {
+          /* ignore */
+        }
+
         const normalizedContent = normalizeSagaFileContent(
           rel,
-          args.content as string,
+          routed.content,
+          { knownEntities },
         );
         let exists = false;
         let original = '';
@@ -712,6 +782,9 @@ export async function runTool(
           if (!isMissing(e)) throw e;
           exists = false;
         }
+        const rationale = routed.rerouted
+          ? `${routed.rerouted}. ${(args.rationale as string | undefined) ?? ''}`.trim()
+          : (args.rationale as string | undefined) ?? null;
         return {
           ok: true,
           data: {
@@ -723,7 +796,7 @@ export async function runTool(
             original,
             originalHash: hashContent(original),
             exists,
-            rationale: (args.rationale as string | undefined) ?? null,
+            rationale,
           },
         };
       }

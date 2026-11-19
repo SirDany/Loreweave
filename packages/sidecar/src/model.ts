@@ -48,7 +48,50 @@ export interface ModelsDiscoveryResult {
   error?: string;
 }
 
+export type ModelTier = 'local-compact' | 'standard' | 'high-capacity';
+
+export interface ModelCapabilityProfile {
+  provider: ChatProvider;
+  modelId: string;
+  contextWindow: number;
+  tier: ModelTier;
+  maxToolStepsPerTurn: number;
+  recommendedBatchSize: number;
+  supportsStreaming: boolean;
+}
+
 const DISCOVERY_TIMEOUT_MS = 6000;
+const OLLAMA_TIMEOUT_MS = 900_000; // 15 minutes to prevent Headers Timeout Error on slow local inference
+
+export function createResilientFetch(timeoutMs = OLLAMA_TIMEOUT_MS): typeof fetch {
+  return (async (
+    input: Parameters<typeof fetch>[0],
+    init?: Parameters<typeof fetch>[1],
+  ): ReturnType<typeof fetch> => {
+    const controller = new AbortController();
+    const timeout = setTimeout(
+      () =>
+        controller.abort(
+          new Error(`Local LLM request timed out after ${timeoutMs / 1000}s`),
+        ),
+      timeoutMs,
+    );
+    if (init?.signal) {
+      init.signal.addEventListener('abort', () =>
+        controller.abort(init.signal?.reason),
+      );
+    }
+    try {
+      return await fetch(input, {
+        ...init,
+        signal: controller.signal,
+        keepalive: true,
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
+  }) as typeof fetch;
+}
 
 export const PROVIDER_CATALOG: Record<ChatProvider, ProviderMeta> = {
   google: {
@@ -308,11 +351,13 @@ export async function resolveModel() {
         createOllama: (opts: {
           baseURL: string;
           headers?: Record<string, string>;
+          fetch?: typeof fetch;
         }) => (model: string) => unknown;
       };
       const ollama = mod.createOllama({
         baseURL: `${base}/api`,
         headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : undefined,
+        fetch: createResilientFetch(),
       });
       return ollama(modelId);
     } catch {
@@ -321,6 +366,7 @@ export async function resolveModel() {
         name: 'ollama',
         baseURL: `${base}/v1`,
         apiKey: apiKey ?? 'ollama',
+        fetch: createResilientFetch(),
       });
       return client.chat(modelId);
     }
@@ -402,6 +448,142 @@ export async function resolveModel() {
   }
 
   throw new Error(`Unknown LW_AI_PROVIDER: ${provider}`);
+}
+
+/**
+ * Return an adaptive capability profile for the active model.
+ * Enables the sidecar and UI to dynamically adjust context size, step limits,
+ * and batch granularity so that compact local models (e.g. Qwen 8B) don't
+ * blow up while high-capacity models (e.g. Gemini 2.5 Pro, Claude Sonnet 4)
+ * are utilized to their full capability.
+ */
+export function getModelProfile(
+  provider?: ChatProvider,
+  modelId?: string,
+): ModelCapabilityProfile {
+  const p = provider ?? detectActiveProvider() ?? 'ollama';
+  const rawModel =
+    modelId ??
+    process.env.LW_AI_MODEL ??
+    PROVIDER_CATALOG[p]?.defaultModel ??
+    '';
+  const m = rawModel.toLowerCase();
+
+  if (p === 'google') {
+    if (m.includes('pro')) {
+      return {
+        provider: p,
+        modelId: rawModel,
+        contextWindow: 2_000_000,
+        tier: 'high-capacity',
+        maxToolStepsPerTurn: 35,
+        recommendedBatchSize: 8,
+        supportsStreaming: true,
+      };
+    }
+    return {
+      provider: p,
+      modelId: rawModel,
+      contextWindow: 1_000_000,
+      tier: 'high-capacity',
+      maxToolStepsPerTurn: 25,
+      recommendedBatchSize: 6,
+      supportsStreaming: true,
+    };
+  }
+
+  if (p === 'anthropic') {
+    if (m.includes('haiku')) {
+      return {
+        provider: p,
+        modelId: rawModel,
+        contextWindow: 200_000,
+        tier: 'standard',
+        maxToolStepsPerTurn: 15,
+        recommendedBatchSize: 5,
+        supportsStreaming: true,
+      };
+    }
+    return {
+      provider: p,
+      modelId: rawModel,
+      contextWindow: 200_000,
+      tier: 'high-capacity',
+      maxToolStepsPerTurn: 25,
+      recommendedBatchSize: 6,
+      supportsStreaming: true,
+    };
+  }
+
+  if (p === 'openai') {
+    if (m.includes('mini')) {
+      return {
+        provider: p,
+        modelId: rawModel,
+        contextWindow: 128_000,
+        tier: 'standard',
+        maxToolStepsPerTurn: 15,
+        recommendedBatchSize: 4,
+        supportsStreaming: true,
+      };
+    }
+    return {
+      provider: p,
+      modelId: rawModel,
+      contextWindow: 128_000,
+      tier: 'standard',
+      maxToolStepsPerTurn: 20,
+      recommendedBatchSize: 6,
+      supportsStreaming: true,
+    };
+  }
+
+  if (p === 'ollama') {
+    if (m.includes('70b') || m.includes('120b') || m.includes('405b')) {
+      return {
+        provider: p,
+        modelId: rawModel,
+        contextWindow: 65_536,
+        tier: 'standard',
+        maxToolStepsPerTurn: 12,
+        recommendedBatchSize: 5,
+        supportsStreaming: true,
+      };
+    }
+    // Local compact models (qwen3:8b, llama3.1:8b, mistral:7b, gemma:2b, etc.)
+    const ctx = m.includes('qwen3') ? 40_960 : 32_768;
+    return {
+      provider: p,
+      modelId: rawModel,
+      contextWindow: ctx,
+      tier: 'local-compact',
+      maxToolStepsPerTurn: 6,
+      recommendedBatchSize: 3,
+      supportsStreaming: true,
+    };
+  }
+
+  if (p === 'groq' || p === 'deepseek') {
+    return {
+      provider: p,
+      modelId: rawModel,
+      contextWindow: 64_000,
+      tier: 'standard',
+      maxToolStepsPerTurn: 15,
+      recommendedBatchSize: 5,
+      supportsStreaming: true,
+    };
+  }
+
+  return {
+    provider: p,
+    modelId: rawModel,
+    contextWindow: 32_768,
+    tier: 'local-compact',
+    maxToolStepsPerTurn: 6,
+    recommendedBatchSize: 3,
+    supportsStreaming: true,
+  };
 }
 
 // ---------- live model discovery -------------------------------------------

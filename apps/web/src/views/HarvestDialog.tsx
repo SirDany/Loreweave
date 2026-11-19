@@ -1,11 +1,13 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { Cpu, Sparkles } from 'lucide-react';
 import {
   fileToBase64,
   runIngest,
   type IngestManifest,
   type IngestUploadFile,
 } from '../lib/lw.js';
+import type { ModelCapabilityProfile } from '../state/useChat.js';
 
 interface Props {
   sagaPath: string;
@@ -56,6 +58,16 @@ export function HarvestDialog({
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [manifest, setManifest] = useState<IngestManifest | null>(null);
+  const [profile, setProfile] = useState<ModelCapabilityProfile | null>(null);
+
+  useEffect(() => {
+    fetch('/lw/model-profile')
+      .then((r) => r.json())
+      .then((res: { ok?: boolean; profile?: ModelCapabilityProfile }) => {
+        if (res?.ok && res.profile) setProfile(res.profile);
+      })
+      .catch(() => {});
+  }, []);
 
   const selectFiles = () => {
     const input = document.createElement('input');
@@ -240,15 +252,32 @@ export function HarvestDialog({
           )}
 
           {manifest && (
-            <div className="border border-emerald-500/30 bg-emerald-500/10 rounded-xl p-4 text-xs space-y-2">
-              <div className="font-semibold text-emerald-400">
-                Staged {manifest.files.length} file{manifest.files.length === 1 ? '' : 's'}
+            <div className="border border-emerald-500/30 bg-emerald-500/10 rounded-xl p-4 text-xs space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-emerald-400">
+                  Staged {manifest.files.length} file{manifest.files.length === 1 ? '' : 's'}
+                </span>
+                {profile && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-primary/30 bg-primary/10 font-mono text-[10px] text-primary">
+                    <Cpu className="h-3 w-3" />
+                    <span>{profile.modelId}</span>
+                    <span className="opacity-75 uppercase">({profile.tier})</span>
+                  </span>
+                )}
               </div>
               <div className="font-mono text-[11px] text-muted-foreground">
                 .loreweave/ingest/{manifest.batchId}
               </div>
-              <div className="text-foreground/90">
-                Invoke Scribe to analyze the staged files, detect conflicts with canon, and propose draft Codex entries.
+              <div className="text-foreground/90 leading-relaxed">
+                {profile?.tier === 'local-compact' ? (
+                  <span>
+                    Ready for phased harvesting. Scribe will survey the staged files section by section, declare any foundational sigils/kinds first, and migrate entries in lightweight micro-batches of {profile.recommendedBatchSize} to conserve your local model&apos;s context window.
+                  </span>
+                ) : (
+                  <span>
+                    Ready for harvesting. Scribe will scan the staged document, detect entity hierarchies, weave canonical @type/id echoes, and propose validated Codex entries and story chapters.
+                  </span>
+                )}
               </div>
             </div>
           )}
@@ -265,14 +294,16 @@ export function HarvestDialog({
           {manifest && onOpenAssistant ? (
             <button
               type="button"
-              onClick={() =>
+              onClick={() => {
+                const batchSize = profile?.recommendedBatchSize ?? 3;
                 onOpenAssistant(
-                  `Analyze the newly staged harvest batch in .loreweave/ingest/${manifest.batchId}/manifest.json. Read the staged files using read_file, extract characters, locations, concepts, terms, and chapter prose, surface any canon conflicts, and use propose_new_entry to draft each new entry starting directly with valid YAML frontmatter (id, type, name, status: draft, and properties.source pointing to the staged file path — never wrap entries in \`\`\`markdown code fences).`,
-                )
-              }
-              className="px-4 py-1.5 rounded-lg border border-primary/50 bg-primary/20 text-primary font-medium hover:bg-primary/30 text-xs transition-colors shadow-sm"
+                  `Harvest staged batch .loreweave/ingest/${manifest.batchId}/manifest.json.\nFollow the harvesting workflow:\n1. Use read_file to survey the staged document (scan section by section with startLine/maxLines) to establish a lightweight entity map.\n2. Establish foundational Sigils or Custom Kinds first if shared domains are detected.\n3. Migrate the first micro-batch of ${batchSize} entities/chapters with rich, substantive lore and canonical @type/id Echoes, and report progress before continuing to the next batch.`,
+                );
+              }}
+              className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg border border-primary/50 bg-primary/20 text-primary font-medium hover:bg-primary/30 text-xs transition-colors shadow-sm"
             >
-              Analyze with Scribe
+              <Sparkles className="h-3.5 w-3.5" />
+              <span>Launch Phased Harvest</span>
             </button>
           ) : (
             <button

@@ -526,15 +526,250 @@ export function normalizeTraceMarkdown(
 }
 
 /**
+ * Convert leading tabs on frontmatter lines to spaces so YAML parsers don't fail.
+ */
+export function cleanFrontmatterTabs(raw: string): string {
+  const lines = raw.split(/\r?\n/);
+  let inFrontmatter = false;
+  const out: string[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (line === undefined) continue;
+    if (i === 0 && line.trim() === '---') {
+      inFrontmatter = true;
+      out.push(line);
+      continue;
+    }
+    if (inFrontmatter && line.trim() === '---') {
+      inFrontmatter = false;
+      out.push(line);
+      continue;
+    }
+    if (inFrontmatter) {
+      out.push(line.replace(/^\t+/, (tabs) => '  '.repeat(tabs.length)));
+    } else {
+      out.push(line);
+    }
+  }
+  return out.join('\n');
+}
+
+export interface KnownEntitySummary {
+  id: string;
+  name: string;
+  type: string;
+  aliases?: string[];
+}
+
+/**
+ * Automatically scan markdown body paragraphs for mentions of known canon entities
+ * and weave canonical `@type/id` or `[Display Name](@type/id)` Echoes.
+ * Skips markdown headings, code blocks, URLs, and existing `@...` or `[...]` links.
+ */
+export function weaveEchoesInMarkdown(
+  body: string,
+  knownEntities: KnownEntitySummary[],
+  currentEntityId?: string,
+): string {
+  if (!knownEntities || knownEntities.length === 0) return body;
+
+  const entities = knownEntities
+    .filter((e) => e.id !== currentEntityId)
+    .sort((a, b) => b.name.length - a.name.length);
+
+  const lines = body.split(/\r?\n/);
+  let inCodeBlock = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (line === undefined) continue;
+    if (line.trim().startsWith('```')) {
+      inCodeBlock = !inCodeBlock;
+      continue;
+    }
+    if (inCodeBlock) continue;
+    if (/^#{1,6}\s/.test(line)) continue;
+
+    let updatedLine = line;
+
+    for (const ent of entities) {
+      const namesToMatch = [ent.name, ...(ent.aliases ?? [])].filter(
+        (n): n is string => Boolean(n && n.length >= 3),
+      );
+
+      for (const name of namesToMatch) {
+        const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const regex = new RegExp(`(?<![@\\[\\w])${escaped}(?![\\]\\w])`, 'g');
+
+        if (!regex.test(updatedLine)) continue;
+        regex.lastIndex = 0;
+
+        updatedLine = updatedLine.replace(regex, (matched, offset, fullString) => {
+          const before = fullString.slice(0, offset);
+          const openBracket = before.lastIndexOf('[');
+          const closeBracket = before.lastIndexOf(']');
+          const openParen = before.lastIndexOf('(');
+          const closeParen = before.lastIndexOf(')');
+          if (openBracket > closeBracket) return matched;
+          if (openParen > closeParen) return matched;
+          if (offset > 0 && fullString[offset - 1] === '@') return matched;
+
+          if (matched.toLowerCase() === ent.id.replace(/-/g, ' ')) {
+            return `@${ent.type}/${ent.id}`;
+          }
+          return `[${matched}](@${ent.type}/${ent.id})`;
+        });
+      }
+    }
+
+    lines[i] = updatedLine;
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * Detect entity category mismatches (e.g. an AI, comrade, culture, or species
+ * mistakenly placed under `codex/locations/`) and auto-route to the proper folder.
+ */
+export function autoRouteTaxonomy(
+  relPath: string,
+  raw: string,
+): { relPath: string; content: string; rerouted?: string } {
+  let normRel = toForwardSlashes(relPath).replace(/^\/+/, '');
+  const parts = normRel.split('/');
+  const lastPart = parts[parts.length - 1];
+  if (parts.length > 0 && lastPart && lastPart.endsWith('.md')) {
+    const dot = lastPart.lastIndexOf('.');
+    const stem = lastPart.slice(0, dot);
+    const cleanStem = stem
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+    parts[parts.length - 1] = `${cleanStem}.md`;
+    normRel = parts.join('/');
+  }
+
+  const cleanedRaw = cleanFrontmatterTabs(raw);
+  let parsedData: Record<string, unknown> = {};
+  let body = cleanedRaw;
+  try {
+    const m = matter(cleanedRaw);
+    parsedData = (m.data as Record<string, unknown>) ?? {};
+    body = m.content;
+  } catch {
+    /* fallback to regex */
+  }
+
+  const rawRole = String(
+    (parsedData.properties as Record<string, unknown> | undefined)?.role ??
+      parsedData.role ??
+      '',
+  ).toLowerCase();
+  const rawDesc = String(
+    (parsedData.properties as Record<string, unknown> | undefined)?.description ??
+      parsedData.description ??
+      '',
+  ).toLowerCase();
+  const rawInherits = Array.isArray(parsedData.inherits)
+    ? parsedData.inherits.map(String).join(' ').toLowerCase()
+    : String(parsedData.inherits ?? '').toLowerCase();
+  const rawType = String(parsedData.type ?? '').toLowerCase();
+  const combinedContext = `${rawRole} ${rawDesc} ${rawInherits} ${body.slice(0, 1500).toLowerCase()}`;
+
+  const stem = basenameStem(normRel);
+
+  if (normRel.startsWith('codex/locations/')) {
+    const isCharacter =
+      rawType === 'character' ||
+      rawInherits.includes('ai') ||
+      rawInherits.includes('human') ||
+      rawInherits.includes('sigil/ai') ||
+      rawInherits.includes('sigil/human') ||
+      /\b(ai|artificial intelligence|tether|comrade|person|being|persona|investigator|traveller|archaeologist|official)\b/.test(
+        rawRole,
+      ) ||
+      /\b(captured ai|ship ai|former tether|comrade ais? carried in|sub-ais?)\b/.test(
+        combinedContext,
+      );
+
+    const isFaction =
+      rawType === 'faction' ||
+      /\b(culture|cybernetic culture|society|faction|political group|organization)\b/.test(
+        rawRole,
+      ) ||
+      /\b(all ais taken together|a network of ais|culture that embraces cybernetics|political entity)\b/.test(
+        combinedContext,
+      );
+
+    const isAlienSpecies =
+      rawInherits.includes('alien') ||
+      /\b(alien species|intelligent alien life)\b/.test(rawRole) ||
+      /\b(intelligent alien life form)\b/.test(combinedContext);
+
+    const isVessel =
+      rawInherits.includes('ship') ||
+      /\b(spaceship|ship|vessel|starship)\b/.test(rawRole) ||
+      /\b(is the ship)\b/.test(combinedContext);
+
+    if (isCharacter) {
+      const newPath = `codex/characters/${stem}.md`;
+      const updatedContent = cleanedRaw.replace(/type:\s*['"]?location['"]?/i, 'type: character');
+      return {
+        relPath: newPath,
+        content: updatedContent,
+        rerouted: `Auto-routed from ${normRel} to ${newPath} (detected entity type: character / AI / person)`,
+      };
+    }
+    if (isFaction) {
+      const newPath = `codex/factions/${stem}.md`;
+      const updatedContent = cleanedRaw.replace(/type:\s*['"]?location['"]?/i, 'type: faction');
+      return {
+        relPath: newPath,
+        content: updatedContent,
+        rerouted: `Auto-routed from ${normRel} to ${newPath} (detected entity type: faction / organization / culture)`,
+      };
+    }
+    if (isAlienSpecies) {
+      const newPath = `sigils/${stem}.md`;
+      const updatedContent = cleanedRaw.replace(/type:\s*['"]?location['"]?/i, 'type: sigil');
+      return {
+        relPath: newPath,
+        content: updatedContent,
+        rerouted: `Auto-routed from ${normRel} to ${newPath} (detected entity type: species / sigil)`,
+      };
+    }
+    if (isVessel) {
+      const newPath = `codex/lore/${stem}.md`;
+      const updatedContent = cleanedRaw.replace(/type:\s*['"]?location['"]?/i, 'type: lore');
+      return {
+        relPath: newPath,
+        content: updatedContent,
+        rerouted: `Auto-routed from ${normRel} to ${newPath} (detected entity type: lore / vessel)`,
+      };
+    }
+  }
+
+  return { relPath: normRel, content: cleanedRaw };
+}
+
+/**
  * Normalize file contents before saving or proposing edits inside a Saga.
  * Prevents wrapping code fences and ensures Codex/Lexicon/Sigil/Trace files
  * carry valid YAML frontmatter matching their path & filename.
  */
-export function normalizeSagaFileContent(relPath: string, raw: string): string {
+export function normalizeSagaFileContent(
+  relPath: string,
+  raw: string,
+  options?: { knownEntities?: KnownEntitySummary[] },
+): string {
   const normRel = toForwardSlashes(relPath).replace(/^\/+/, '').toLowerCase();
   if (normRel.startsWith('.loreweave/')) return raw;
 
-  const hasFence = raw.trimStart().startsWith('```');
+  const tabCleaned = cleanFrontmatterTabs(raw);
+  const hasFence = tabCleaned.trimStart().startsWith('```');
   const expectedId = slugifyKebab(basenameStem(relPath));
 
   if (
@@ -546,7 +781,7 @@ export function normalizeSagaFileContent(relPath: string, raw: string): string {
   ) {
     if (!hasFence) {
       try {
-        const parsed = matter(raw);
+        const parsed = matter(tabCleaned);
         const strict = EntryFrontmatterSchema.safeParse(parsed.data);
         const loose = strict.success
           ? null
@@ -556,30 +791,42 @@ export function normalizeSagaFileContent(relPath: string, raw: string): string {
           : loose?.success
             ? loose.data
             : null;
-        if (fm && fm.id === expectedId) return raw;
+        if (fm && fm.id === expectedId && (!options?.knownEntities || options.knownEntities.length === 0)) {
+          return tabCleaned;
+        }
       } catch {
         /* fall through to normalize */
       }
     }
-    return normalizeEntryMarkdown(raw, relPath).content;
+    const normalized = normalizeEntryMarkdown(tabCleaned, relPath);
+    if (options?.knownEntities && options.knownEntities.length > 0) {
+      const wovenBody = weaveEchoesInMarkdown(
+        normalized.body,
+        options.knownEntities,
+        expectedId,
+      );
+      const yamlBlock = YAML.stringify(normalized.frontmatter, { lineWidth: 0 }).trimEnd();
+      return `---\n${yamlBlock}\n---\n\n${wovenBody.trim()}\n`;
+    }
+    return normalized.content;
   }
 
   if (normRel.endsWith('.md') && normRel.startsWith('traces/')) {
     if (!hasFence) {
       try {
-        const parsed = matter(raw);
+        const parsed = matter(tabCleaned);
         const res = TraceFrontmatterSchema.safeParse(parsed.data);
-        if (res.success && res.data.id === expectedId) return raw;
+        if (res.success && res.data.id === expectedId) return tabCleaned;
       } catch {
         /* fall through to normalize */
       }
     }
-    return normalizeTraceMarkdown(raw, relPath).content;
+    return normalizeTraceMarkdown(tabCleaned, relPath).content;
   }
 
   if (/\.(md|markdown|ya?ml)$/i.test(normRel)) {
-    return stripOuterCodeFence(raw);
+    return stripOuterCodeFence(tabCleaned);
   }
 
-  return raw;
+  return tabCleaned;
 }

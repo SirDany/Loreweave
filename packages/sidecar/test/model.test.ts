@@ -6,10 +6,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   detectActiveProvider,
   discoverModels,
+  getModelProfile,
   normalizeOllamaBase,
   resolveModel,
 } from '../src/model.js';
-import { registerSidecar, type MiddlewareHost } from '../src/middleware.js';
+import {
+  compactChatHistory,
+  registerSidecar,
+  type MiddlewareHost,
+} from '../src/middleware.js';
 
 const TRACKED_ENV = [
   'LW_AI_PROVIDER',
@@ -478,5 +483,54 @@ describe('sidecar /lw/models endpoint', () => {
     expect(body.provider).toBe('google');
     expect(body.source).toBe('curated');
     expect(body.models.some((m) => m.id === 'gemini-2.5-flash')).toBe(true);
+  });
+
+  it('serves GET /lw/model-profile with adaptive limits', async () => {
+    const h = makeHost();
+    server = h.server;
+    registerSidecar(h.host, { repoRoot: dir, cliBin: '/nonexistent/bin.js' });
+    const port = await h.port;
+
+    const res = await fetch(`http://127.0.0.1:${port}/lw/model-profile`);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { ok: boolean; profile: { tier: string; maxToolStepsPerTurn: number } };
+    expect(body.ok).toBe(true);
+    expect(typeof body.profile.tier).toBe('string');
+    expect(typeof body.profile.maxToolStepsPerTurn).toBe('number');
+  });
+});
+
+describe('model capability profiling & context compaction', () => {
+  it('accurately profiles compact local models vs frontier high-capacity models', () => {
+    const ollamaCompact = getModelProfile('ollama', 'qwen2.5:7b');
+    expect(ollamaCompact.tier).toBe('local-compact');
+    expect(ollamaCompact.maxToolStepsPerTurn).toBe(6);
+    expect(ollamaCompact.recommendedBatchSize).toBe(3);
+
+    const geminiLarge = getModelProfile('google', 'gemini-2.5-pro');
+    expect(geminiLarge.tier).toBe('high-capacity');
+    expect(geminiLarge.contextWindow).toBeGreaterThanOrEqual(1_000_000);
+    expect(geminiLarge.maxToolStepsPerTurn).toBe(35);
+    expect(geminiLarge.recommendedBatchSize).toBe(8);
+
+    const claudeStandard = getModelProfile('anthropic', 'claude-3-5-haiku-20241022');
+    expect(claudeStandard.tier).toBe('standard');
+    expect(claudeStandard.maxToolStepsPerTurn).toBe(15);
+  });
+
+  it('compacts earlier chat turns to protect context budget while preserving current prompt', () => {
+    const profile = getModelProfile('ollama', 'qwen3:8b');
+    const messages = [
+      { role: 'user' as const, content: 'A'.repeat(8000) },
+      { role: 'assistant' as const, content: 'B'.repeat(8000) },
+      { role: 'user' as const, content: 'Please harvest the next 3 items.' },
+    ];
+
+    const compacted = compactChatHistory(messages, profile);
+    // Last user message must remain untouched
+    expect(compacted[compacted.length - 1]!.content).toBe('Please harvest the next 3 items.');
+    // Total characters across all compacted messages should be well within the budget
+    const totalChars = compacted.reduce((sum, m) => sum + m.content.length, 0);
+    expect(totalChars).toBeLessThan(12000);
   });
 });

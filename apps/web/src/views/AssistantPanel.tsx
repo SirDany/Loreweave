@@ -5,9 +5,12 @@ import {
   ChevronDown,
   ChevronRight,
   Clipboard,
+  Cpu,
   ExternalLink,
   Gauge,
   Loader2,
+  Maximize2,
+  Minimize2,
   RotateCcw,
   Send,
   Settings,
@@ -196,7 +199,18 @@ export function AssistantPanel({
   }, [initialContext]);
   const [showingSettings, setShowingSettings] = useState(false);
   const [showingUsage, setShowingUsage] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [applyingAll, setApplyingAll] = useState(false);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isFullscreen) {
+        setIsFullscreen(false);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isFullscreen]);
   const [aiCfg, setAiCfg] = useState<
     MaskedLoreweaveConfig | null | 'unavailable'
   >(null);
@@ -282,12 +296,37 @@ export function AssistantPanel({
 
   return (
     <aside
-      style={{ width: width ? `${width}px` : undefined }}
-      className="w-[420px] shrink-0 flex flex-col panel-glass h-full min-h-0 max-h-full overflow-hidden"
+      style={{ width: isFullscreen ? undefined : width ? `${width}px` : undefined }}
+      className={cn(
+        isFullscreen
+          ? 'fixed inset-0 z-[120] flex flex-col bg-background/95 backdrop-blur-2xl shadow-2xl h-screen overflow-hidden'
+          : 'w-[420px] shrink-0 flex flex-col panel-glass h-full min-h-0 max-h-full overflow-hidden',
+      )}
     >
       <header className="shrink-0 px-4 py-2.5 border-b border-border/80 bg-muted/15 flex items-center gap-2">
         <span className="h-2 w-2 rounded-full bg-primary animate-pulse shrink-0" />
-        <span className="font-semibold text-xs tracking-tight text-foreground">Scribe</span>
+        <span className="font-semibold text-xs tracking-tight text-foreground">
+          {isFullscreen ? 'Scribe Mission Control' : 'Scribe'}
+        </span>
+        {chat.modelProfile && (
+          <div
+            title={`Active Model Profile: ${chat.modelProfile.modelId} (${chat.modelProfile.tier})\nContext Window: ${chat.modelProfile.contextWindow.toLocaleString()} tokens\nMax Steps/Turn: ${chat.modelProfile.maxToolStepsPerTurn}\nRecommended Batch: ${chat.modelProfile.recommendedBatchSize}`}
+            className={cn(
+              'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 font-mono text-[10px] shrink-0',
+              chat.modelProfile.tier === 'local-compact'
+                ? 'border-amber-500/40 bg-amber-500/10 text-amber-400'
+                : chat.modelProfile.tier === 'high-capacity'
+                  ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-400'
+                  : 'border-blue-500/40 bg-blue-500/10 text-blue-400',
+            )}
+          >
+            <Cpu className="h-3 w-3" />
+            <span className="hidden sm:inline">{chat.modelProfile.modelId}</span>
+            <span className="opacity-75 text-[9px] uppercase">
+              ({chat.modelProfile.tier.replace('local-', '')})
+            </span>
+          </div>
+        )}
         {onOpenAiSettings && aiPill ? (
           <button
             type="button"
@@ -384,6 +423,23 @@ export function AssistantPanel({
           variant="ghost"
           size="sm"
           className="h-7 px-2 text-muted-foreground hover:text-foreground"
+          onClick={() => setIsFullscreen((v) => !v)}
+          title={
+            isFullscreen
+              ? 'Collapse to sidebar (Esc)'
+              : 'Expand Scribe Mission Control (wide view for heavy operations)'
+          }
+        >
+          {isFullscreen ? (
+            <Minimize2 className="h-3.5 w-3.5" />
+          ) : (
+            <Maximize2 className="h-3.5 w-3.5" />
+          )}
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 px-2 text-muted-foreground hover:text-foreground"
           onClick={onClose}
           title="Close Scribe panel (Ctrl+Shift+A)"
         >
@@ -411,11 +467,16 @@ export function AssistantPanel({
         />
       )}
 
-      {/* Messages */}
-      <div
-        ref={scrollRef}
-        className="flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden scrollbar-ember px-4 py-3 space-y-4"
-      >
+      {/* Main Workspace Body */}
+      <div className="flex-1 min-h-0 flex flex-row overflow-hidden">
+        {/* Chat Stream Column */}
+        <div className="flex-1 min-w-0 flex flex-col h-full overflow-hidden">
+          {/* Messages */}
+          <div
+            ref={scrollRef}
+            className="flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden scrollbar-ember px-4 py-3 space-y-4"
+          >
+            <div className={cn('space-y-4', isFullscreen && 'max-w-4xl mx-auto w-full')}>
         {chat.messages.length === 0 && (
           <div className="text-sm text-muted-foreground italic space-y-2">
             <div className="flex items-center gap-1.5 text-foreground/90 font-medium not-italic">
@@ -459,8 +520,8 @@ export function AssistantPanel({
           );
         })}
 
-        {pendingOpen.length > 0 && <Separator />}
-        {pendingActionable.length >= 2 && (
+        {!isFullscreen && pendingOpen.length > 0 && <Separator />}
+        {!isFullscreen && pendingActionable.length >= 2 && (
           <div className="flex items-center justify-between gap-2 pt-1">
             <span className="label-rune text-[11px]">
               Open Proposals ({pendingActionable.length})
@@ -487,31 +548,34 @@ export function AssistantPanel({
             </Button>
           </div>
         )}
-        {pendingOpen.map((action) => (
-          <PendingActionCard
-            key={action.id}
-            action={action}
-            onApply={async () => {
-              await chat.applyPending(action.id);
-              onApplied?.();
-            }}
-            onDiscard={() => chat.discardPending(action.id)}
-            onRevert={async () => {
-              await chat.revertApplied(action.id);
-              onApplied?.();
-            }}
-          />
-        ))}
+        {!isFullscreen &&
+          pendingOpen.map((action) => (
+            <PendingActionCard
+              key={action.id}
+              action={action}
+              onApply={async () => {
+                await chat.applyPending(action.id);
+                onApplied?.();
+              }}
+              onDiscard={() => chat.discardPending(action.id)}
+              onRevert={async () => {
+                await chat.revertApplied(action.id);
+                onApplied?.();
+              }}
+            />
+          ))}
 
         {chat.streamError && (
           <div className="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-xs text-destructive">
             {chat.streamError}
           </div>
         )}
-      </div>
+            </div>
+          </div>
 
       {/* Composer */}
       <div className="shrink-0 border-t border-border/80 bg-background/70 backdrop-blur-md p-3 space-y-2">
+        <div className={cn('space-y-2', isFullscreen && 'max-w-4xl mx-auto w-full')}>
         {/* Quick Scribe Intent Chips */}
         <div className="flex flex-wrap items-center gap-1.5 pb-0.5">
           <button
@@ -640,7 +704,103 @@ export function AssistantPanel({
           )}
         </div>
       </div>
-    </aside>
+    </div>
+  </div>
+
+{/* Mission Control Radar Pane (Only when isFullscreen) */}
+{isFullscreen && (
+  <aside className="w-[380px] shrink-0 border-l border-border/80 bg-muted/10 flex flex-col overflow-y-auto p-4 space-y-4">
+    {/* Active Model Capabilities Card */}
+    {chat.modelProfile && (
+      <div className="rounded-xl border border-border/80 bg-card/60 p-3.5 space-y-2.5 text-xs shadow-sm">
+        <div className="flex items-center justify-between">
+          <span className="font-semibold text-foreground flex items-center gap-1.5">
+            <Cpu className="h-4 w-4 text-primary" />
+            <span>Engine & Safety Limits</span>
+          </span>
+          <Badge
+            variant={chat.modelProfile.tier === 'local-compact' ? 'warning' : 'secondary'}
+            className="text-[10px] uppercase font-mono"
+          >
+            {chat.modelProfile.tier}
+          </Badge>
+        </div>
+        <div className="grid grid-cols-2 gap-2 pt-1 font-mono text-[11px] text-muted-foreground">
+          <div>
+            Model: <span className="text-foreground">{chat.modelProfile.modelId}</span>
+          </div>
+          <div>
+            Batch: <span className="text-foreground">≤{chat.modelProfile.recommendedBatchSize} items</span>
+          </div>
+          <div>
+            Steps: <span className="text-foreground">{chat.modelProfile.maxToolStepsPerTurn}/turn</span>
+          </div>
+          <div>
+            Context: <span className="text-foreground">{chat.modelProfile.contextWindow.toLocaleString()} tok</span>
+          </div>
+        </div>
+        <div className="text-[10px] text-muted-foreground/80 pt-1.5 border-t border-border/40 leading-relaxed">
+          Context-compaction & resilient 15-minute fetch keepalive active.
+        </div>
+      </div>
+    )}
+
+    {/* Quick Action Deck */}
+    <div className="flex-1 min-h-0 flex flex-col rounded-xl border border-border/80 bg-card/60 p-3.5 space-y-2.5 shadow-sm">
+      <div className="flex items-center justify-between">
+        <span className="font-semibold text-xs text-foreground">
+          Pending Actions ({pendingOpen.length})
+        </span>
+        {pendingActionable.length >= 1 && (
+          <Button
+            size="sm"
+            disabled={applyingAll}
+            onClick={async () => {
+              setApplyingAll(true);
+              try {
+                for (const item of pendingActionable) {
+                  await chat.applyPending(item.id);
+                }
+                onApplied?.();
+              } finally {
+                setApplyingAll(false);
+              }
+            }}
+            className="h-6 px-2 text-[11px] gap-1 bg-primary text-primary-foreground hover:bg-primary/90"
+          >
+            <Check className="h-3 w-3" />
+            Apply All ({pendingActionable.length})
+          </Button>
+        )}
+      </div>
+      <div className="flex-1 min-h-0 overflow-y-auto space-y-2.5 pr-1">
+        {pendingOpen.length === 0 ? (
+          <div className="text-xs text-muted-foreground/80 italic text-center py-6">
+            No open proposals. Scribe changes will surface here for inspection and batch apply.
+          </div>
+        ) : (
+          pendingOpen.map((action) => (
+            <PendingActionCard
+              key={action.id}
+              action={action}
+              onApply={async () => {
+                await chat.applyPending(action.id);
+                onApplied?.();
+              }}
+              onDiscard={() => chat.discardPending(action.id)}
+              onRevert={async () => {
+                await chat.revertApplied(action.id);
+                onApplied?.();
+              }}
+            />
+          ))
+        )}
+      </div>
+    </div>
+  </aside>
+)}
+</div>
+</aside>
   );
 }
 

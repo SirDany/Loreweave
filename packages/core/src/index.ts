@@ -53,4 +53,8 @@ export {
   normalizeEntryMarkdown,
   normalizeTraceMarkdown,
   normalizeSagaFileContent,
+  cleanFrontmatterTabs,
+  autoRouteTaxonomy,
+  weaveEchoesInMarkdown,
+  type KnownEntitySummary,
 } from "./normalizer.js";

@@ -57,8 +57,11 @@ import {
 } from './embeddings.js';
 import { commitFile } from './git.js';
 import {
+  detectActiveProvider,
   discoverModels,
+  getModelProfile,
   resolveModel,
+  type ModelCapabilityProfile,
 } from './model.js';
 import { safeJoin } from './paths.js';
 import {
@@ -161,6 +164,58 @@ function readBody(req: IncomingMessage, res: ServerResponse): Promise<string | n
     });
     req.on('error', () => resolve(null));
   });
+}
+
+/**
+ * Safely compacts chat conversation history so earlier turns do not overflow
+ * the active model's context window. Preserves the latest user message intact.
+ */
+export function compactChatHistory(
+  messages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>,
+  profile: ModelCapabilityProfile,
+): Array<{ role: 'user' | 'assistant' | 'system'; content: string }> {
+  if (messages.length <= 2) return messages;
+
+  const maxHistoryChars =
+    profile.tier === 'local-compact'
+      ? 10_000
+      : profile.tier === 'standard'
+        ? 32_000
+        : 150_000;
+
+  const lastIndex = messages.length - 1;
+  const lastMsg = messages[lastIndex]!;
+
+  let usedChars = lastMsg.content.length;
+  const result: Array<{ role: 'user' | 'assistant' | 'system'; content: string }> = [lastMsg];
+
+  for (let i = lastIndex - 1; i >= 0; i--) {
+    const msg = messages[i]!;
+    const remaining = maxHistoryChars - usedChars;
+
+    if (remaining <= 0) {
+      if (i === 0 && result.length > 1) {
+        result.unshift({
+          role: 'system',
+          content: `[Note: ${i + 1} earlier conversation turn(s) omitted to fit context window for ${profile.modelId}]`,
+        });
+      }
+      continue;
+    }
+
+    if (msg.content.length > remaining) {
+      const head = Math.floor(remaining * 0.45);
+      const tail = Math.floor(remaining * 0.35);
+      const compacted = `${msg.content.slice(0, head)}\n\n[... ${msg.content.length - head - tail} characters omitted for context limit ...]\n\n${msg.content.slice(msg.content.length - tail)}`;
+      result.unshift({ ...msg, content: compacted });
+      usedChars += compacted.length;
+    } else {
+      result.unshift(msg);
+      usedChars += msg.content.length;
+    }
+  }
+
+  return result;
 }
 
 /**
@@ -1139,6 +1194,23 @@ export function registerSidecar(
     }
   });
 
+  // --- /lw/model-profile (active capability profile & context limits) --------
+  host.use('/lw/model-profile', async (req, res) => {
+    try {
+      const cfg = await loadConfig();
+      const provider = cfg.chat?.provider ?? detectActiveProvider();
+      const modelId = cfg.chat?.model ?? process.env.LW_AI_MODEL;
+      const profile = getModelProfile(provider, modelId);
+      res.statusCode = 200;
+      res.setHeader('content-type', 'application/json');
+      res.setHeader('cache-control', 'no-store');
+      res.end(JSON.stringify({ ok: true, profile }));
+    } catch (e) {
+      res.statusCode = 500;
+      res.end(JSON.stringify({ ok: false, error: (e as Error).message }));
+    }
+  });
+
   // --- /lw/events (SSE FS watcher) -----------------------------------------
   host.use('/lw/events', (req, res) => {
     if (req.method !== 'GET') {
@@ -1287,6 +1359,12 @@ export function registerSidecar(
       const agent = agents.find((a) => a.id === payload.agent);
       if (!agent) throw new Error(`unknown agent: ${payload.agent}`);
 
+      const cfg = await loadConfig();
+      const activeProvider = cfg.chat?.provider ?? detectActiveProvider();
+      const activeModelId = cfg.chat?.model ?? process.env.LW_AI_MODEL;
+      const profile = getModelProfile(activeProvider, activeModelId);
+      send('profile', profile);
+
       const model = await resolveModel();
 
       const ctx: ToolContext = {
@@ -1368,6 +1446,15 @@ export function registerSidecar(
           .join(', ')}. Consider calling \`lw_weave\` on any you need before drafting.`;
       }
 
+      system += `\n\n### Model Execution Constraints (Auto-Detected)
+- Active Model: \`${profile.modelId}\` (${profile.tier})
+- Context Window Limit: ${profile.contextWindow.toLocaleString()} tokens
+- Max Tool Steps per Turn: ${profile.maxToolStepsPerTurn}
+- Recommended Micro-Batch Size: Propose at most ${profile.recommendedBatchSize} entries per turn.
+- Strategy: Make concise, decisive tool calls. When processing source documents or batches, complete this turn's micro-batch (${profile.recommendedBatchSize} items) and stop, reporting progress to the user so the conversation continues iteratively without context exhaustion.`;
+
+      const compactedMessages = compactChatHistory(payload.messages, profile);
+
       const { streamText, stepCountIs } = await import('ai');
       // The `ai` SDK type shape drifts between versions; the public runtime
       // contract (`fullStream`, `await result.usage`) is stable. Cast the
@@ -1375,10 +1462,10 @@ export function registerSidecar(
       const result = (streamText as (args: never) => unknown)({
         model: model as never,
         system,
-        messages: payload.messages,
+        messages: compactedMessages,
         tools,
-        // v5 replaced `maxSteps` with the more general `stopWhen` predicate.
-        stopWhen: stepCountIs(35),
+        // Adapt tool steps dynamically to model capacity
+        stopWhen: stepCountIs(profile.maxToolStepsPerTurn),
         abortSignal: abort.signal,
       } as never) as {
         fullStream: AsyncIterable<
