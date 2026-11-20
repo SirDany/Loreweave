@@ -49,13 +49,16 @@ export default defineConfig({
   build: {
     target: 'es2022',
     sourcemap: true,
+    chunkSizeWarningLimit: 800,
     rollupOptions: {
       output: {
         manualChunks(id) {
           if (!id.includes('node_modules')) return;
+          if (id.includes('@lezer')) {
+            return 'lezer';
+          }
           if (
             id.includes('@codemirror') ||
-            id.includes('@lezer') ||
             id.includes('codemirror')
           ) {
             return 'codemirror';

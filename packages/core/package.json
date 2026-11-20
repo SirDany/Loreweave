@@ -4,13 +4,27 @@
   "description": "Core library for Loreweave: loader, resolver, validator, timeline, calendar.",
   "type": "module",
   "main": "./dist/index.js",
+  "browser": "./dist/browser.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
+      "browser": {
+        "types": "./dist/browser.d.ts",
+        "import": "./dist/browser.js"
+      },
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./browser": {
+      "types": "./dist/browser.d.ts",
+      "import": "./dist/browser.js"
+    },
+    "./references": {
+      "types": "./dist/references.d.ts",
+      "import": "./dist/references.js"
     }
   },
+  "sideEffects": false,
   "files": ["dist"],
   "scripts": {
     "build": "tsc -p tsconfig.json",
