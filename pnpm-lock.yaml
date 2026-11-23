@@ -112,7 +112,7 @@ importers:
         version: 19.2.3(@types/react@19.2.14)
       '@vitejs/plugin-react':
         specifier: ^5.0.0
-        version: 5.2.0(vite@8.3.8(@types/node@22.12.0)(jiti@1.21.7)(yaml@2.8.3))
+        version: 5.2.0(vite@8.3.8(@types/node@26.6.6)(jiti@1.21.7)(yaml@2.8.3))
       autoprefixer:
         specifier: 10.5.0
         version: 10.5.0(postcss@8.5.33)
@@ -127,10 +127,10 @@ importers:
         version: 6.0.3
       vite:
         specifier: '>=8.1.6'
-        version: 8.3.8(@types/node@22.12.0)(jiti@1.21.7)(yaml@2.8.3)
+        version: 8.3.8(@types/node@26.6.6)(jiti@1.21.7)(yaml@2.8.3)
       vitest:
         specifier: '>=4.1.11'
-        version: 5.1.0(@opentelemetry/api@1.9.0)(@types/node@22.12.0)(vite@8.3.8(@types/node@22.12.0)(jiti@1.21.7)(yaml@2.8.3))
+        version: 5.1.0(@opentelemetry/api@1.9.0)(@types/node@26.6.6)(vite@8.3.8(@types/node@26.6.6)(jiti@1.21.7)(yaml@2.8.3))
 
   packages/cli:
     dependencies:
@@ -166,8 +166,8 @@ importers:
         specifier: 7.0.0
         version: 7.0.0
       '@types/node':
-        specifier: 22.12.0
-        version: 22.12.0
+        specifier: 26.6.6
+        version: 26.6.6
       '@types/pdf-parse':
         specifier: 1.1.5
         version: 1.1.5
@@ -179,7 +179,7 @@ importers:
         version: 6.0.3
       vitest:
         specifier: '>=4.1.11'
-        version: 5.1.0(@opentelemetry/api@1.9.0)(@types/node@22.12.0)(vite@8.3.8(@types/node@22.12.0)(jiti@1.21.7)(yaml@2.8.3))
+        version: 5.1.0(@opentelemetry/api@1.9.0)(@types/node@26.6.6)(vite@8.3.8(@types/node@26.6.6)(jiti@1.21.7)(yaml@2.8.3))
 
   packages/core:
     dependencies:
@@ -194,14 +194,14 @@ importers:
         version: 4.6.7
     devDependencies:
       '@types/node':
-        specifier: 22.12.0
-        version: 22.12.0
+        specifier: 26.6.6
+        version: 26.6.6
       typescript:
         specifier: 6.0.3
         version: 6.0.3
       vitest:
         specifier: '>=4.1.11'
-        version: 5.1.0(@opentelemetry/api@1.9.0)(@types/node@22.12.0)(vite@8.3.8(@types/node@22.12.0)(jiti@1.21.7)(yaml@2.8.3))
+        version: 5.1.0(@opentelemetry/api@1.9.0)(@types/node@26.6.6)(vite@8.3.8(@types/node@26.6.6)(jiti@1.21.7)(yaml@2.8.3))
 
   packages/mcp:
     dependencies:
@@ -222,14 +222,14 @@ importers:
         version: 4.6.7
     devDependencies:
       '@types/node':
-        specifier: ^22.12.0
-        version: 22.12.0
+        specifier: ^26.6.6
+        version: 26.6.6
       typescript:
         specifier: 6.0.3
         version: 6.0.3
       vitest:
         specifier: '>=4.1.11'
-        version: 5.1.0(@opentelemetry/api@1.9.0)(@types/node@22.12.0)(vite@8.3.8(@types/node@22.12.0)(jiti@1.21.7)(yaml@2.8.3))
+        version: 5.1.0(@opentelemetry/api@1.9.0)(@types/node@26.6.6)(vite@8.3.8(@types/node@26.6.6)(jiti@1.21.7)(yaml@2.8.3))
 
   packages/sidecar:
     dependencies:
@@ -260,14 +260,14 @@ importers:
         version: 3.5.0(ai@6.0.333(zod@4.6.7))(zod@4.6.7)
     devDependencies:
       '@types/node':
-        specifier: 22.12.0
-        version: 22.12.0
+        specifier: 26.6.6
+        version: 26.6.6
       typescript:
         specifier: 6.0.3
         version: 6.0.3
       vitest:
         specifier: '>=4.1.11'
-        version: 5.1.0(@opentelemetry/api@1.9.0)(@types/node@22.12.0)(vite@8.3.8(@types/node@22.12.0)(jiti@1.21.7)(yaml@2.8.3))
+        version: 5.1.0(@opentelemetry/api@1.9.0)(@types/node@26.6.6)(vite@8.3.8(@types/node@26.6.6)(jiti@1.21.7)(yaml@2.8.3))
 
 packages:
 
@@ -886,8 +886,8 @@ packages:
   '@types/jsesc@2.5.1':
     resolution: {integrity: sha512-9VN+6yxLOPLOav+7PwjZbxiID2bVaeq0ED4qSQmdQTdjnXJSaCVKTR58t15oqH1H5t8Ng2ZX1SabJVoN9Q34bw==}
 
-  '@types/node@22.12.0':
-    resolution: {integrity: sha512-Fll2FZ1riMjNmlmJOdAyY5pUbkftXslB5DgEzlIuNaiWhXd00FhWxVC/r4yV/4wBb9JfImTu+jiSvXTkJ7F/gA==}
+  '@types/node@26.6.6':
+    resolution: {integrity: sha512-MzQj+8Kx3XI40OmUAE6Qoh58ZMNstNNMwn2nfd3qWsfe7nDNSqJNzes4njhz6AHwrSHOffSLwXU6yb474Q4aog==}
 
   '@types/pdf-parse@1.1.5':
     resolution: {integrity: sha512-kBfrSXsloMnUJOKi25s3+hRmkycHfLK6A09eRGqF/N8BkQoPUmaCr+q8Cli5FnfohEz/rsv82zAiPz/LXtOGhA==}
@@ -2080,8 +2080,8 @@ packages:
   underscore@1.13.8:
     resolution: {integrity: sha512-DXtD3ZtEQzc7M8m4cXotyHR+FAS18C64asBYY5vqZexfYryNNnDc02W4hKg3rdQuqOYas1jkseX0+nZXjTXnvQ==}
 
-  undici-types@6.20.0:
-    resolution: {integrity: sha512-Ny6QZ2Nju20vw1SRHe3d9jVu6gJ+4e3+MMpqu7pqE5HT6WsTSlce++GQmK5UXS8mzV8DSYHrQH+Xrf2jVcuKNg==}
+  undici-types@8.9.0:
+    resolution: {integrity: sha512-KTDyRTYX8sWmKXAikPHHSyc63CRPETMctyjKFupcC6OBLXT3xsN0e9aF7m+mIXutFWpUXuedtowG7iLOzp0kQg==}
 
   undici@6.29.1:
     resolution: {integrity: sha512-EvRlUt/QqAEvXdQeRMYUfwOQsfzpDztykrG2owGEE/rBOBoYv9uF39ZzsNDh4lTFHhTr2XOZjKkYgueD12ZmGA==}
@@ -2867,13 +2867,13 @@ snapshots:
 
   '@types/jsesc@2.5.1': {}
 
-  '@types/node@22.12.0':
+  '@types/node@26.6.6':
     dependencies:
-      undici-types: 6.20.0
+      undici-types: 8.9.0
 
   '@types/pdf-parse@1.1.5':
     dependencies:
-      '@types/node': 22.12.0
+      '@types/node': 26.6.6
 
   '@types/react-dom@19.2.3(@types/react@19.2.14)':
     dependencies:
@@ -2885,15 +2885,15 @@ snapshots:
 
   '@types/readdir-glob@1.1.5':
     dependencies:
-      '@types/node': 22.12.0
+      '@types/node': 26.6.6
 
   '@types/yauzl@2.10.3':
     dependencies:
-      '@types/node': 22.12.0
+      '@types/node': 26.6.6
 
   '@vercel/oidc@3.2.0': {}
 
-  '@vitejs/plugin-react@5.2.0(vite@8.3.8(@types/node@22.12.0)(jiti@1.21.7)(yaml@2.8.3))':
+  '@vitejs/plugin-react@5.2.0(vite@8.3.8(@types/node@26.6.6)(jiti@1.21.7)(yaml@2.8.3))':
     dependencies:
       '@babel/core': 8.1.2
       '@babel/plugin-transform-react-jsx-self': 7.27.1(@babel/core@8.1.2)
@@ -2901,16 +2901,16 @@ snapshots:
       '@rolldown/pluginutils': 1.0.0-rc.3
       '@types/babel__core': 7.20.5
       react-refresh: 0.18.0
-      vite: 8.3.8(@types/node@22.12.0)(jiti@1.21.7)(yaml@2.8.3)
+      vite: 8.3.8(@types/node@26.6.6)(jiti@1.21.7)(yaml@2.8.3)
 
-  '@vitest/mocker@5.1.0(vite@8.3.8(@types/node@22.12.0)(jiti@1.21.7)(yaml@2.8.3))':
+  '@vitest/mocker@5.1.0(vite@8.3.8(@types/node@26.6.6)(jiti@1.21.7)(yaml@2.8.3))':
     dependencies:
       '@jridgewell/trace-mapping': 0.3.31
       '@vitest/spy': 5.1.0
       estree-walker: 3.0.3
       magic-string: 1.4.5
     optionalDependencies:
-      vite: 8.3.8(@types/node@22.12.0)(jiti@1.21.7)(yaml@2.8.3)
+      vite: 8.3.8(@types/node@26.6.6)(jiti@1.21.7)(yaml@2.8.3)
 
   '@vitest/spy@5.1.0': {}
 
@@ -4053,7 +4053,7 @@ snapshots:
 
   underscore@1.13.8: {}
 
-  undici-types@6.20.0: {}
+  undici-types@8.9.0: {}
 
   undici@6.29.1: {}
 
@@ -4073,7 +4073,7 @@ snapshots:
 
   verkit@0.5.0: {}
 
-  vite@8.3.8(@types/node@22.12.0)(jiti@1.21.7)(yaml@2.8.3):
+  vite@8.3.8(@types/node@26.6.6)(jiti@1.21.7)(yaml@2.8.3):
     dependencies:
       lightningcss: 1.33.0
       picomatch: 4.0.7
@@ -4081,15 +4081,15 @@ snapshots:
       rolldown: 1.2.19
       tinyglobby: 0.2.17
     optionalDependencies:
-      '@types/node': 22.12.0
+      '@types/node': 26.6.6
       fsevents: 2.3.3
       jiti: 1.21.7
       yaml: 2.8.3
 
-  vitest@5.1.0(@opentelemetry/api@1.9.0)(@types/node@22.12.0)(vite@8.3.8(@types/node@22.12.0)(jiti@1.21.7)(yaml@2.8.3)):
+  vitest@5.1.0(@opentelemetry/api@1.9.0)(@types/node@26.6.6)(vite@8.3.8(@types/node@26.6.6)(jiti@1.21.7)(yaml@2.8.3)):
     dependencies:
       '@types/chai': 5.2.3
-      '@vitest/mocker': 5.1.0(vite@8.3.8(@types/node@22.12.0)(jiti@1.21.7)(yaml@2.8.3))
+      '@vitest/mocker': 5.1.0(vite@8.3.8(@types/node@26.6.6)(jiti@1.21.7)(yaml@2.8.3))
       chai: 6.3.0
       es-module-lexer: 2.3.2
       expect-type: 1.4.0
@@ -4100,11 +4100,11 @@ snapshots:
       tinybench: 6.2.3
       tinyexec: 1.3.1
       tinyglobby: 0.2.17
-      vite: 8.3.8(@types/node@22.12.0)(jiti@1.21.7)(yaml@2.8.3)
+      vite: 8.3.8(@types/node@26.6.6)(jiti@1.21.7)(yaml@2.8.3)
       why-is-node-running: 3.2.1
     optionalDependencies:
       '@opentelemetry/api': 1.9.0
-      '@types/node': 22.12.0
+      '@types/node': 26.6.6
     transitivePeerDependencies:
       - msw
 
