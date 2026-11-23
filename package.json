@@ -19,7 +19,7 @@
     "mcp": "pnpm --filter @loreweave/mcp start"
   },
   "devDependencies": {
-    "typescript": "6.0.3"
+    "typescript": "7.0.2"
   },
   "pnpm": {
     "overrides": {
