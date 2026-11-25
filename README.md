@@ -4,439 +4,354 @@
   <img src="docs/assets/loreweave-icon.png" alt="Loreweave" width="160" />
 </p>
 
-**A local-first, agentic storytelling workbench.**
-Your canon lives as plain Markdown and YAML on your disk. An agentic framework
-exposing high-level domain tools over **Model Context Protocol (MCP)**, a TypeScript
-core for graph validation and weave resolution, a CLI (`lw`), and a sleek
-browser-hostable web UI give you and your AI co-writer total clarity across
-characters, locations, timelines, and prose.
+<p align="center">
+  <strong>A customizable framework for your notes, lore, and canon — engineered so AI agents assist your writing by following your own exact definitions precisely and reliably.</strong>
+</p>
 
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-![Node](https://img.shields.io/badge/node-%E2%89%A520.10-brightgreen)
-![pnpm](https://img.shields.io/badge/pnpm-9.12-f69220)
-![Tests](https://img.shields.io/badge/tests-199%20passing-success)
-
-> **Status:** early but usable end-to-end against the bundled example Saga.
-> APIs, file layout, and agent prompts may still shift before 1.0.
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-PolyForm--Noncommercial--1.0.0-orange.svg" alt="License: PolyForm Noncommercial 1.0.0" /></a>
+  <img src="https://img.shields.io/badge/node-%E2%89%A520.10-brightgreen" alt="Node >= 20.10" />
+  <img src="https://img.shields.io/badge/pnpm-9.12-f69220" alt="pnpm 9.12" />
+  <img src="https://img.shields.io/badge/mcp-compliant-blueviolet" alt="Model Context Protocol" />
+  <img src="https://img.shields.io/badge/local--first-yes-blue" alt="Local First" />
+</p>
 
 ---
 
-## Why Loreweave?
+## What is Loreweave?
 
-Most writing tools either hide your text behind a proprietary database or
-treat the wiki, the timeline, and the prose as three unrelated apps.
-Loreweave takes a different stance:
+> **Loreweave is a software solution designed to be tailored to your own needs, intended to be used with an AI agent for assisting — not for autonomous content generation.**
 
-- **Your files stay yours.** Everything is plain text on disk, versionable
-  with git, editable with any editor. No lock-in, no cloud account.
-- **Canon is queryable.** A typed loader, resolver, and validator turn your
-  Markdown/YAML into a graph you can audit, weave (resolve inheritance),
-  search, and traverse from the CLI.
-- **Agents are co-writers, not ghostwriters.** Each agent is scoped
-  (`@scribe` drafts prose, `@warden` audits, `@polisher` only smooths
-  language, `@muse` never commits). Every write is approval-gated.
-- **Grounded in your world.** A cached canon digest (phone book + resolved
-  weaves + thread summaries) is injected into every chat turn, and
-  optional embeddings power a `semantic_search` tool — so agents cite
-  your canon instead of hallucinating.
+Most "AI writing" tools attempt to automate authoring: they generate generic prose, impose rigid three-act structures, or force your world into inflexible, pre-baked genre templates. 
+
+**Loreweave does the exact opposite:**
+- **You define the world, the categories, and the processes:** It is not a program designed to guide or dictate your creative process. Instead, every category, entity type, taxonomy, tag, rule, and workflow is defined entirely by the user. Whether your world needs characters, magic systems, quantum technologies, diplomatic treaties, or custom architectural classifications, you decide how your notes are structured.
+- **Assisting, not content generating:** Loreweave is not an auto-complete ghostwriter or a bulk text generator. The AI is positioned as a rigorous, bounded **assistant** (an auditor, fact-checker, researcher, and continuity editor). Human writers retain total creative authority.
+- **A reliable framework for your notes and agents:** Loreweave turns your notes, outlines, and world lore (stored as plain Markdown and YAML on your disk) into a typed, validated knowledge graph. This provides a deterministic foundation for AI agents: instead of hallucinating or drifting, **agents follow your own definitions, rules, and canon precisely and reliably**.
+- **Human agency and approval gates:** Agents never silently modify your manuscript or canon. Every write proposed by an agent is strictly approval-gated and automatically committed to local Git history, giving you complete rollback capability and audit trails.
 
 ---
 
-## Features
+## Quickstart: How to Get Running
 
-- **Codex / Lexicon / Sigils** — characters, locations, concepts, lore,
-  waypoints, terms, slang, tags, and inheritance, all as frontmatter
-  Markdown.
-- **Weave resolution** — compose properties across Sigil `inherits` chains
-  with explicit `overrides`; inherited values are surfaced in the UI
-  (italicized, with provenance tooltips).
-- **Threads with branches** — timeline YAML with absolute calendar dates,
-  relational `before`/`after`/`concurrent` edges, and `branches_from`
-  diffs against a parent thread.
-- **Story mode & scene mode** — write a whole `chapter.md`, or split a
-  chapter into `scenes/*.md` files and `lw compile` them back into a
-  single chapter with a provenance banner.
-- **Split-view editor** — prose on the left, Codex entry under the cursor's
-  Echo on the right; jump between references in one click.
-- **Constellation graph** — concentric-ring graph of the whole Saga, with
-  a dedicated inheritance mode that highlights the Sigil ladder.
-- **Local git versioning** — every approved agent write is one commit,
-  with an in-app Versions panel, diff viewer, branch switcher, and
-  snapshot-based backups.
-- **Optional embeddings** — Ollama or any OpenAI-compatible endpoint;
-  plain JSON index under `.loreweave/embeddings/`. Off by default.
-- **Exports** — Saga zip, Codex/Slang Markdown+HTML, and per-tome
-  Markdown/HTML/PDF/DOCX/EPUB (PDF/DOCX/EPUB require `pandoc`).
+Anyone can get Loreweave running locally in just a few minutes. Follow the step-by-step instructions below.
+
+### 1. Prerequisites
+
+Before starting, make sure you have the following installed on your machine:
+
+- **Node.js**: version `20.10.0` or higher ([Download Node.js](https://nodejs.org/))
+  ```bash
+  node --version   # should report v20.10.0 or greater
+  ```
+- **pnpm**: version `9.x` ([Installation Guide](https://pnpm.io/installation))
+  ```bash
+  # If you have npm or corepack:
+  corepack enable
+  # OR:
+  npm install -g pnpm
+  pnpm --version   # should report 9.x
+  ```
+- **Git**: installed and available in your terminal path ([Download Git](https://git-scm.com/))
+  ```bash
+  git --version
+  ```
+
+*(Optional dependencies)*:
+- **Rust toolchain** (stable): only needed if you want to compile the native desktop Tauri application.
+- **Pandoc**: only needed if exporting to PDF, DOCX, or EPUB formats (`lw export --format tome-pdf`).
+
+---
+
+### 2. Setup (3 Steps)
+
+Open your terminal (PowerShell, Bash, or Zsh) and run:
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/Sir-Dany/Loreweave.git
+cd Loreweave
+
+# 2. Install workspace dependencies
+pnpm install
+
+# 3. Build all packages and the web application bundle
+pnpm build:all
+```
+
+> **Tip:** `pnpm build:all` compiles `@loreweave/core`, `@loreweave/cli`, `@loreweave/sidecar`, `@loreweave/mcp`, and the `@loreweave/web` production assets in `apps/web/dist/`.
+
+---
+
+### 3. Launch Loreweave
+
+You can run Loreweave in whichever mode fits your workflow:
+
+#### Option A: Local Web Workbench (Recommended for Writers)
+
+Launch the integrated local server (serves the web interface and mounts the local sidecar):
+
+```bash
+pnpm start
+```
+
+- Opens automatically in your browser at **`http://127.0.0.1:4729`**.
+- Local-first & private: binds strictly to `127.0.0.1` — your files are never transmitted to any cloud server.
+- Optional flags:
+  ```bash
+  node scripts/launch.mjs --port 8080    # Custom port
+  node scripts/launch.mjs --no-open      # Don't auto-launch browser
+  ```
+
+#### Option B: Active UI Development Mode (Hot Reload)
+
+If you are developing features or tweaking UI components with instant hot module reloading:
+
+```bash
+pnpm dev
+```
+
+- Starts the Vite development server at **`http://127.0.0.1:5173`** with the live sidecar middleware mounted.
+
+#### Option C: Connect AI Agents via MCP (Model Context Protocol)
+
+Loreweave provides a native **Model Context Protocol (MCP)** server over stdio. This enables any MCP-compatible AI assistant (such as **Claude Desktop**, **Cursor**, **Antigravity**, **VS Code**, or **Roo Code**) to read your canon, query timelines, audit consistency, and propose scoped changes using domain tools.
+
+To run the MCP server manually:
+```bash
+pnpm mcp
+```
+
+##### Connecting to Claude Desktop
+Add this to your `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "loreweave": {
+      "command": "pnpm",
+      "args": ["--dir", "/path/to/Loreweave", "mcp"],
+      "env": {
+        "LOREWEAVE_SAGA_DIR": "/path/to/Loreweave/sagas/example-saga"
+      }
+    }
+  }
+}
+```
+
+##### Connecting to Cursor or Antigravity
+Configure an MCP server in `.cursor/mcp.json` or your assistant settings:
+```json
+{
+  "mcpServers": {
+    "loreweave": {
+      "command": "node",
+      "args": ["/path/to/Loreweave/packages/mcp/dist/index.js"],
+      "env": {
+        "LOREWEAVE_SAGA_DIR": "/path/to/Loreweave/sagas/example-saga"
+      }
+    }
+  }
+}
+```
+
+The MCP server exposes high-level domain tools:
+- `loreweave_get_overview` — summary of sagas, tomes, and entry counts
+- `loreweave_read_entry` — read typed entries and their resolved frontmatter
+- `loreweave_upsert_entry` — create or edit entries (draft / review flow)
+- `loreweave_delete_entry` — delete entries safely
+- `loreweave_get_timeline` — query chronologically ordered events and threads
+- `loreweave_scan_loose_ends` — identify unresolved plot points and broken references
+- `loreweave_cascade_rename` — rename an entry across all markdown echoes and YAML frontmatter
+
+#### Option D: Command Line Ground Truth (`lw` CLI)
+
+The `lw` CLI is the authoritative validator and manipulator of your canon:
+
+```bash
+# Validate your Saga graph and cross-references:
+pnpm lw validate sagas/example-saga
+
+# Inspect the resolved weave (inheritance + overrides) for an entry:
+pnpm lw weave sagas/example-saga character/aaron
+
+# Find all inbound and outbound references (Echoes) for an entity:
+pnpm lw echoes sagas/example-saga character/aaron
+
+# Audit prose chapters for broken echoes or canon drift:
+pnpm lw audit sagas/example-saga --tome book-one
+
+# Print a linear chronological timeline:
+pnpm lw thread sagas/example-saga main --linear
+
+# Concatenate scene files into a chapter:
+pnpm lw compile sagas/example-saga --tome book-one
+```
+
+#### Option E: Desktop App (Tauri)
+
+For a dedicated native desktop window (backed by Rust and system webview):
+
+```bash
+# Launch in native desktop debug mode:
+pnpm desktop
+
+# Build standalone desktop installer (.exe, .deb, .AppImage):
+pnpm desktop:build
+```
+
+---
+
+### 4. Running the Tests
+
+Verify that your local setup is healthy:
+
+```bash
+# Run tests across core, cli, mcp, and sidecar:
+pnpm test
+
+# Run web UI component and integration tests:
+pnpm --filter @loreweave/web test
+```
+
+---
+
+## Core Concepts & Architecture
+
+### Plain Text on Disk
+
+Everything in Loreweave is stored as human-readable **Markdown** and **YAML** in standard directories. You can edit with VS Code, Obsidian, Neovim, or the Loreweave Web UI. There are no opaque databases, proprietary file formats, or cloud locks.
+
+```
+sagas/<saga-slug>/
+  saga.yaml           # Metadata, active tome, calendar references
+  codex/              # characters/, locations/, concepts/, lore/, waypoints/
+  lexicon/            # terms/ and slang/ with phonetic pronunciation
+  sigils/             # reusable tags, groups, and property-inheritance templates
+  threads/            # timelines (<thread-id>.yaml) with calendar dates and DAG edges
+  calendars/          # custom world calendars (<calendar-id>.yaml)
+  traces/             # idea notes, todos, and inline remarks
+  kinds/              # user-defined custom entity types (e.g., magic-system.md)
+  tomes/<tome-slug>/  # books containing story prose
+    tome.yaml
+    story/01-first-chapter/
+      chapter.md      # prose manuscript
+      _meta.yaml      # chapter POV, setting, and timeline waypoint
+      scenes/         # optional: modular scenes concatenated via `lw compile`
+```
+
+### The Assistance Pipeline: How Agents Respect Your Definitions
+
+```
+┌────────────────────────────────────────────────────────┐
+│                   YOUR CANON ON DISK                   │
+│   (Markdown + Frontmatter YAML + Threads + Lexicon)    │
+└──────────────────────────┬─────────────────────────────┘
+                           │ Typed Parse & Validation
+                           ▼
+┌────────────────────────────────────────────────────────┐
+│                   @loreweave/core                      │
+│   - Weave Resolution (Sigil inheritance + overrides)   │
+│   - Echo Reference Graph (@type/id indexing)           │
+│   - Chronological Thread & Calendar DAG                │
+│   - Canon Digest Generation                            │
+└──────────────┬──────────────────────────┬──────────────┘
+               │                          │
+        stdio  │                   HTTP   │
+               ▼                          ▼
+┌──────────────────────────────┐   ┌─────────────────────────────┐
+│       @loreweave/mcp         │   │     @loreweave/sidecar      │
+│  (For Claude, Cursor, AGY)   │   │  (For Web UI & Local Copilot│
+└──────────────┬───────────────┘   └──────────────┬──────────────┘
+               │                                  │
+               ▼                                  ▼
+┌────────────────────────────────────────────────────────┐
+│                ASSISTING AGENT EXECUTION               │
+│  1. Agent receives full Canon Digest & typed schemas   │
+│  2. Agent calls domain tools to query exact facts      │
+│  3. Agent performs audit, fact-check, or scoped draft  │
+│  4. Proposals require Human Approval before write      │
+│  5. Changes committed to local Git with audit trail   │
+└────────────────────────────────────────────────────────┘
+```
 
 ---
 
 ## Vocabulary
 
-| Term         | What it is                                                                      |
-| ------------ | ------------------------------------------------------------------------------- |
-| **Saga**     | Series. Top-level project. `sagas/<saga-slug>/`                                 |
-| **Tome**     | A book within a Saga. Holds **only prose** under `tomes/<slug>/story/`.         |
-| **Codex**    | Characters, locations, concepts, lore, waypoints. `codex/`                      |
-| **Lexicon**  | Terms, slang, pronunciations. `lexicon/`                                        |
-| **Sigil**    | Tag / group / inheritance source. `sigils/`                                     |
-| **Thread**   | Timeline of waypoints. `threads/`                                               |
-| **Waypoint** | A waypoint entry placed on a Thread (absolute date, relational edges, or both). |
-| **Echo**     | An `@type/id` reference written inline in prose or frontmatter.                 |
-| **Weave**    | The resolved view of an entry: own properties + inherited Sigils + overrides.  |
-| **Trace**    | Sticky trace (idea / todo / question / remark). `traces/`                       |
+| Term | Meaning |
+| :--- | :--- |
+| **Saga** | A complete story universe or book series (`sagas/<slug>/`). |
+| **Tome** | A single book within a Saga. Holds story prose under `tomes/<slug>/story/`. |
+| **Codex** | Encyclopedia entries (characters, locations, concepts, lore, waypoints, custom kinds). |
+| **Sigil** | A template for property inheritance and tagging. Entries inheriting a Sigil receive its default properties unless explicitly overridden. |
+| **Weave** | The resolved, fully-computed view of an entry: its own fields + inherited Sigil properties + explicit overrides. |
+| **Echo** | An inline reference (`@type/id`) in prose or notes that cross-links directly to a Codex entry. |
+| **Thread** | A narrative timeline comprised of Waypoints, with support for branching timelines (`branches_from`) and relational ordering (`before`/`after`/`concurrent`). |
+| **Waypoint** | A discrete narrative event or milestone tied to a calendar date, a relational position, or both. |
+| **Lexicon** | World vocabulary: terms, dialects, slang, pronunciations, and specialized meanings. |
+| **Trace** | Sticky note or memo attached to an entry or floating freely (ideas, questions, reminders). |
 
-See [docs/conventions.md](docs/conventions.md) for the full spec.
-
----
-
-## Quickstart
-
-### 1. Run the MCP Server (for AI Assistants)
-
-Loreweave provides a native **Model Context Protocol (MCP)** server over stdio for agents (Claude Desktop, Cursor, Antigravity, VS Code, Roo Code):
-
-```pwsh
-pnpm mcp
-```
-
-This exposes high-level domain tools (`loreweave_get_overview`, `loreweave_read_entry`, `loreweave_upsert_entry`, `loreweave_delete_entry`, `loreweave_scan_loose_ends`, `loreweave_cascade_rename`, `loreweave_get_timeline`, etc.), relieving agents of manual file-tree navigation and formatting boilerplate while ensuring referential integrity and audit tracing.
-
-### 2. Run the Web UI (Browser Workbench)
-
-Loreweave includes a sleek, browser-hostable UI with split-view editing, live reference chips, visual timeline explorer, constellation relation map, and an **Integrity & Loose Ends Dashboard**:
-
-```pwsh
-pnpm install
-pnpm build:all       # builds core, cli, mcp, sidecar, and web bundle
-pnpm start           # launches Loreweave web UI at http://127.0.0.1:4729
-```
-
-For hot-reload UI development:
-
-```pwsh
-pnpm dev             # runs Vite dev server with hot reload
-```
-
-`pnpm start` runs [scripts/launch.mjs](scripts/launch.mjs): a tiny Node
-server that serves the built web bundle and mounts the `/lw` sidecar on the
-same port. It binds to `127.0.0.1` only — your filesystem is never exposed
-over the network — and opens your default browser. Pass `--port 1234` to
-change the port or `--no-open` to skip the browser launch.
-
-### Dev mode (hot-reload)
-
-For UI development you want Vite instead of the built bundle:
-
-```pwsh
-pnpm dev                          # alias of dev:web
-pnpm --filter @loreweave/web dev  # explicit
-```
-
-Vite binds to `127.0.0.1:5173` and mounts the same sidecar middleware.
-
-### Desktop app (Tauri)
-
-To iterate on the native shell or produce installers locally you also need
-a [Rust toolchain](https://www.rust-lang.org/tools/install) (stable) and,
-on Linux, the WebKit/GTK dev packages listed in
-[`.github/workflows/release.yml`](.github/workflows/release.yml).
-
-```pwsh
-pnpm desktop          # tauri dev — native window backed by `pnpm dev`
-pnpm desktop:build    # full bundle: build:all → stage resources → fetch
-                      # portable Node → `tauri build` → installer in
-                      # apps/desktop/src-tauri/target/release/bundle/
-```
-
-The bundled app spawns the embedded Node sidecar on a random localhost
-port, waits for it, and points the WebView2 / WebKitGTK window at it —
-the user never sees a browser.
-
-### Try the CLI
-
-```pwsh
-pnpm lw validate sagas/example-saga
-pnpm lw weave    sagas/example-saga character/aaron       # resolved view
-pnpm lw echoes   sagas/example-saga character/aaron       # inbound + outbound refs
-pnpm lw thread   sagas/example-saga main --linear
-pnpm lw audit    sagas/example-saga --tome book-one
-pnpm lw compile  sagas/example-saga --tome book-one       # scenes/ → chapter.md
-```
-
-### Run the tests
-
-```pwsh
-pnpm test                         # all packages (core + cli + sidecar)
-pnpm --filter @loreweave/web test # web tests
-```
+See [docs/conventions.md](docs/conventions.md) for the complete specification.
 
 ---
 
-## Repo layout
+## The Built-in Agent Roles
 
-```
-.github/                 Copilot instructions, agents, prompts
-apps/web/                React + Vite UI + sidecar Vite plugin
-apps/desktop/            Tauri shell (Rust + WebView2 / WebKitGTK)
-packages/core/           Loader, resolver, validator, timeline, calendar, digest
-packages/cli/            `lw` — command-line ground truth
-packages/sidecar/        HTTP middleware, agents, tools, embeddings
-scripts/launch.mjs       Standalone launcher used by `pnpm start`
-scripts/stage-desktop-resources.mjs   Copies build outputs into Tauri resources/
-scripts/fetch-desktop-node.mjs        Downloads portable Node for the bundle
-sagas/                   Your writing projects (one folder per Saga)
-sagas/example-saga/      Reference content covering every feature
-docs/                    Specs and conventions
-```
+Loreweave includes pre-configured, specialized agent personas in [.github/agents/](.github/agents/). Each agent is strictly bounded to prevent unauthorized modifications:
 
-A Saga directory looks like:
-
-```
-sagas/<saga>/
-  saga.yaml
-  codex/         characters/, locations/, concepts/, lore/, waypoints/
-  lexicon/       terms / slang
-  sigils/        tags & groups
-  threads/       <id>.yaml
-  calendars/     <id>.yaml
-  traces/        <id>.md
-  tomes/<tome>/
-    tome.yaml
-    story/NN-<chapter>/
-      chapter.md
-      _meta.yaml
-      scenes/    (optional; `lw compile` concatenates → chapter.md)
-```
+| Agent | Purpose & Boundaries |
+| :--- | :--- |
+| **`@warden`** | **Continuity Auditor:** Checks prose against the Codex. Verifies that character eye colors, travel timelines, lore constraints, and slang terms match established canon. Never edits files directly. |
+| **`@scribe`** | **Prose & Canon Co-Writer:** Drafts or expands scenes while strictly adhering to Codex facts. If a new fact is established, it proposes a draft Codex update with `status: draft`. |
+| **`@muse`** | **Ideation Partner:** Brainstorms plot alternatives, explores character motivations, and pressure-tests narrative logic. Never commits prose or alters canon. |
+| **`@polisher`** | **Style & Grammar Editor:** Refines cadence, sentence structure, and vocabulary. Strictly barred from modifying facts, names, or lore. |
+| **`@archivist`** | **Worldbuilder Assistant:** Ingests raw source notes (staged via `lw ingest`) and structures them into properly formatted Codex and Lexicon entries for your approval. |
 
 ---
 
-## Copilot agents
+## Web UI (Grimoire)
 
-Open this repo in VS Code; agents in [.github/agents/](.github/agents/) appear
-in the chat agent picker:
+The Loreweave web application provides a clean, responsive workbench for writers:
 
-| Agent         | Scope                                                                |
-| ------------- | -------------------------------------------------------------------- |
-| `@muse`       | Sparring partner for ideation. Never commits prose.                  |
-| `@scribe`     | Writes chapters, honors the Codex, updates it when facts land.       |
-| `@warden`     | Audits prose-vs-canon drift, broken Echoes, slang misuse.            |
-| `@polisher`   | Grammar / punctuation / flow only. Never touches canon.              |
-| `@archivist`  | Drafts Codex/Lexicon entries from material staged via `lw ingest`.   |
-
-File-scoped rules in [.github/instructions/](.github/instructions/) auto-apply
-when editing files under `codex/`, `lexicon/`, `sigils/`, `traces/`, or any
-tome's `story/`.
+- **Story Studio:** Split-view editor with prose on the left and active `@type/id` Codex reference cards on the right. Includes live autocomplete for lore entities and click-to-jump navigation.
+- **Codex Explorer:** Filter, search, and manage world entries. Renaming an entry automatically updates all referencing Echoes and Sigils across the entire Saga.
+- **Timeline Loom:** Visual representation of Threads, branching narrative paths, and calendar waypoints.
+- **Constellation Graph:** Interactive graph showing the web of relationships and Sigil inheritance hierarchies connecting your lore.
+- **Lexicon & Slang Guide:** Rapid lookup of pronunciation guides, dialect groupings, and definitions.
+- **Versions & Snapshots:** Built-in Git branch manager, visual diff viewer, and instant snapshot backup/restore tools.
 
 ---
 
-## Web UI
+## Extending Loreweave to Your Needs
 
-The **Grimoire** sidebar surfaces every lens on your Saga:
+Because Loreweave is designed to be tailored to your requirements, it provides two primary extension points:
 
-- **Story** — chapter prose with inline `@type/id` autocomplete, Echo
-  decorations, hover cards (status, aliases, inherited properties, tags),
-  and a toggleable split-view Codex pane (`BookOpen` icon).
-- **Codex** — browse/edit characters, locations, concepts, lore, waypoints;
-  rename cascades through every Echo, Sigil `inherits`, and Waypoint
-  reference via `lw rename`.
-- **Lexicon** — terms & slang with pronunciations and slang-group membership.
-- **Sigils** — tags, groups, slang-groups.
-- **Threads** — dated axis / relational flow / branching lane view, with
-  reorder and branch-diff modes.
-- **Traces** — sticky traces (ideas / todos / questions / remarks).
-- **Constellation** — SVG graph with type-filter, neighborhood highlight,
-  and an inheritance-only mode.
-- **Versions** — branch + dirty-files panel, commit, switch, fetch/pull/push,
-  plus inline snapshot (backup/restore) controls.
+1. **Custom Kinds (Entity Types):**
+   Need an entity type that isn't standard? Create a Markdown file in `sagas/<saga>/kinds/<kind-id>.md` (e.g., `magic-school.md`, `starship.md`, `faction.md`). Loreweave automatically generates forms, validation, and CLI commands for your custom kind. See [docs/kinds.md](docs/kinds.md).
 
-The **Shelf** top bar carries **Open Saga…**, **Export…**, **Import…**,
-**Search…** (`Ctrl+P` / `Ctrl+K`), and **Backups…**. The right-hand
-**Weave** panel shows the resolved view with **Echoes**, **Traces**, and
-**Diff** (vs HEAD) tabs.
+2. **Custom Lenses (Views):**
+   Want a custom way to view your data? Loreweave supports virtual Lenses (such as property-bucketed Kanban boards, timelines, or tabular registries). Add a YAML manifest at `sagas/<saga>/.loreweave/lenses/<lens-id>.yaml`. See [docs/loom.md](docs/loom.md).
 
 ---
 
-## Embeddings (optional)
+## Troubleshooting
 
-Embeddings are opt-in and never enabled silently. Set an env var, build an
-index, and the `semantic_search` agent tool plus `/lw/embed/search` endpoint
-light up:
-
-```pwsh
-# Ollama (local)
-$env:LOREWEAVE_EMBEDDINGS          = "ollama"
-$env:LOREWEAVE_EMBEDDINGS_ENDPOINT = "http://127.0.0.1:11434"
-$env:LOREWEAVE_EMBEDDINGS_MODEL    = "nomic-embed-text"
-
-# Or any OpenAI-compatible endpoint
-$env:LOREWEAVE_EMBEDDINGS          = "openai-compatible"
-$env:LOREWEAVE_EMBEDDINGS_ENDPOINT = "https://api.openai.com/v1"
-$env:LOREWEAVE_EMBEDDINGS_MODEL    = "text-embedding-3-small"
-$env:LOREWEAVE_EMBEDDINGS_API_KEY  = "sk-..."
-```
-
-The index is a plain JSON file at `<saga>/.loreweave/embeddings/index.json`
-— no native deps, easy to delete, trivial to diff.
-
----
-
-## CLI reference
-
-```pwsh
-# Canon
-lw validate <saga>
-lw weave    <saga> <type>/<id>           # alias: resolve
-lw echoes   <saga> <type>/<id>           # alias: refs
-lw audit    <saga> [--tome <slug>]
-lw thread   <saga> <thread-id> --linear [--with-branches] [--tome <slug>]
-lw calendar <saga>
-lw dump     <saga> [--tome <slug>]
-lw search   <saga> <query> [--scope all|entries|prose|echoes] [--type <t>] [--case]
-lw entry-diff <saga> <type>/<id> [--staged]
-lw list-sagas [root]
-
-# Authoring
-lw rename   <saga> <type>/<old> <new> [--apply]
-lw migrate  <saga> [--apply]
-lw ingest   <saga> <files...>                    # md / txt / html / pdf / docx
-lw compile  <saga> [--tome <slug>] [--chapter <slug>] [--check]
-
-# Publishing
-lw export <saga> --format saga                         # zip
-lw export <saga> --format saga-json
-lw export <saga> --format codex-md | codex-html
-lw export <saga> --format slang-md
-lw export <saga> --format tome-md    --tome <slug>
-lw export <saga> --format tome-html  --tome <slug>
-lw export <saga> --format tome-pdf   --tome <slug>     # pandoc
-lw export <saga> --format tome-docx  --tome <slug>     # pandoc
-lw export <saga> --format tome-epub  --tome <slug>     # pandoc
-lw export <saga> --format chapter-md --tome <slug> --chapter <slug>
-lw import <bundle.zip> [--into sagas/] [--plan] [--resolve overwrite|keep|prompt]
-
-# Backups
-lw backup      <saga> [--label <name>] [--keep <n>]
-lw backup-list <saga>
-lw restore     <snapshot.zip> [--saga <dir>] [--apply]
-
-# Local versioning (wraps git)
-lw git status | branches | log | commit | checkout | init
-lw git remotes | remote-add | fetch | pull | push | diff
-lw git merge-abort | merge-continue
-```
-
----
-
-## Architecture
-
-```
-apps/web (React + Vite)
-   │
-   │  HTTP
-   ▼
-@loreweave/sidecar  ──►  @loreweave/cli  ──►  @loreweave/core
-   │                       (spawned)            (pure TS)
-   │
-   ├─ /lw/dump, /lw/weave, /lw/echoes, …   (CLI passthrough)
-   ├─ /lw/write, /lw/apply                 (approval-gated writes + git)
-   ├─ /lw/digest                           (cached canon digest)
-   ├─ /lw/embed/{status,build,search}      (optional)
-   └─ /lw/chat, /lw/agents, /lw/events     (agent turns + SSE)
-```
-
-- **`packages/core`** is pure TypeScript with no I/O beyond a pluggable
-  `StorageAdapter` (fs + in-memory).
-- **`packages/cli`** is the ground-truth binary. The UI and sidecar never
-  reimplement validation or weave — they shell out to `lw`.
-- **`packages/sidecar`** is an embeddable connect-style middleware. Vite
-  mounts it in dev; [scripts/launch.mjs](scripts/launch.mjs) mounts it in
-  production alongside the static bundle.
-
----
-
-## Hosting
-
-Loreweave is local-first. The full app only makes sense with a sidecar that
-can read/write your Saga on disk, so pure static hosts (GitHub Pages,
-Netlify static, Cloudflare Pages) can't run the full experience.
-
-Three free-on-GitHub options cover the realistic cases:
-
-- **Desktop installer — recommended for non-developers.** The
-  [`release` workflow](.github/workflows/release.yml) builds the Tauri
-  bundle (Windows `.exe` / Linux `.deb` + `.AppImage`) for every push to
-  `main` and publishes signed artifacts to GitHub Releases on every
-  `v*` tag. Users download one file, install it, and never touch a
-  terminal.
-- **GitHub Pages — demo preview.** The [`pages` workflow](.github/workflows/pages.yml)
-  builds `apps/web` with `VITE_LW_DEMO=1` and a repo-scoped base path,
-  bakes a snapshot of the example Saga into the bundle, then deploys
-  with a persistent banner explaining that reads/writes are disabled.
-  Good as a landing page.
-- **GitHub Codespaces — full editor in the browser.** The
-  [.devcontainer/](.devcontainer/devcontainer.json) config installs pnpm,
-  builds the workspace, and forwards port `5173`. Click **Code →
-  Codespaces → Create codespace on main** and run `pnpm dev` — the real
-  sidecar is available over an authenticated tunnel.
-
-For self-hosting (Fly.io / Render / a home server) you'd need to expose the
-sidecar as a production HTTP service with auth. That changes the
-local-first threat model and is out of scope for this repo.
-
----
-
-## Extending Loreweave
-
-Loreweave is built around two extension seams:
-
-- **Kinds** — the entry-type catalog. Built-in Kinds (`character`,
-  `location`, `concept`, `lore`, `waypoint`, `term`, `sigil`) ship
-  baked in; Sagas add or override them by dropping
-  `<saga>/kinds/<id>.md`. See **[docs/kinds.md](docs/kinds.md)**.
-- **Lenses & the Loom** — the view layer. Every Grimoire section
-  (Codex, Lexicon, Sigils, Threads, Traces, Constellation, Story,
-  Versions) is a virtual Lens manifest dispatched through the Loom.
-  Contributed renderers live under `apps/web/src/loom/contrib/`. See
-  **[docs/loom.md](docs/loom.md)**.
-
-The reference contribution is the **kanban** renderer
-(`apps/web/src/loom/contrib/KanbanLens.tsx`) — a property-bucketed
-column view you can wire to any Kind. Set `editable: true` on the
-manifest and cards become draggable; column moves persist to the
-entry's frontmatter.
-
-Saga-defined Lenses live at `<saga>/.loreweave/lenses/<id>.yaml` and
-are loaded automatically. From the UI, **Actions → Compose lens…**
-scaffolds one interactively.
-
----
-
-## Contributing
-
-Contributions are welcome — especially bug reports against the example
-Saga, agent prompt tweaks, and polish on the web UI.
-
-1. Fork and clone.
-2. `pnpm install && pnpm build:all`.
-3. `pnpm test && pnpm --filter @loreweave/web test` — keep them green.
-4. For UI work, `pnpm dev`. For CLI/sidecar work, `pnpm -r --filter "./packages/*" build` in a second terminal as you iterate.
-5. Open a PR. Describe what it does _and what it intentionally doesn't_.
-
-### Invariants
-
-When changing code, preserve these:
-
-1. Writes are **always** approval-gated — no silent canon changes.
-2. The CLI stays the authoritative ground truth for validation / weave / audit.
-3. Local-first: no network call is required for core workflows.
-4. `StorageAdapter` is the only filesystem seam in the sidecar.
+- **`node_modules missing` / Command not found**: Make sure you have run `pnpm install` in the root repository folder.
+- **`missing dist/index.js` or `apps/web/dist`**: You must build the project before launching `pnpm start`. Run `pnpm build:all`.
+- **Port already in use**: If port `4729` (default for `pnpm start`) or `5173` (default for `pnpm dev`) is in use, pass a custom port:
+  ```bash
+  node scripts/launch.mjs --port 5000
+  ```
+- **Node version warnings**: Ensure you are running Node.js `>= 20.10.0` with `node -v`. If you use `nvm` or `fnm`, run `nvm use 20` or `fnm use 20`.
 
 ---
 
 ## License
 
-[MIT](LICENSE). © 2026 Sir Dany and contributors.
+This software is licensed under the **[PolyForm Noncommercial License 1.0.0](LICENSE)**.
 
-The bundled [example Saga](sagas/example-saga) is released under the same
-license and exists to demonstrate every feature — copy it, fork it, or
-delete it.
+### Summary of Terms:
+- **Free for Personal Use:** You are free to use, study, modify, and build upon Loreweave for personal writing, hobby projects, research, education, and noncommercial creative pursuits without paying any fees.
+- **Commercial Use Strictly Prohibited:** You may not use this software for any commercial purpose (including for-profit business tools, commercial SaaS hosting, paid writing services, or embedding in commercial applications) without prior written permission.
+- **Consent & Collaboration:** Commercial use is permitted **only with the express prior consent, collaboration, or a commercial license agreement** from the author (**Sir Dany**). For commercial inquiries, partnerships, or collaboration proposals, please reach out via GitHub issues or contact the maintainer directly.
