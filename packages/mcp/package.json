@@ -20,12 +20,12 @@
     "@loreweave/core": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.6.0",
     "gray-matter": "^4.0.3",
-    "yaml": "^2.8.3",
+    "yaml": "^2.9.1",
     "zod": "^3.23.8"
   },
   "devDependencies": {
     "@types/node": "^22.12.0",
     "typescript": "6.0.3",
-    "vitest": "^4.1.5"
+    "vitest": "^5.1.1"
   }
 }
